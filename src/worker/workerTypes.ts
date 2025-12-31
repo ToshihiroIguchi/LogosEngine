@@ -1,4 +1,4 @@
-import { Output } from '../types';
+import type { Output } from '../types';
 
 export type WorkerAction = 'EXECUTE' | 'INTERRUPT';
 

@@ -1,0 +1,46 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import type { WorkerRequest, WorkerResponse } from '../worker/workerTypes';
+
+export function usePyodide() {
+    const [isReady, setIsReady] = useState(false);
+    const workerRef = useRef<Worker | null>(null);
+    const resolversRef = useRef<Map<string, (response: WorkerResponse) => void>>(new Map());
+
+    useEffect(() => {
+        const worker = new Worker(new URL('../worker/pyodide.worker.ts', import.meta.url), {
+            type: 'module'
+        });
+
+        worker.onmessage = (event) => {
+            const data = event.data;
+            if (data.type === 'READY') {
+                setIsReady(true);
+                return;
+            }
+
+            const { id } = data as WorkerResponse;
+            const resolver = resolversRef.current.get(id);
+            if (resolver) {
+                resolver(data as WorkerResponse);
+                resolversRef.current.delete(id);
+            }
+        };
+
+        workerRef.current = worker;
+        return () => worker.terminate();
+    }, []);
+
+    const execute = useCallback((code: string): Promise<WorkerResponse> => {
+        if (!workerRef.current || !isReady) return Promise.reject(new Error('Pyodide is not ready'));
+
+        const id = crypto.randomUUID();
+        const request: WorkerRequest = { id, action: 'EXECUTE', code };
+
+        return new Promise((resolve) => {
+            resolversRef.current.set(id, resolve);
+            workerRef.current?.postMessage(request);
+        });
+    }, [isReady]);
+
+    return { isReady, execute };
+}
