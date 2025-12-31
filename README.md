@@ -1,73 +1,139 @@
-# React + TypeScript + Vite
+# LogosEngine
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A Mathematica-like computational notebook that runs entirely in your browser using WebAssembly.
 
-Currently, two official plugins are available:
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Python](https://img.shields.io/badge/python-3.11-blue.svg)
+![React](https://img.shields.io/badge/react-19.2-blue.svg)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Features
 
-## React Compiler
+- **Symbolic Mathematics**: Powered by SymPy for differentiation, integration, equation solving, and more
+- **Graphing**: Create plots using Matplotlib, rendered directly in the browser
+- **Browser-Based**: No server required - runs completely in your browser using Pyodide (Python WASM)
+- **Notebook Interface**: Familiar cell-based interface with execution history
+- **Smart Execution Queue**: Start working immediately - code executes automatically when the engine is ready
+- **Example Library**: 8 built-in code templates to help you get started
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Quick Start
 
-## Expanding the ESLint configuration
+### Installation
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+```bash
+# Clone the repository
+git clone https://github.com/ToshihiroIguchi/LogosEngine.git
+cd LogosEngine
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+# Install dependencies
+npm install
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Start development server
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Open http://localhost:5173/ in your browser.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### First Run
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+1. Wait for "Engine Ready" to appear (30-60 seconds on first load)
+2. The welcome cell contains a sample calculation - press `Shift+Enter` to execute
+3. Click the purple "Examples" button to explore more features
+
+## Usage Examples
+
+### Differentiation
+```python
+diff(sin(x), x)
+# Output: cos(x)
 ```
+
+### Integration
+```python
+integrate(1/x, x)
+# Output: log(x)
+```
+
+### Plotting
+```python
+plot(sin(x))
+# Displays a graph of sin(x)
+```
+
+### Equation Solving
+```python
+solve(x**2 - 4, x)
+# Output: [-2, 2]
+```
+
+### Matrix Operations
+```python
+M = Matrix([[1, 2], [3, 4]])
+M.det()
+# Output: -2
+```
+
+## Keyboard Shortcuts
+
+- `Shift+Enter` - Execute current cell
+- `Ctrl+Enter` - Execute cell and stay in place
+
+## Building for Production
+
+```bash
+# Create production build
+npm run build
+
+# Preview production build
+npm run preview
+```
+
+The build output will be in the `dist/` directory.
+
+## Technology Stack
+
+- **Frontend**: React 19, TypeScript, Vite
+- **Styling**: Tailwind CSS 4
+- **Math Rendering**: KaTeX
+- **Python Runtime**: Pyodide 0.29.0
+- **Symbolic Math**: SymPy
+- **Plotting**: Matplotlib
+
+## Browser Compatibility
+
+- Chrome/Edge 90+
+- Firefox 88+
+- Safari 15+
+
+**Note**: Requires WebAssembly and Web Worker support.
+
+## Architecture
+
+LogosEngine uses a Web Worker architecture to run Python code without blocking the UI:
+
+```
+┌─────────────┐         ┌──────────────┐
+│   React UI  │ ◄─────► │ Web Worker   │
+│             │         │ (Pyodide)    │
+└─────────────┘         └──────────────┘
+      │                        │
+      │                        ▼
+      │                 ┌──────────────┐
+      │                 │ SymPy        │
+      │                 │ Matplotlib   │
+      └────────────────►└──────────────┘
+           Results
+```
+
+## License
+
+MIT License - see LICENSE file for details
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## Acknowledgments
+
+- Built with [Pyodide](https://pyodide.org/)
+- Powered by [SymPy](https://www.sympy.org/)
+- Inspired by Mathematica and Jupyter Notebook
