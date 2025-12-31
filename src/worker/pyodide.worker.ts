@@ -9,7 +9,7 @@ import sys
 import io
 import base64
 import matplotlib
-matplotlib.use('Agg') # Set non-GUI backend for Web Worker
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from sympy import *
 
@@ -17,12 +17,15 @@ from sympy import *
 x, y, z, t = symbols('x y z t')
 
 def execute_cell(code):
-    plt.clf()
+    # Close previous figures instead of clf() to avoid creating a blank one
+    plt.close('all')
+    
     stdout_buffer = io.StringIO()
     sys.stdout = stdout_buffer
     error = None
     result_val = None
     latex_res = None
+    
     try:
         lines = code.strip().split('\\n')
         if len(lines) > 0:
@@ -41,20 +44,25 @@ def execute_cell(code):
         import traceback
         error = traceback.format_exc()
         result_val = None
+        
     sys.stdout = sys.__stdout__
     stdout_content = stdout_buffer.getvalue()
+    
     if result_val is not None:
         try:
             latex_res = latex(result_val)
         except:
             pass
+            
     img_base64 = None
+    # Only capture if a figure was actually created/modified
     if plt.get_fignums():
         buf = io.BytesIO()
         plt.savefig(buf, format='png', bbox_inches='tight')
         buf.seek(0)
         img_base64 = base64.b64encode(buf.read()).decode('utf-8')
         plt.close('all')
+        
     return {
         "stdout": stdout_content,
         "result": str(result_val) if result_val is not None else None,
@@ -90,19 +98,28 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
             const resultProxy = execute_cell(code);
             const result = resultProxy.toJs({ dict_converter: Object.fromEntries });
             resultProxy.destroy();
+
             const outputs: Output[] = [];
             const timestamp = Date.now();
-            if (result.stdout) outputs.push({ type: 'text', value: result.stdout, timestamp });
+
+            if (result.stdout && result.stdout.trim()) {
+                outputs.push({ type: 'text', value: result.stdout, timestamp });
+            }
+
             if (result.error) {
                 outputs.push({ type: 'error', value: result.error, timestamp });
             } else {
-                if (result.latex && result.latex !== 'None') {
+                if (result.latex && result.latex !== 'None' && result.latex.trim()) {
                     outputs.push({ type: 'latex', value: result.latex, timestamp });
-                } else if (result.result && result.result !== 'None') {
+                } else if (result.result && result.result !== 'None' && result.result.trim()) {
                     outputs.push({ type: 'text', value: result.result, timestamp });
                 }
-                if (result.image) outputs.push({ type: 'image', value: `data:image/png;base64,${result.image}`, timestamp });
+
+                if (result.image) {
+                    outputs.push({ type: 'image', value: `data:image/png;base64,${result.image}`, timestamp });
+                }
             }
+
             self.postMessage({ id, status: result.error ? 'ERROR' : 'SUCCESS', results: outputs });
         } catch (err: any) {
             self.postMessage({
