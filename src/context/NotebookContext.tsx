@@ -12,6 +12,7 @@ interface NotebookContextType {
     executeCell: (id: string) => Promise<void>;
     executeAll: () => Promise<void>;
     insertExample: (code: string) => void;
+    importNotebook: (data: any) => void;
 }
 
 const NotebookContext = createContext<NotebookContextType | undefined>(undefined);
@@ -76,8 +77,32 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         setCells(prev => [...prev, newCell]);
     }, []);
 
+    const importNotebook = useCallback((data: any) => {
+        try {
+            if (!data.cells || !Array.isArray(data.cells)) {
+                throw new Error('Invalid notebook format: missing cells array');
+            }
+
+            const importedCells: Cell[] = data.cells.map((cell: any) => ({
+                id: crypto.randomUUID(),
+                type: cell.type || 'code',
+                content: cell.content || '',
+                outputs: [],
+                isExecuting: false
+            }));
+
+            if (importedCells.length === 0) {
+                throw new Error('No cells found in the imported file');
+            }
+
+            setCells(importedCells);
+        } catch (err: any) {
+            alert(`Import failed: ${err.message}`);
+        }
+    }, []);
+
     return (
-        <NotebookContext.Provider value={{ cells, isReady, addCell, updateCell, deleteCell, executeCell, executeAll, insertExample }}>
+        <NotebookContext.Provider value={{ cells, isReady, addCell, updateCell, deleteCell, executeCell, executeAll, insertExample, importNotebook }}>
             {children}
         </NotebookContext.Provider>
     );

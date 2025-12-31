@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
-import { Download, PlayCircle, Plus, Globe, Loader2, Info, BookOpen, ChevronDown } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Download, PlayCircle, Plus, Globe, Loader2, Info, BookOpen, ChevronDown, Upload } from 'lucide-react';
 import { useNotebook } from '../../context/NotebookContext';
 import { CellItem } from './CellItem';
 import { EXAMPLES } from '../../constants/examples';
 
 export const NotebookContainer: React.FC = () => {
-    const { cells, addCell, executeAll, isReady, insertExample } = useNotebook();
+    const { cells, addCell, executeAll, isReady, insertExample, importNotebook } = useNotebook();
     const [showExamples, setShowExamples] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleExport = () => {
         const data = JSON.stringify({ cells, version: '1.0' }, null, 2);
@@ -19,6 +20,29 @@ export const NotebookContainer: React.FC = () => {
         URL.revokeObjectURL(url);
     };
 
+    const handleImport = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = JSON.parse(e.target?.result as string);
+                importNotebook(data);
+            } catch (err) {
+                alert('Failed to parse JSON file. Please ensure it is a valid notebook export.');
+            }
+        };
+        reader.readAsText(file);
+
+        // Reset input so the same file can be selected again
+        event.target.value = '';
+    };
+
     const handleInsertExample = (code: string) => {
         insertExample(code);
         setShowExamples(false);
@@ -26,6 +50,13 @@ export const NotebookContainer: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-[#FDFDFD] flex flex-col">
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                onChange={handleFileChange}
+                className="hidden"
+            />
             <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200/60 px-6 py-3 flex items-center justify-between shadow-sm">
                 <div className="flex items-center gap-4">
                     <div className="bg-blue-600 p-1.5 rounded-lg shadow-blue-200 shadow-lg"><Globe className="text-white" size={20} /></div>
@@ -70,6 +101,9 @@ export const NotebookContainer: React.FC = () => {
                         </div>
                         <button onClick={executeAll} disabled={!isReady} className="flex items-center gap-2 px-4 py-1.5 bg-white text-blue-600 rounded-lg shadow-sm border border-gray-200 hover:bg-blue-50 transition-all font-medium text-xs disabled:opacity-50">
                             <PlayCircle size={14} />Run All
+                        </button>
+                        <button onClick={handleImport} className="flex items-center gap-2 px-4 py-1.5 text-gray-600 rounded-lg hover:bg-white transition-all font-medium text-xs">
+                            <Upload size={14} />Import
                         </button>
                         <button onClick={handleExport} className="flex items-center gap-2 px-4 py-1.5 text-gray-600 rounded-lg hover:bg-white transition-all font-medium text-xs">
                             <Download size={14} />Export
