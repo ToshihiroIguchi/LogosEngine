@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Trash2, PlusCircle } from 'lucide-react';
+import { Play, Trash2, PlusCircle, Clock } from 'lucide-react';
 import type { Cell } from '../../types';
 import { useNotebook } from '../../context/NotebookContext';
 import { CellOutput } from './CellOutput';
@@ -16,7 +16,7 @@ interface CellItemProps {
 }
 
 export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
-    const { updateCell, executeCell, deleteCell, addCell } = useNotebook();
+    const { updateCell, executeCell, deleteCell, addCell, isReady } = useNotebook();
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && e.shiftKey) {
@@ -25,11 +25,14 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
         }
     };
 
+    // Determine if cell is queued (executing but engine not ready)
+    const isQueued = cell.isExecuting && !isReady;
+
     return (
         <div className="group relative mb-6">
             <div className={cn(
                 "flex flex-col border rounded-xl overflow-hidden transition-all duration-200 bg-white",
-                cell.isExecuting ? "ring-2 ring-blue-400 border-blue-400 shadow-md" : "border-gray-200 shadow-sm hover:border-gray-300"
+                cell.isExecuting ? (isQueued ? "ring-2 ring-amber-400 border-amber-400 shadow-md" : "ring-2 ring-blue-400 border-blue-400 shadow-md") : "border-gray-200 shadow-sm hover:border-gray-300"
             )}>
                 <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50/50 border-b border-gray-100 opacity-60 group-hover:opacity-100 transition-opacity">
                     <div className="flex items-center gap-3">
@@ -39,6 +42,12 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                         <span className="text-[10px] font-medium text-gray-500 uppercase tracking-widest bg-gray-200/50 px-1.5 py-0.5 rounded">
                             {cell.type}
                         </span>
+                        {isQueued && (
+                            <span className="flex items-center gap-1 text-[10px] font-medium text-amber-600 uppercase tracking-widest bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                                <Clock size={10} />
+                                Queued
+                            </span>
+                        )}
                     </div>
                     <div className="flex items-center gap-1">
                         <button onClick={() => executeCell(cell.id)} disabled={cell.isExecuting} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-30">

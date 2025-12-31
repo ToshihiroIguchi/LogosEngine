@@ -5,6 +5,7 @@ export function usePyodide() {
     const [isReady, setIsReady] = useState(false);
     const workerRef = useRef<Worker | null>(null);
     const resolversRef = useRef<Map<string, (response: WorkerResponse) => void>>(new Map());
+    const queueRef = useRef<Array<{ id: string; code: string; resolve: (response: WorkerResponse) => void }>>([]);
 
     useEffect(() => {
         const worker = new Worker(new URL('../worker/pyodide.worker.ts', import.meta.url), {
@@ -15,6 +16,15 @@ export function usePyodide() {
             const data = event.data;
             if (data.type === 'READY') {
                 setIsReady(true);
+
+                // Process queued executions
+                const queue = queueRef.current;
+                queueRef.current = [];
+                queue.forEach(({ id, code, resolve }) => {
+                    resolversRef.current.set(id, resolve);
+                    const request: WorkerRequest = { id, action: 'EXECUTE', code };
+                    worker.postMessage(request);
+                });
                 return;
             }
 
@@ -31,14 +41,20 @@ export function usePyodide() {
     }, []);
 
     const execute = useCallback((code: string): Promise<WorkerResponse> => {
-        if (!workerRef.current || !isReady) return Promise.reject(new Error('Pyodide is not ready'));
+        if (!workerRef.current) return Promise.reject(new Error('Worker not initialized'));
 
         const id = crypto.randomUUID();
-        const request: WorkerRequest = { id, action: 'EXECUTE', code };
 
         return new Promise((resolve) => {
-            resolversRef.current.set(id, resolve);
-            workerRef.current?.postMessage(request);
+            if (!isReady) {
+                // Queue the execution for when the engine becomes ready
+                queueRef.current.push({ id, code, resolve });
+            } else {
+                // Execute immediately
+                resolversRef.current.set(id, resolve);
+                const request: WorkerRequest = { id, action: 'EXECUTE', code };
+                workerRef.current?.postMessage(request);
+            }
         });
     }, [isReady]);
 
