@@ -25,7 +25,6 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
         }
     };
 
-    // Determine if cell is queued (executing but engine not ready)
     const isQueued = cell.isExecuting && !isReady;
 
     return (
@@ -64,7 +63,7 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                         value={cell.content}
                         onChange={(e) => updateCell(cell.id, e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="Enter math code here..."
+                        placeholder="Enter code here... (Shift+Enter to run)"
                         rows={Math.max(3, cell.content.split('\n').length)}
                         spellCheck={false}
                     />

@@ -1,10 +1,12 @@
-import React from 'react';
-import { Download, PlayCircle, Plus, Globe, Loader2, Info } from 'lucide-react';
+import React, { useState } from 'react';
+import { Download, PlayCircle, Plus, Globe, Loader2, Info, BookOpen, ChevronDown } from 'lucide-react';
 import { useNotebook } from '../../context/NotebookContext';
 import { CellItem } from './CellItem';
+import { EXAMPLES } from '../../constants/examples';
 
 export const NotebookContainer: React.FC = () => {
-    const { cells, addCell, executeAll, isReady } = useNotebook();
+    const { cells, addCell, executeAll, isReady, insertExample } = useNotebook();
+    const [showExamples, setShowExamples] = useState(false);
 
     const handleExport = () => {
         const data = JSON.stringify({ cells, version: '1.0' }, null, 2);
@@ -15,6 +17,11 @@ export const NotebookContainer: React.FC = () => {
         link.download = `notebook-${new Date().toISOString().slice(0, 10)}.json`;
         link.click();
         URL.revokeObjectURL(url);
+    };
+
+    const handleInsertExample = (code: string) => {
+        insertExample(code);
+        setShowExamples(false);
     };
 
     return (
@@ -38,7 +45,29 @@ export const NotebookContainer: React.FC = () => {
                         </div>
                     )}
                     <div className="h-6 w-px bg-gray-200 mx-2" />
-                    <div className="flex items-center bg-gray-100/50 p-1 rounded-xl border border-gray-200/50">
+                    <div className="flex items-center bg-gray-100/50 p-1 rounded-xl border border-gray-200/50 gap-1">
+                        <div className="relative">
+                            <button
+                                onClick={() => setShowExamples(!showExamples)}
+                                className="flex items-center gap-2 px-4 py-1.5 bg-white text-purple-600 rounded-lg shadow-sm border border-gray-200 hover:bg-purple-50 transition-all font-medium text-xs"
+                            >
+                                <BookOpen size={14} />Examples<ChevronDown size={12} className={`transition-transform ${showExamples ? 'rotate-180' : ''}`} />
+                            </button>
+                            {showExamples && (
+                                <div className="absolute top-full mt-2 right-0 bg-white border border-gray-200 rounded-xl shadow-lg w-64 max-h-96 overflow-y-auto z-50">
+                                    {EXAMPLES.map((example, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => handleInsertExample(example.code)}
+                                            className="w-full text-left px-4 py-3 hover:bg-purple-50 transition-colors border-b border-gray-100 last:border-b-0"
+                                        >
+                                            <div className="text-sm font-semibold text-gray-900">{example.title}</div>
+                                            <div className="text-xs text-gray-500 mt-1 font-mono truncate">{example.code.split('\n')[1]}</div>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                         <button onClick={executeAll} disabled={!isReady} className="flex items-center gap-2 px-4 py-1.5 bg-white text-blue-600 rounded-lg shadow-sm border border-gray-200 hover:bg-blue-50 transition-all font-medium text-xs disabled:opacity-50">
                             <PlayCircle size={14} />Run All
                         </button>

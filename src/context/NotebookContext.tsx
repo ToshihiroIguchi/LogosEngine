@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 import type { Cell } from '../types';
 import { usePyodide } from '../hooks/usePyodide';
+import { WELCOME_CODE } from '../constants/examples';
 
 interface NotebookContextType {
     cells: Cell[];
@@ -10,13 +11,14 @@ interface NotebookContextType {
     deleteCell: (id: string) => void;
     executeCell: (id: string) => Promise<void>;
     executeAll: () => Promise<void>;
+    insertExample: (code: string) => void;
 }
 
 const NotebookContext = createContext<NotebookContextType | undefined>(undefined);
 
 export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [cells, setCells] = useState<Cell[]>([
-        { id: '1', type: 'code', content: '', outputs: [], isExecuting: false }
+        { id: '1', type: 'code', content: WELCOME_CODE, outputs: [], isExecuting: false }
     ]);
     const { isReady, execute } = usePyodide();
 
@@ -63,8 +65,19 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         }
     }, [cells, executeCell]);
 
+    const insertExample = useCallback((code: string) => {
+        const newCell: Cell = {
+            id: crypto.randomUUID(),
+            type: 'code',
+            content: code,
+            outputs: [],
+            isExecuting: false
+        };
+        setCells(prev => [...prev, newCell]);
+    }, []);
+
     return (
-        <NotebookContext.Provider value={{ cells, isReady, addCell, updateCell, deleteCell, executeCell, executeAll }}>
+        <NotebookContext.Provider value={{ cells, isReady, addCell, updateCell, deleteCell, executeCell, executeAll, insertExample }}>
             {children}
         </NotebookContext.Provider>
     );
