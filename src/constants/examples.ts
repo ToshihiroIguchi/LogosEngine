@@ -1,5 +1,5 @@
 export const WELCOME_CODE = `# Welcome to LogosEngine! 🚀
-# A Mathematica-like computational notebook in your browser
+# Computational notebook in your browser
 # Press Shift+Enter to execute this cell
 
 # Example: Differentiation
