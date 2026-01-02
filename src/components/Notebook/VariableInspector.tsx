@@ -13,7 +13,7 @@ export const VariableInspector: React.FC<VariableInspectorProps> = ({ isOpen, on
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-y-0 right-0 w-80 bg-white border-l border-gray-200 shadow-2xl z-[60] flex flex-col animate-in slide-in-from-right duration-300">
+        <div className="w-80 bg-white border-l border-gray-200 flex flex-col shrink-0 h-full animate-in slide-in-from-right-10 duration-300">
             <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gray-50/50">
                 <div className="flex items-center gap-2 text-gray-700">
                     <Database size={18} className="text-purple-600" />

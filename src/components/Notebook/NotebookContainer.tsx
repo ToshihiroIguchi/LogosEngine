@@ -55,7 +55,7 @@ export const NotebookContainer: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-[#FDFDFD] flex flex-col">
+        <div className="h-screen bg-[#FDFDFD] flex flex-col overflow-hidden">
             <input
                 ref={fileInputRef}
                 type="file"
@@ -63,7 +63,9 @@ export const NotebookContainer: React.FC = () => {
                 onChange={handleFileChange}
                 className="hidden"
             />
-            <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200/60 px-6 py-3 flex items-center justify-between shadow-sm">
+
+            {/* Header - Fixed at top */}
+            <header className="flex-none bg-white/80 backdrop-blur-md border-b border-gray-200/60 px-6 py-3 flex items-center justify-between shadow-sm z-30">
                 <div className="flex items-center gap-4">
                     <div className="bg-white p-1 rounded-lg border border-gray-100 shadow-sm"><img src="/logo.png" alt="LogosEngine" className="w-8 h-8 object-contain" /></div>
                     <div>
@@ -130,35 +132,45 @@ export const NotebookContainer: React.FC = () => {
                     </div>
                 </div>
             </header>
-            <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-12">
-                <div className="space-y-4">
-                    {cells.map((cell, index) => <CellItem key={cell.id} cell={cell} index={index} />)}
+
+            {/* Main Content Area + Sidebar */}
+            <div className="flex-1 flex overflow-hidden">
+                {/* Scrollable Notebook Area */}
+                <div className="flex-1 flex flex-col min-w-0 overflow-y-auto scroll-smooth">
+                    <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-12">
+                        <div className="space-y-4">
+                            {cells.map((cell, index) => <CellItem key={cell.id} cell={cell} index={index} />)}
+                        </div>
+                        <div className="mt-12 flex justify-center pb-24">
+                            <button onClick={() => addCell('code')} className="group flex flex-col items-center gap-3 text-gray-300 hover:text-blue-500 transition-all">
+                                <div className="p-3 border-2 border-dashed border-gray-200 rounded-2xl group-hover:border-blue-200 group-hover:bg-blue-50/50 transition-all"><Plus size={24} /></div>
+                                <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Add Computational Block</span>
+                            </button>
+                        </div>
+                    </main>
+                    <footer className="py-6 px-8 border-t border-gray-100 flex items-center justify-between bg-gray-50/50 mt-auto">
+                        <div className="flex items-center gap-3 text-xs text-gray-400 font-mono">
+                            <span>PYTHON 3.11</span><span className="opacity-30">•</span><span>SYMPY CORE</span><span className="opacity-30">•</span><span>BROWSER-WASM</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => setShowDisclaimer(true)}
+                                className="text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-tighter hover:underline transition-all"
+                            >
+                                Legal & Risk
+                            </button>
+                            <div className="flex items-center gap-1.5 px-3 py-1 bg-white border border-gray-200 rounded-full shadow-sm cursor-help hover:border-blue-300 transition-colors">
+                                <Info size={12} className="text-blue-500" /><span className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">Computational Notebook Environment</span>
+                            </div>
+                        </div>
+                    </footer>
                 </div>
-                <div className="mt-12 flex justify-center pb-24">
-                    <button onClick={() => addCell('code')} className="group flex flex-col items-center gap-3 text-gray-300 hover:text-blue-500 transition-all">
-                        <div className="p-3 border-2 border-dashed border-gray-200 rounded-2xl group-hover:border-blue-200 group-hover:bg-blue-50/50 transition-all"><Plus size={24} /></div>
-                        <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Add Computational Block</span>
-                    </button>
-                </div>
-            </main>
-            <footer className="py-6 px-8 border-t border-gray-100 flex items-center justify-between bg-gray-50/50">
-                <div className="flex items-center gap-3 text-xs text-gray-400 font-mono">
-                    <span>PYTHON 3.11</span><span className="opacity-30">•</span><span>SYMPY CORE</span><span className="opacity-30">•</span><span>BROWSER-WASM</span>
-                </div>
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => setShowDisclaimer(true)}
-                        className="text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-tighter hover:underline transition-all"
-                    >
-                        Legal & Risk
-                    </button>
-                    <div className="flex items-center gap-1.5 px-3 py-1 bg-white border border-gray-200 rounded-full shadow-sm cursor-help hover:border-blue-300 transition-colors">
-                        <Info size={12} className="text-blue-500" /><span className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">Computational Notebook Environment</span>
-                    </div>
-                </div>
-            </footer>
+
+                {/* Docked Sidebar */}
+                <VariableInspector isOpen={showVariables} onClose={() => setShowVariables(false)} />
+            </div>
+
             <DisclaimerModal isOpen={showDisclaimer} onClose={() => setShowDisclaimer(false)} />
-            <VariableInspector isOpen={showVariables} onClose={() => setShowVariables(false)} />
         </div>
     );
 };
