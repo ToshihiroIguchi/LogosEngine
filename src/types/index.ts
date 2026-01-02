@@ -5,6 +5,9 @@ export interface Output {
   value: string;
   rawText?: string;
   tsv?: string;
+  lineNo?: number;
+  traceback?: string;
+  errorName?: string;
   timestamp: number;
 }
 

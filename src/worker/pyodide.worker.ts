@@ -13,6 +13,8 @@ const INITIAL_PYTHON_CODE = `
 import sys
 import io
 import base64
+import traceback
+import ast
 # Matplotlib imports removed for concurrent loading
 from sympy import *
 
@@ -24,6 +26,49 @@ def setup_context(ctx):
     ctx['x'], ctx['y'], ctx['z'], ctx['t'] = ctx['symbols']('x y z t')
     # plt is injected later when ready
 
+def format_error(e):
+    # Get exception info
+    exc_type, exc_value, exc_traceback = sys.exc_info()
+    
+    # Format message
+    error_name = exc_type.__name__
+    message = str(exc_value)
+    
+    # Get line number and handle SyntaxError specially
+    line_no = None
+    if isinstance(e, SyntaxError):
+        line_no = e.lineno
+    else:
+        # Extract traceback and find the last frame in the user's code
+        # Filter out internal Pyodide and worker internal frames
+        tb_list = traceback.extract_tb(exc_traceback)
+        for frame in reversed(tb_list):
+            # compile uses <string>, and we want to stop at the first user-code frame
+            if frame.filename == '<string>':
+                line_no = frame.lineno
+                break
+    
+    # Format traceback (removing internal frames to keep it professional)
+    # We use traceback.format_exception but filter the output if possible
+    # For now, we'll keep the full one but maybe strip the header if it's redundant
+    tb_lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+    
+    # Filter out entries that are purely internal to pyodide/worker setup
+    filtered_tb = []
+    for line in tb_lines:
+        if 'File "/lib/' in line or 'File "/tokenize.py"' in line:
+            continue
+        filtered_tb.append(line)
+        
+    formatted_tb = "".join(filtered_tb)
+    
+    return {
+        "errorName": error_name,
+        "message": message,
+        "lineNo": line_no,
+        "traceback": formatted_tb
+    }
+
 def execute_cell(code, ctx):
     # Close previous figures only if plt is available
     if 'plt' in ctx:
@@ -31,27 +76,36 @@ def execute_cell(code, ctx):
     
     stdout_buffer = io.StringIO()
     sys.stdout = stdout_buffer
-    error = None
+    error_data = None
     result_val = None
     latex_res = None
     
     try:
-        lines = code.strip().split('\\n')
-        if len(lines) > 0:
-            exec_code = '\\n'.join(lines[:-1])
-            eval_code = lines[-1]
-            if exec_code:
-                exec(exec_code, ctx)
-            try:
-                result_val = eval(eval_code, ctx)
-            except:
-                exec(eval_code, ctx)
-                result_val = None
+        # AST-based execution for accurate line numbers and REPL-style eval/exec split
+        tree = ast.parse(code)
+        
+        if not tree.body:
+            # Empty code
+            pass
         else:
-            result_val = None
+            last_node = tree.body[-1]
+            if isinstance(last_node, ast.Expr):
+                # If the last node is an expression, we evaluate it to get the result
+                # 1. Execute all but the last node
+                if len(tree.body) > 1:
+                    exec_mod = ast.Module(body=tree.body[:-1], type_ignores=[])
+                    exec(compile(exec_mod, '<string>', 'exec'), ctx)
+                
+                # 2. Evaluate the last expression
+                eval_expr = ast.Expression(body=last_node.value)
+                result_val = eval(compile(eval_expr, '<string>', 'eval'), ctx)
+            else:
+                # If the last node is not an expression (e.g. assignment), just exec all
+                exec(compile(tree, '<string>', 'exec'), ctx)
+                result_val = None
+
     except Exception as e:
-        import traceback
-        error = traceback.format_exc()
+        error_data = format_error(e)
         result_val = None
         
     sys.stdout = sys.__stdout__
@@ -77,7 +131,7 @@ def execute_cell(code, ctx):
         "result": str(result_val) if result_val is not None else None,
         "latex": latex_res,
         "image": img_base64,
-        "error": error,
+        "error": error_data,
         "tsv": get_tsv(result_val)
     }
 
@@ -299,8 +353,18 @@ self.onmessage = async (event: MessageEvent<WorkerRequest | CompletionRequest>) 
                 outputs.push({ type: 'text', value: result.stdout, timestamp });
             }
 
+            // Enhanced Error Handling
             if (result.error) {
-                outputs.push({ type: 'error', value: result.error, timestamp });
+                // Ensure error is an object, handling legacy string errors if any
+                const errorVal = typeof result.error === 'string' ? { message: result.error } : result.error;
+                outputs.push({
+                    type: 'error',
+                    value: errorVal.message,
+                    errorName: errorVal.errorName,
+                    lineNo: errorVal.lineNo,
+                    traceback: errorVal.traceback,
+                    timestamp
+                });
             } else {
                 if (result.latex && result.latex !== 'None' && result.latex.trim()) {
                     outputs.push({
@@ -346,7 +410,7 @@ function getVariables(): Variable[] {
     const vars: Variable[] = [];
     const ignored = new Set([
         '__builtins__', 'symbols', 'Matrix', 'Rational', 'Integer', 'Float',
-        'Symbol', 'Function', 'plt', 'x', 'y', 'z', 't', 'setup_context', 'execute_cell'
+        'Symbol', 'Function', 'plt', 'x', 'y', 'z', 't', 'setup_context', 'execute_cell', 'format_error'
     ]);
 
     try {

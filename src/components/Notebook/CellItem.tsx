@@ -22,9 +22,11 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
     const { updateCell, executeCell, deleteCell, addCell, interrupt, isReady, getCompletions } = useNotebook();
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
     const completionProviderRegistered = useRef(false);
+    const monacoRef = useRef<any>(null);
 
     const handleEditorDidMount = (editor: editor.IStandaloneCodeEditor, monaco: typeof import('monaco-editor')) => {
         editorRef.current = editor;
+        monacoRef.current = monaco;
 
         if (!completionProviderRegistered.current) {
             registerPythonCompletionProvider(monaco, getCompletions);
@@ -39,6 +41,46 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                 executeCell(cell.id);
             }
         });
+    };
+
+    // Sync error markers
+    React.useEffect(() => {
+        if (!editorRef.current || !monacoRef.current) return;
+
+        const model = editorRef.current.getModel();
+        if (!model) return;
+
+        // Clear markers when executing
+        if (cell.isExecuting) {
+            monacoRef.current.editor.setModelMarkers(model, 'python', []);
+            return;
+        }
+
+        const errorOutput = cell.outputs.find(o => o.type === 'error');
+        if (errorOutput && typeof errorOutput.lineNo === 'number') {
+            monacoRef.current.editor.setModelMarkers(model, 'python', [{
+                startLineNumber: errorOutput.lineNo,
+                startColumn: 1,
+                endLineNumber: errorOutput.lineNo,
+                endColumn: 1000,
+                message: errorOutput.value,
+                severity: monacoRef.current.MarkerSeverity.Error
+            }]);
+        } else {
+            monacoRef.current.editor.setModelMarkers(model, 'python', []);
+        }
+    }, [cell.outputs, cell.isExecuting]);
+
+    const handleContentChange = (value: string | undefined) => {
+        updateCell(cell.id, value || '');
+
+        // Proactively clear markers when user edits the code
+        if (editorRef.current && monacoRef.current) {
+            const model = editorRef.current.getModel();
+            if (model) {
+                monacoRef.current.editor.setModelMarkers(model, 'python', []);
+            }
+        }
     };
 
     const isQueued = cell.isExecuting && !isReady;
@@ -84,7 +126,7 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                         height={Math.max(100, (cell.content.split('\n').length + 1) * 19 + 32) + 'px'}
                         language="python"
                         value={cell.content}
-                        onChange={(value) => updateCell(cell.id, value || '')}
+                        onChange={handleContentChange}
                         onMount={handleEditorDidMount}
                         options={{
                             minimap: { enabled: false },

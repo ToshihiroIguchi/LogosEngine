@@ -34,9 +34,43 @@ export const CellOutput: React.FC<CellOutputProps> = ({ outputs, executionCount 
                                 <img src={output.value} alt="Plot" className="max-w-full h-auto rounded shadow-sm bg-white border border-gray-100" />
                             </div>
                         ) : output.type === 'error' ? (
-                            <pre className="text-red-600 text-sm whitespace-pre-wrap font-mono p-3 bg-red-50 rounded-lg border border-red-100 italic">
-                                {output.value}
-                            </pre>
+                            <div className="bg-[#FFF5F5] rounded-lg border border-[#FFE3E3] overflow-hidden shadow-sm">
+                                <div className="p-3 flex gap-3 items-start">
+                                    <div className="bg-[#FF9B9B] p-1.5 rounded-full shadow-inner mt-0.5">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="text-[11px] font-bold text-[#E53E3E] uppercase tracking-wider font-mono bg-white px-2 py-0.5 rounded border border-[#FED7D7]">
+                                                {output.errorName || 'Error'}
+                                            </span>
+                                            {output.lineNo && (
+                                                <span className="text-[10px] text-[#A0AEC0] font-mono">
+                                                    at line {output.lineNo}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="font-mono text-sm font-medium text-[#2D3748] leading-snug select-text">
+                                            {output.value}
+                                        </div>
+                                        {output.traceback && (
+                                            <div className="mt-3 pt-2 border-t border-[#FFE3E3]/50">
+                                                <details className="group">
+                                                    <summary className="text-[11px] text-[#E53E3E] cursor-pointer hover:underline select-none flex items-center gap-1.5 font-bold transition-all w-fit opacity-80 hover:opacity-100">
+                                                        <ChevronDown size={12} className="transition-transform group-open:rotate-180" />
+                                                        Traceback
+                                                    </summary>
+                                                    <div className="mt-3 relative">
+                                                        <pre className="text-[11px] text-[#C53030] whitespace-pre-wrap font-mono bg-white/60 p-3 rounded-lg border border-[#FED7D7]/50 overflow-x-auto select-text leading-relaxed">
+                                                            {output.traceback}
+                                                        </pre>
+                                                    </div>
+                                                </details>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
                         ) : (
                             <pre className="text-gray-800 text-sm whitespace-pre-wrap font-mono leading-relaxed px-1">
                                 {output.value}
