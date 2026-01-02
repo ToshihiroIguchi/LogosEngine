@@ -19,16 +19,21 @@ interface CellItemProps {
 }
 
 export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
-    const { updateCell, executeCell, deleteCell, addCell, interrupt, isReady, getCompletions } = useNotebook();
+    const {
+        updateCell, executeCell, deleteCell, addCell, interrupt, isReady, getCompletions,
+        focusedCellId, setFocusedCellId, selectNextCell
+    } = useNotebook();
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
     const completionProviderRegistered = useRef(false);
     const monacoRef = useRef<any>(null);
     const executeCellRef = useRef(executeCell);
+    const selectNextCellRef = useRef(selectNextCell);
 
-    // Keep the ref updated with the latest executeCell function to prevent stale closures
+    // Keep the refs updated with the latest functions to prevent stale closures
     React.useEffect(() => {
         executeCellRef.current = executeCell;
-    }, [executeCell]);
+        selectNextCellRef.current = selectNextCell;
+    }, [executeCell, selectNextCell]);
 
     const handleEditorDidMount = (editor: editor.IStandaloneCodeEditor, monaco: typeof import('monaco-editor')) => {
         editorRef.current = editor;
@@ -46,11 +51,27 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                 monaco.KeyMod.Shift | monaco.KeyCode.Enter,
                 monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter
             ],
-            run: () => {
-                executeCellRef.current(cell.id);
+            run: async () => {
+                await executeCellRef.current(cell.id);
+                selectNextCellRef.current(cell.id);
             }
         });
+
+        // Check if we should focus immediately after mounting
+        // This is necessary for newly created cells
+        if (focusedCellId === cell.id) {
+            editor.focus();
+            setFocusedCellId(null);
+        }
     };
+
+    // Handle focus when this cell is selected as the next cell
+    React.useEffect(() => {
+        if (focusedCellId === cell.id && editorRef.current) {
+            editorRef.current.focus();
+            setFocusedCellId(null); // Reset after focusing
+        }
+    }, [focusedCellId, cell.id, setFocusedCellId]);
 
     // Sync error markers
     React.useEffect(() => {
@@ -121,7 +142,14 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                                 <Square size={14} fill="currentColor" />
                             </button>
                         ) : (
-                            <button onClick={() => executeCell(cell.id)} disabled={cell.isExecuting} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-30">
+                            <button
+                                onClick={async () => {
+                                    await executeCell(cell.id);
+                                    selectNextCell(cell.id);
+                                }}
+                                disabled={cell.isExecuting}
+                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-30"
+                            >
                                 <Play size={14} fill="currentColor" />
                             </button>
                         )}

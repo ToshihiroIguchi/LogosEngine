@@ -14,7 +14,9 @@ interface NotebookContextType {
     isSidebarOpen: boolean;
     setIsSidebarOpen: (isOpen: boolean) => void;
     isReady: boolean;
-    addCell: (type: 'code' | 'markdown', index?: number) => void;
+    focusedCellId: string | null;
+    setFocusedCellId: (id: string | null) => void;
+    addCell: (type: 'code' | 'markdown', index?: number) => string;
     updateCell: (id: string, content: string) => void;
     deleteCell: (id: string) => void;
     executeCell: (id: string) => Promise<void>;
@@ -22,6 +24,7 @@ interface NotebookContextType {
     interrupt: () => void;
     insertExample: (code: string) => void;
     importNotebook: (data: any) => void;
+    selectNextCell: (currentId: string) => void;
     getCompletions: (code: string, position: number) => Promise<import('../worker/workerTypes').CompletionResponse>;
 }
 
@@ -35,16 +38,19 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     const [activeDocumentation, setActiveDocumentation] = useState<Documentation | null>(null);
     const [activeTab, setActiveTab] = useState<SidebarTab>('variables');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [focusedCellId, setFocusedCellId] = useState<string | null>(null);
     const { isReady, execute, interrupt: pyodideInterrupt, getCompletions } = usePyodide();
 
     const addCell = useCallback((type: 'code' | 'markdown', index?: number) => {
-        const newCell: Cell = { id: crypto.randomUUID(), type, content: '', outputs: [], isExecuting: false };
+        const id = crypto.randomUUID();
+        const newCell: Cell = { id, type, content: '', outputs: [], isExecuting: false };
         setCells(prev => {
             if (index === undefined) return [...prev, newCell];
             const next = [...prev];
             next.splice(index + 1, 0, newCell);
             return next;
         });
+        return id;
     }, []);
 
     const updateCell = useCallback((id: string, content: string) => {
@@ -83,6 +89,20 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             setCells(prev => prev.map(c => c.id === id ? { ...c, outputs: [{ type: 'error', value: err.message, timestamp: Date.now() }], isExecuting: false } : c));
         }
     }, [cells, execute]);
+
+    const selectNextCell = useCallback((currentId: string) => {
+        const currentIndex = cells.findIndex(c => c.id === currentId);
+        if (currentIndex === -1) return;
+
+        if (currentIndex < cells.length - 1) {
+            // Focus existing next cell
+            setFocusedCellId(cells[currentIndex + 1].id);
+        } else {
+            // Create and focus new cell
+            const newId = addCell('code');
+            setFocusedCellId(newId);
+        }
+    }, [cells, addCell]);
 
     const executeAll = useCallback(async () => {
         for (const cell of cells) {
@@ -134,7 +154,9 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         <NotebookContext.Provider value={{
             cells, variables, activeDocumentation, activeTab, setActiveTab,
             isSidebarOpen, setIsSidebarOpen,
-            isReady, addCell, updateCell, deleteCell, executeCell, executeAll, interrupt, insertExample, importNotebook,
+            isReady, focusedCellId, setFocusedCellId,
+            addCell, updateCell, deleteCell, executeCell, executeAll, interrupt, insertExample, importNotebook,
+            selectNextCell,
             getCompletions
         }}>
             {children}
