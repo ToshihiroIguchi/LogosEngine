@@ -16,14 +16,14 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from sympy import *
 
-# Setup the user context with default symbols
+# Setup the user context with default symbols and functions
 def setup_context(ctx):
+    # Inject all sympy functions into the user context
+    exec("from sympy import *", {}, ctx)
     # Default symbols
-    ctx['x'], ctx['y'], ctx['z'], ctx['t'] = symbols('x y z t')
-    # Make sure common modules are available in user scope
+    ctx['x'], ctx['y'], ctx['z'], ctx['t'] = ctx['symbols']('x y z t')
+    # Shortcuts
     ctx['plt'] = plt
-    ctx['symbols'] = symbols
-    # Add other common sympy/matplotlib functions as needed
 
 def execute_cell(code, ctx):
     # Close previous figures
