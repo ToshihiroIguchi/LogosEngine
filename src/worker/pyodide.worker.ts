@@ -1,6 +1,6 @@
 import { loadPyodide, type PyodideInterface } from 'pyodide';
 import type { WorkerRequest } from './workerTypes';
-import type { Output } from '../types';
+import type { Output, Variable } from '../types';
 
 let pyodide: PyodideInterface;
 
@@ -135,15 +135,53 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
                 }
             }
 
-            self.postMessage({ id, status: result.error ? 'ERROR' : 'SUCCESS', results: outputs });
+            // After successful execution, get the current user variables
+            const variables = getVariables();
+
+            self.postMessage({ id, status: result.error ? 'ERROR' : 'SUCCESS', results: outputs, variables });
         } catch (err: any) {
             self.postMessage({
                 id,
                 status: 'ERROR',
-                results: [{ type: 'error', value: err.message, timestamp: Date.now() }]
+                results: [{ type: 'error', value: err.message, timestamp: Date.now() }],
+                variables: [] // No variables on error, or an empty array
             });
         }
     }
 };
+
+function getVariables(): Variable[] {
+    if (!pyodide || !user_context) return [];
+
+    const vars: Variable[] = [];
+    const ignored = new Set([
+        '__builtins__', 'symbols', 'Matrix', 'Rational', 'Integer', 'Float',
+        'Symbol', 'Function', 'plt', 'x', 'y', 'z', 't', 'setup_context', 'execute_cell'
+    ]);
+
+    try {
+        const keys = pyodide.globals.get('list')(user_context.keys()).toJs();
+
+        for (const key of keys) {
+            if (typeof key !== 'string' || ignored.has(key) || key.startsWith('_')) continue;
+
+            try {
+                const val = user_context.get(key);
+                if (typeof val === 'function') continue;
+
+                const typeName = pyodide.globals.get('type')(val).__name__;
+                let strVal = String(val);
+                if (strVal.length > 100) strVal = strVal.substring(0, 97) + "...";
+
+                vars.push({ name: key, type: typeName, value: strVal });
+            } catch (e) {
+                // Skip if error
+            }
+        }
+    } catch (e) {
+        console.error('Error fetching variables:', e);
+    }
+    return vars;
+}
 
 initPyodide();

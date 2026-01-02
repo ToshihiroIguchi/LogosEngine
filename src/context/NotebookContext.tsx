@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
-import type { Cell } from '../types';
+import type { Cell, Variable } from '../types';
 import { usePyodide } from '../hooks/usePyodide';
 import { WELCOME_CODE } from '../constants/examples';
 
 interface NotebookContextType {
     cells: Cell[];
+    variables: Variable[];
     isReady: boolean;
     addCell: (type: 'code' | 'markdown', index?: number) => void;
     updateCell: (id: string, content: string) => void;
@@ -22,6 +23,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     const [cells, setCells] = useState<Cell[]>([
         { id: '1', type: 'code', content: WELCOME_CODE, outputs: [], isExecuting: false }
     ]);
+    const [variables, setVariables] = useState<Variable[]>([]);
     const { isReady, execute, interrupt: pyodideInterrupt } = usePyodide();
 
     const addCell = useCallback((type: 'code' | 'markdown', index?: number) => {
@@ -56,6 +58,9 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             setCells(prev => prev.map(c =>
                 c.id === id ? { ...c, outputs: response.results, isExecuting: false, executionCount: (c.executionCount || 0) + 1 } : c
             ));
+            if (response.variables) {
+                setVariables(response.variables);
+            }
         } catch (err: any) {
             setCells(prev => prev.map(c => c.id === id ? { ...c, outputs: [{ type: 'error', value: err.message, timestamp: Date.now() }], isExecuting: false } : c));
         }
@@ -108,7 +113,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     }, []);
 
     return (
-        <NotebookContext.Provider value={{ cells, isReady, addCell, updateCell, deleteCell, executeCell, executeAll, interrupt, insertExample, importNotebook }}>
+        <NotebookContext.Provider value={{ cells, variables, isReady, addCell, updateCell, deleteCell, executeCell, executeAll, interrupt, insertExample, importNotebook }}>
             {children}
         </NotebookContext.Provider>
     );

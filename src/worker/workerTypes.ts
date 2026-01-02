@@ -1,4 +1,4 @@
-import type { Output } from '../types';
+import type { Output, Variable } from '../types';
 
 export type WorkerAction = 'EXECUTE' | 'INTERRUPT';
 
@@ -12,6 +12,7 @@ export interface WorkerResponse {
     id: string;
     status: 'SUCCESS' | 'ERROR';
     results: Output[];
+    variables?: Variable[];
     error?: string;
 }
 

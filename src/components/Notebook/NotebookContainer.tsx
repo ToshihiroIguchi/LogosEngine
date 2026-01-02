@@ -1,14 +1,16 @@
 import React, { useState, useRef } from 'react';
-import { Download, PlayCircle, Plus, Loader2, Info, BookOpen, ChevronDown, Upload, Square } from 'lucide-react';
+import { Download, PlayCircle, Plus, Loader2, Info, BookOpen, ChevronDown, Upload, Square, Database } from 'lucide-react';
 import { useNotebook } from '../../context/NotebookContext';
 import { CellItem } from './CellItem';
 import { DisclaimerModal } from './DisclaimerModal';
+import { VariableInspector } from './VariableInspector';
 import { EXAMPLES } from '../../constants/examples';
 
 export const NotebookContainer: React.FC = () => {
     const { cells, addCell, executeAll, interrupt, isReady, insertExample, importNotebook } = useNotebook();
     const [showExamples, setShowExamples] = useState(false);
     const [showDisclaimer, setShowDisclaimer] = useState(false);
+    const [showVariables, setShowVariables] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const isExecutingAny = cells.some(c => c.isExecuting);
@@ -83,6 +85,14 @@ export const NotebookContainer: React.FC = () => {
                     <div className="flex items-center bg-gray-100/50 p-1 rounded-xl border border-gray-200/50 gap-1">
                         <div className="relative">
                             <button
+                                onClick={() => setShowVariables(!showVariables)}
+                                className={`flex items-center gap-2 px-4 py-1.5 rounded-lg shadow-sm border transition-all font-medium text-xs ${showVariables ? 'bg-purple-600 text-white border-purple-700 shadow-purple-100' : 'bg-white text-purple-600 border-gray-200 hover:bg-purple-50'}`}
+                            >
+                                <Database size={14} />Variables
+                            </button>
+                        </div>
+                        <div className="relative">
+                            <button
                                 onClick={() => setShowExamples(!showExamples)}
                                 className="flex items-center gap-2 px-4 py-1.5 bg-white text-purple-600 rounded-lg shadow-sm border border-gray-200 hover:bg-purple-50 transition-all font-medium text-xs"
                             >
@@ -148,6 +158,7 @@ export const NotebookContainer: React.FC = () => {
                 </div>
             </footer>
             <DisclaimerModal isOpen={showDisclaimer} onClose={() => setShowDisclaimer(false)} />
+            <VariableInspector isOpen={showVariables} onClose={() => setShowVariables(false)} />
         </div>
     );
 };

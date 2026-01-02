@@ -1,5 +1,9 @@
 import React from 'react';
 import { Play, Trash2, PlusCircle, Clock, Square } from 'lucide-react';
+import Editor from 'react-simple-code-editor';
+import { highlight, languages } from 'prismjs';
+import 'prismjs/components/prism-python';
+import 'prismjs/themes/prism.css';
 import type { Cell } from '../../types';
 import { useNotebook } from '../../context/NotebookContext';
 import { CellOutput } from './CellOutput';
@@ -63,20 +67,25 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                         </button>
                     </div>
                 </div>
-                <div className="relative">
-                    <textarea
-                        className="w-full p-4 font-mono text-sm bg-transparent outline-none resize-none leading-relaxed min-h-[80px]"
+                <div className="relative min-h-[100px] p-2">
+                    <Editor
                         value={cell.content}
-                        onChange={(e) => updateCell(cell.id, e.target.value)}
+                        onValueChange={(code) => updateCell(cell.id, code)}
+                        highlight={(code) => highlight(code, languages.python, 'python')}
+                        padding={16}
+                        className="font-mono text-sm leading-relaxed outline-none"
+                        style={{
+                            fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+                            minHeight: '80px'
+                        }}
+                        textareaId={`editor-${cell.id}`}
+                        textareaClassName="outline-none focus:ring-0"
                         onKeyDown={handleKeyDown}
-                        placeholder="Enter code here... (Shift+Enter to run)"
-                        rows={Math.max(3, cell.content.split('\n').length)}
-                        spellCheck={false}
                     />
                 </div>
                 {cell.outputs.length > 0 && (
                     <div className="border-t border-gray-50">
-                        <CellOutput outputs={cell.outputs} />
+                        <CellOutput outputs={cell.outputs} executionCount={cell.executionCount} />
                     </div>
                 )}
             </div>

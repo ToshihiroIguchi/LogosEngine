@@ -18,3 +18,9 @@ export interface Cell {
 export interface NotebookState {
   cells: Cell[];
 }
+
+export interface Variable {
+  name: string;
+  type: string;
+  value: string;
+}
