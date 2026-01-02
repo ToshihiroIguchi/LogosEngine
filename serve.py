@@ -3,7 +3,7 @@ import socketserver
 import os
 import sys
 
-PORT = 8000
+PORT = 8300
 DIRECTORY = "dist"
 
 class Handler(http.server.SimpleHTTPRequestHandler):

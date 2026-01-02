@@ -62,13 +62,13 @@ Windows環境などでJavaScriptファイルが正しく認識されない（MIM
 ```bash
 python serve.py
 ```
-実行後、ブラウザで `http://localhost:8000` を開いてください。
+実行後、ブラウザで `http://localhost:8300` を開いてください。
 
 ### 3. Python標準コマンドによる起動
 スクリプトを使わず、標準のワンライナーでも起動可能です（`dist`内に移動して実行します）。
 ```bash
 cd dist
-python -m http.server 8000
+python -m http.server 8300
 ```
 
 ### なぜPythonサーバーが便利なのか？
@@ -77,7 +77,7 @@ python -m http.server 8000
 - **デプロイの容易さ**: 公開サーバーがPythonのみをサポートしている場合でも、`dist` の中身をアップロードするだけで公開が完了します。
 
 ### 4. Access the Notebook
-1. Open your web browser and navigate to the address shown (usually `http://localhost:8000`).
+1. Open your web browser and navigate to the address shown (usually `http://localhost:8300`).
 2. **Initialization**: On the first load, the app will download the Pyodide runtime and required Python packages (SymPy, Matplotlib). This can take 30-60 seconds depending on your connection.
 3. **Engine Ready**: Once the status in the header changes to "Engine Ready", you can begin executing Python code.
 4. **Execution**: Type your code in a cell and press `Shift+Enter` to run it.
