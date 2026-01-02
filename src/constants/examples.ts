@@ -1,9 +1,9 @@
-export const WELCOME_CODE = `# Welcome to LogosEngine! 🚀
-# Computational notebook in your browser
-# Press Shift+Enter to execute this cell
+export const WELCOME_CODE = `# LogosEngine - Interactive Computational Notebook
+# Symbolic math powered by SymPy
 
-# Example: Differentiation
-diff(sin(x), x)`;
+# Example: Symbolic Differentiation
+f = sin(x) * exp(x)
+diff(f, x)`;
 
 export const EXAMPLES = [
     {
