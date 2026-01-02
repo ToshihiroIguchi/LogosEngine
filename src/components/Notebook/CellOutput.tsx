@@ -45,7 +45,7 @@ export const CellOutput: React.FC<CellOutputProps> = ({ outputs, executionCount 
 
                         {/* Hover Copy Menu */}
                         {output.type !== 'image' && (
-                            <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="absolute top-0 right-0">
                                 <CopyMenu output={output} />
                             </div>
                         )}
@@ -83,7 +83,10 @@ const CopyMenu: React.FC<{ output: Output }> = ({ output }) => {
     }, []);
 
     return (
-        <div className="relative" ref={menuRef}>
+        <div
+            className={`relative ${isOpen ? 'opacity-100 z-50' : 'opacity-0 group-hover:opacity-100 transition-opacity'}`}
+            ref={menuRef}
+        >
             <button
                 onClick={() => setIsOpen(!isOpen)}
                 className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-white rounded border border-transparent hover:border-gray-200 transition-all shadow-sm bg-white/50 backdrop-blur-sm flex items-center gap-1"
