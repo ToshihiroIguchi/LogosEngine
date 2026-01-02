@@ -46,35 +46,35 @@ npm run dev
 ```
 By default, the application will be available at `http://localhost:5173/`.
 
-## Pythonを使用したサーバーの起動 (静的ホスティング)
+## Serving with Python (Static Hosting)
 
-Node.js (npm) を常駐させたくない場合や、Python環境メインで利用したい場合は、ビルド済みの静的ファイルをPythonで配信できます。
+If you prefer not to keep Node.js (npm) running, or if you primarily use a Python environment, you can serve the pre-built static files using Python.
 
-### 1. ビルド (初回またはコード変更時のみ)
-ソースコードをブラウザが解読できる形式に変換するため、一度だけNode.js環境でビルドを行います。
+### 1. Build (First time or after code changes)
+The project must be built once in a Node.js environment to transform the source code into a browser-executable format.
 ```bash
 npm run build
 ```
-これにより、公開用の全ファイルが `dist` フォルダに出力されます。
+This will generate the production-ready files in the `dist` folder.
 
-### 2. Pythonスクリプトによる起動 (推奨)
-Windows環境などでJavaScriptファイルが正しく認識されない（MIMEタイプエラー）のを防ぐため、専用の起動スクリプトを用意しています。
+### 2. Serve using Python Script (Recommended)
+We provide a dedicated serving script to prevent issues like MIME type errors (commonly seen on Windows where JavaScript files might be incorrectly served).
 ```bash
 python serve.py
 ```
-実行後、ブラウザで `http://localhost:8300` を開いてください。
+After running the script, open `http://localhost:8300` in your browser.
 
-### 3. Python標準コマンドによる起動
-スクリプトを使わず、標準のワンライナーでも起動可能です（`dist`内に移動して実行します）。
+### 3. Serve using Standard Python Command
+You can also serve the files using a standard one-liner (execute this from within the `dist` directory).
 ```bash
 cd dist
 python -m http.server 8300
 ```
 
-### なぜPythonサーバーが便利なのか？
-- **軽量**: Node.jsの重いプロセスを動かし続ける必要がありません。
-- **ポータビリティ**: `dist` フォルダと `serve.py` さえあれば、PythonがインストールされているどのPCでも LogosEngine を動かせます。USBメモリに入れて持ち運ぶことも可能です。
-- **デプロイの容易さ**: 公開サーバーがPythonのみをサポートしている場合でも、`dist` の中身をアップロードするだけで公開が完了します。
+### Why use a Python server?
+- **Lightweight**: No need to keep heavy Node.js processes running.
+- **Portability**: All you need are the `dist` folder and `serve.py`. LogosEngine can run on any PC with Python installed, even from a USB drive.
+- **Ease of Deployment**: Even if your production server only supports Python, you can deploy by simply uploading the contents of the `dist` folder.
 
 ### 4. Access the Notebook
 1. Open your web browser and navigate to the address shown (usually `http://localhost:8300`).
@@ -167,16 +167,16 @@ LogosEngine uses a Web Worker architecture to run Python code without blocking t
            Results
 ```
 
-## Disclaimer (免責事項)
+## Disclaimer
 
-本ソフトウェアは、「現状のまま（AS IS）」提供されるものであり、明示または黙示を問わず、商品性、特定の目的への適合性、および権利侵害がないことの保証を含め、いかなる保証も行いません。
-本ソフトウェアの使用（計算結果の利用を含む）に起因して、ユーザーまたは第三者に生じた損害（直接的、間接的、偶発的、特別、懲罰的、結果的損害を含むがこれに限られない）について、著作権者および開発者は一切の責任を負いません。
-ユーザーは、自己の責任において本ソフトウェアを使用するものとします。特に、構造計算、化学反応予測、金融取引などのクリティカルな用途においては、必ず専門家による検証を経てから利用してください。
+This software is provided "AS IS" without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and non-infringement. In no event shall the authors or copyright holders be liable for any claim, damages, or other liability, whether in an action of contract, tort, or otherwise, arising from, out of, or in connection with the software or the use or other dealings in the software (including but not limited to results of calculations).
 
-## Terms of Use (利用規約)
+Users use this software at their own risk. For critical applications such as structural calculations, chemical reaction predictions, or financial transactions, please ensure verification by experts before use.
 
-1.  **合法的な利用**: 本ソフトウェアを、法令に違反する目的、または公序良俗に反する目的（マルウェアの作成、サイバー攻撃の試行、違法な取引の計算などを含む）で使用することを禁止します。
-2.  **プラットフォームの保護**: 本ソフトウェア上で、仮想通貨のマイニングや、ホスティングサーバー（GitHub Pages等）に過度な負荷をかけるスクリプトを実行することを禁止します。
+## Terms of Use
+
+1. **Legal Use**: It is prohibited to use this software for any purpose that violates laws or public order (including malware creation, cyberattacks, or calculations for illegal transactions).
+2. **Platform Protection**: It is prohibited to use this software for cryptocurrency mining or running scripts that place an excessive load on hosting servers (e.g., GitHub Pages).
 
 ## License & Credits
 
