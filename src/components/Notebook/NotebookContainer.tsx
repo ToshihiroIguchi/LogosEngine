@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Download, PlayCircle, Plus, Globe, Loader2, Info, BookOpen, ChevronDown, Upload, Square } from 'lucide-react';
+import { Download, PlayCircle, Plus, Loader2, Info, BookOpen, ChevronDown, Upload, Square } from 'lucide-react';
 import { useNotebook } from '../../context/NotebookContext';
 import { CellItem } from './CellItem';
 import { EXAMPLES } from '../../constants/examples';
@@ -61,7 +61,7 @@ export const NotebookContainer: React.FC = () => {
             />
             <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200/60 px-6 py-3 flex items-center justify-between shadow-sm">
                 <div className="flex items-center gap-4">
-                    <div className="bg-blue-600 p-1.5 rounded-lg shadow-blue-200 shadow-lg"><Globe className="text-white" size={20} /></div>
+                    <div className="bg-white p-1 rounded-lg border border-gray-100 shadow-sm"><img src="/logo.png" alt="LogosEngine" className="w-8 h-8 object-contain" /></div>
                     <div>
                         <h1 className="text-lg font-bold text-gray-900 tracking-tight">LogosEngine</h1>
                         <p className="text-[10px] text-gray-400 font-medium tracking-widest uppercase -mt-0.5">Computational Knowledge System</p>
