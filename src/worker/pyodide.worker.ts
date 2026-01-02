@@ -221,8 +221,8 @@ def _get_completions(prefix, ctx):
     return completions
 `;
 
-// Flag to track if Matplotlib is ready
-let matplotlib_ready = false;
+
+// initPyodide starting
 
 async function initPyodide() {
     const start = performance.now();
@@ -278,7 +278,6 @@ def inject_plt(ctx):
             inject_plt(user_context);
             inject_plt.destroy();
 
-            matplotlib_ready = true;
             console.log(`Worker: Matplotlib loaded in background in ${(performance.now() - tBackground).toFixed(0)}ms`);
         } catch (e) {
             console.error('Worker: Failed to load background packages', e);
