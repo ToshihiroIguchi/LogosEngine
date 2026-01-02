@@ -1,13 +1,15 @@
 import React, { useState, useRef } from 'react';
-import { Download, PlayCircle, Plus, Globe, Loader2, Info, BookOpen, ChevronDown, Upload } from 'lucide-react';
+import { Download, PlayCircle, Plus, Globe, Loader2, Info, BookOpen, ChevronDown, Upload, Square } from 'lucide-react';
 import { useNotebook } from '../../context/NotebookContext';
 import { CellItem } from './CellItem';
 import { EXAMPLES } from '../../constants/examples';
 
 export const NotebookContainer: React.FC = () => {
-    const { cells, addCell, executeAll, isReady, insertExample, importNotebook } = useNotebook();
+    const { cells, addCell, executeAll, interrupt, isReady, insertExample, importNotebook } = useNotebook();
     const [showExamples, setShowExamples] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const isExecutingAny = cells.some(c => c.isExecuting);
 
     const handleExport = () => {
         const data = JSON.stringify({ cells, version: '1.0' }, null, 2);
@@ -99,7 +101,12 @@ export const NotebookContainer: React.FC = () => {
                                 </div>
                             )}
                         </div>
-                        <button onClick={executeAll} disabled={!isReady} className="flex items-center gap-2 px-4 py-1.5 bg-white text-blue-600 rounded-lg shadow-sm border border-gray-200 hover:bg-blue-50 transition-all font-medium text-xs disabled:opacity-50">
+                        {isExecutingAny && (
+                            <button onClick={interrupt} className="flex items-center gap-2 px-4 py-1.5 bg-red-50 text-red-600 rounded-lg shadow-sm border border-red-200 hover:bg-red-100 transition-all font-medium text-xs animate-pulse">
+                                <Square size={14} fill="currentColor" />Stop
+                            </button>
+                        )}
+                        <button onClick={executeAll} disabled={!isReady || isExecutingAny} className="flex items-center gap-2 px-4 py-1.5 bg-white text-blue-600 rounded-lg shadow-sm border border-gray-200 hover:bg-blue-50 transition-all font-medium text-xs disabled:opacity-50">
                             <PlayCircle size={14} />Run All
                         </button>
                         <button onClick={handleImport} className="flex items-center gap-2 px-4 py-1.5 text-gray-600 rounded-lg hover:bg-white transition-all font-medium text-xs">

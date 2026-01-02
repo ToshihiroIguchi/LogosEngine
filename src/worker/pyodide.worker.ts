@@ -4,6 +4,9 @@ import type { Output } from '../types';
 
 let pyodide: PyodideInterface;
 
+// Isolated context for user variables (Python dictionary)
+let user_context: any;
+
 const INITIAL_PYTHON_CODE = `
 import sys
 import io
@@ -13,11 +16,17 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from sympy import *
 
-# Default symbols
-x, y, z, t = symbols('x y z t')
+# Setup the user context with default symbols
+def setup_context(ctx):
+    # Default symbols
+    ctx['x'], ctx['y'], ctx['z'], ctx['t'] = symbols('x y z t')
+    # Make sure common modules are available in user scope
+    ctx['plt'] = plt
+    ctx['symbols'] = symbols
+    # Add other common sympy/matplotlib functions as needed
 
-def execute_cell(code):
-    # Close previous figures instead of clf() to avoid creating a blank one
+def execute_cell(code, ctx):
+    # Close previous figures
     plt.close('all')
     
     stdout_buffer = io.StringIO()
@@ -32,11 +41,11 @@ def execute_cell(code):
             exec_code = '\\n'.join(lines[:-1])
             eval_code = lines[-1]
             if exec_code:
-                exec(exec_code, globals())
+                exec(exec_code, ctx)
             try:
-                result_val = eval(eval_code, globals())
+                result_val = eval(eval_code, ctx)
             except:
-                exec(eval_code, globals())
+                exec(eval_code, ctx)
                 result_val = None
         else:
             result_val = None
@@ -55,7 +64,6 @@ def execute_cell(code):
             pass
             
     img_base64 = None
-    # Only capture if a figure was actually created/modified
     if plt.get_fignums():
         buf = io.BytesIO()
         plt.savefig(buf, format='png', bbox_inches='tight')
@@ -82,6 +90,13 @@ async function initPyodide() {
         await pyodide.loadPackage(['sympy', 'matplotlib']);
         console.log('Worker: Packages loaded. Running initial Python code...');
         await pyodide.runPythonAsync(INITIAL_PYTHON_CODE);
+
+        // Initialize user context as a Python dictionary
+        user_context = pyodide.runPython("{}");
+        const setup_context = pyodide.globals.get("setup_context");
+        setup_context(user_context);
+        setup_context.destroy();
+
         console.log('Worker: Engine Ready.');
         self.postMessage({ type: 'READY' });
     } catch (err) {
@@ -95,7 +110,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
         try {
             if (!pyodide) throw new Error('Engine not ready');
             const execute_cell = pyodide.globals.get("execute_cell");
-            const resultProxy = execute_cell(code);
+            const resultProxy = execute_cell(code, user_context);
             const result = resultProxy.toJs({ dict_converter: Object.fromEntries });
             resultProxy.destroy();
 

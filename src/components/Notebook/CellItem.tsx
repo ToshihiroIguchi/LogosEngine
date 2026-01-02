@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Trash2, PlusCircle, Clock } from 'lucide-react';
+import { Play, Trash2, PlusCircle, Clock, Square } from 'lucide-react';
 import type { Cell } from '../../types';
 import { useNotebook } from '../../context/NotebookContext';
 import { CellOutput } from './CellOutput';
@@ -16,7 +16,7 @@ interface CellItemProps {
 }
 
 export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
-    const { updateCell, executeCell, deleteCell, addCell, isReady } = useNotebook();
+    const { updateCell, executeCell, deleteCell, addCell, interrupt, isReady } = useNotebook();
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && e.shiftKey) {
@@ -49,9 +49,15 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                         )}
                     </div>
                     <div className="flex items-center gap-1">
-                        <button onClick={() => executeCell(cell.id)} disabled={cell.isExecuting} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-30">
-                            <Play size={14} fill="currentColor" />
-                        </button>
+                        {cell.isExecuting ? (
+                            <button onClick={interrupt} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors animate-pulse">
+                                <Square size={14} fill="currentColor" />
+                            </button>
+                        ) : (
+                            <button onClick={() => executeCell(cell.id)} disabled={cell.isExecuting} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-30">
+                                <Play size={14} fill="currentColor" />
+                            </button>
+                        )}
                         <button onClick={() => deleteCell(cell.id)} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                             <Trash2 size={14} />
                         </button>

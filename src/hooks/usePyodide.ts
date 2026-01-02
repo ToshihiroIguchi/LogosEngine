@@ -7,7 +7,12 @@ export function usePyodide() {
     const resolversRef = useRef<Map<string, (response: WorkerResponse) => void>>(new Map());
     const queueRef = useRef<Array<{ id: string; code: string; resolve: (response: WorkerResponse) => void }>>([]);
 
-    useEffect(() => {
+    const initWorker = useCallback(() => {
+        setIsReady(false);
+        if (workerRef.current) {
+            workerRef.current.terminate();
+        }
+
         const worker = new Worker(new URL('../worker/pyodide.worker.ts', import.meta.url), {
             type: 'module'
         });
@@ -37,8 +42,12 @@ export function usePyodide() {
         };
 
         workerRef.current = worker;
-        return () => worker.terminate();
     }, []);
+
+    useEffect(() => {
+        initWorker();
+        return () => workerRef.current?.terminate();
+    }, [initWorker]);
 
     const execute = useCallback((code: string): Promise<WorkerResponse> => {
         if (!workerRef.current) return Promise.reject(new Error('Worker not initialized'));
@@ -58,5 +67,25 @@ export function usePyodide() {
         });
     }, [isReady]);
 
-    return { isReady, execute };
+    const interrupt = useCallback(() => {
+        // Clear all pending state
+        resolversRef.current.forEach((resolve) => {
+            resolve({
+                id: 'interrupted',
+                status: 'ERROR',
+                results: [{
+                    type: 'error',
+                    value: 'Execution interrupted and engine reset.',
+                    timestamp: Date.now()
+                }]
+            });
+        });
+        resolversRef.current.clear();
+        queueRef.current = [];
+
+        // Restart the worker
+        initWorker();
+    }, [initWorker]);
+
+    return { isReady, execute, interrupt };
 }

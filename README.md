@@ -124,9 +124,29 @@ LogosEngine uses a Web Worker architecture to run Python code without blocking t
            Results
 ```
 
-## License
+## Disclaimer (免責事項)
 
-MIT License - see LICENSE file for details
+本ソフトウェアは、「現状のまま（AS IS）」提供されるものであり、明示または黙示を問わず、商品性、特定の目的への適合性、および権利侵害がないことの保証を含め、いかなる保証も行いません。
+本ソフトウェアの使用（計算結果の利用を含む）に起因して、ユーザーまたは第三者に生じた損害（直接的、間接的、偶発的、特別、懲罰的、結果的損害を含むがこれに限られない）について、著作権者および開発者は一切の責任を負いません。
+ユーザーは、自己の責任において本ソフトウェアを使用するものとします。特に、構造計算、化学反応予測、金融取引などのクリティカルな用途においては、必ず専門家による検証を経てから利用してください。
+
+## Terms of Use (利用規約)
+
+1.  **合法的な利用**: 本ソフトウェアを、法令に違反する目的、または公序良俗に反する目的（マルウェアの作成、サイバー攻撃の試行、違法な取引の計算などを含む）で使用することを禁止します。
+2.  **プラットフォームの保護**: 本ソフトウェア上で、仮想通貨のマイニングや、ホスティングサーバー（GitHub Pages等）に過度な負荷をかけるスクリプトを実行することを禁止します。
+
+## License & Credits
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+### Third Party Libraries
+This software uses the following open source libraries:
+
+*   **Pyodide**: Licensed under the Mozilla Public License 2.0 (MPL 2.0).
+*   **SymPy**: Licensed under the New BSD License.
+*   **React**: Licensed under the MIT License.
+*   **Vite**: Licensed under the MIT License.
+*   **Tailwind CSS**: Licensed under the MIT License.
 
 ## Contributing
 
