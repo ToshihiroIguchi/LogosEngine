@@ -2,6 +2,8 @@
 
 A Mathematica-like computational notebook that runs entirely in your browser using WebAssembly.
 
+🚀 **[Live Demo](https://logosengine.tosihihiroiguchigithub.workers.dev/)**
+
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.11-blue.svg)
 ![React](https://img.shields.io/badge/react-19.2-blue.svg)
@@ -15,29 +17,40 @@ A Mathematica-like computational notebook that runs entirely in your browser usi
 - **Smart Execution Queue**: Start working immediately - code executes automatically when the engine is ready
 - **Example Library**: 8 built-in code templates to help you get started
 
-## Quick Start
+## Local Development Setup
 
-### Installation
+To run LogosEngine on your local machine for development or personal use, follow these detailed steps.
 
+### Prerequisites
+
+- **Node.js**: Version 18.0 or higher is recommended.
+- **npm**: Usually comes with Node.js.
+
+### 1. Clone the Repository
+Open your terminal and run:
 ```bash
-# Clone the repository
 git clone https://github.com/ToshihiroIguchi/LogosEngine.git
 cd LogosEngine
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
 ```
 
-Open http://localhost:5173/ in your browser.
+### 2. Install Dependencies
+Install the required React and build tool dependencies:
+```bash
+npm install
+```
 
-### First Run
+### 3. Start the Development Server
+Launch the Vite development server:
+```bash
+npm run dev
+```
+By default, the application will be available at `http://localhost:5173/`.
 
-1. Wait for "Engine Ready" to appear (30-60 seconds on first load)
-2. The welcome cell contains a sample calculation - press `Shift+Enter` to execute
-3. Click the purple "Examples" button to explore more features
+### 4. Access the Notebook
+1. Open your web browser and navigate to `http://localhost:5173/`.
+2. **Initialization**: On the first load, the app will download the Pyodide runtime and required Python packages (SymPy, Matplotlib). This can take 30-60 seconds depending on your connection.
+3. **Engine Ready**: Once the status in the header changes to "Engine Ready", you can begin executing Python code.
+4. **Execution**: Type your code in a cell and press `Shift+Enter` to run it.
 
 ## Usage Examples
 
