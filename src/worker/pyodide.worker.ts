@@ -78,8 +78,33 @@ def execute_cell(code, ctx):
         "result": str(result_val) if result_val is not None else None,
         "latex": latex_res,
         "image": img_base64,
-        "error": error
+        "error": error,
+        "tsv": get_tsv(result_val)
     }
+
+def get_tsv(val):
+    if val is None: return None
+    try:
+        # Check for SymPy Matrix
+        if hasattr(val, 'rows') and hasattr(val, 'cols'):
+            lines = []
+            for r in range(val.rows):
+                lines.append("\\t".join([str(val[r, c]) for c in range(val.cols)]))
+            return "\\n".join(lines)
+        
+        # Check for list of lists (2D array)
+        if isinstance(val, (list, tuple)) and len(val) > 0 and isinstance(val[0], (list, tuple)):
+            lines = []
+            for row in val:
+                lines.append("\\t".join([str(x) for x in row]))
+            return "\\n".join(lines)
+            
+        # Check for flat list
+        if isinstance(val, (list, tuple)):
+            return "\\n".join([str(x) for x in val])
+    except:
+        pass
+    return None
 `;
 
 async function initPyodide() {
@@ -131,9 +156,21 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
                 outputs.push({ type: 'error', value: result.error, timestamp });
             } else {
                 if (result.latex && result.latex !== 'None' && result.latex.trim()) {
-                    outputs.push({ type: 'latex', value: result.latex, timestamp });
+                    outputs.push({
+                        type: 'latex',
+                        value: result.latex,
+                        rawText: result.result,
+                        tsv: result.tsv,
+                        timestamp
+                    });
                 } else if (result.result && result.result !== 'None' && result.result.trim()) {
-                    outputs.push({ type: 'text', value: result.result, timestamp });
+                    outputs.push({
+                        type: 'text',
+                        value: result.result,
+                        rawText: result.result,
+                        tsv: result.tsv,
+                        timestamp
+                    });
                 }
 
                 if (result.image) {

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, ChevronDown, Code, Table, FileText } from 'lucide-react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import type { Output } from '../../types';
@@ -43,10 +43,10 @@ export const CellOutput: React.FC<CellOutputProps> = ({ outputs, executionCount 
                             </pre>
                         )}
 
-                        {/* Hover Copy Button */}
+                        {/* Hover Copy Menu */}
                         {output.type !== 'image' && (
                             <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <CopyButton text={output.value} />
+                                <CopyMenu output={output} />
                             </div>
                         )}
                     </div>
@@ -56,27 +56,73 @@ export const CellOutput: React.FC<CellOutputProps> = ({ outputs, executionCount 
     );
 };
 
-const CopyButton: React.FC<{ text: string }> = ({ text }) => {
+const CopyMenu: React.FC<{ output: Output }> = ({ output }) => {
+    const [isOpen, setIsOpen] = useState(false);
     const [copied, setCopied] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
 
-    const handleCopy = async () => {
+    const handleCopy = async (text: string) => {
         try {
             await navigator.clipboard.writeText(text);
             setCopied(true);
+            setIsOpen(false);
             setTimeout(() => setCopied(false), 2000);
         } catch (err) {
             console.error('Failed to copy text: ', err);
         }
     };
 
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
     return (
-        <button
-            onClick={handleCopy}
-            className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-white rounded border border-transparent hover:border-gray-200 transition-all shadow-sm bg-white/50 backdrop-blur-sm"
-            title="Copy to clipboard"
-        >
-            {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
-        </button>
+        <div className="relative" ref={menuRef}>
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-white rounded border border-transparent hover:border-gray-200 transition-all shadow-sm bg-white/50 backdrop-blur-sm flex items-center gap-1"
+                title="Copy options"
+            >
+                {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+                <ChevronDown size={10} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isOpen && (
+                <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-50 py-1 min-w-[140px] animate-in fade-in zoom-in-95 duration-150">
+                    <button
+                        onClick={() => handleCopy(output.value)}
+                        className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-blue-50 flex items-center gap-2 transition-colors font-medium border-b border-gray-50 last:border-0"
+                    >
+                        <FileText size={12} className="text-blue-400" />
+                        Copy as LaTeX
+                    </button>
+                    {output.rawText && (
+                        <button
+                            onClick={() => handleCopy(output.rawText!)}
+                            className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-blue-50 flex items-center gap-2 transition-colors font-medium border-b border-gray-50 last:border-0"
+                        >
+                            <Code size={12} className="text-purple-400" />
+                            Copy as Code
+                        </button>
+                    )}
+                    {output.tsv && (
+                        <button
+                            onClick={() => handleCopy(output.tsv!)}
+                            className="w-full text-left px-3 py-2 text-xs text-green-700 hover:bg-green-50 flex items-center gap-2 transition-colors font-medium"
+                        >
+                            <Table size={12} className="text-green-500" />
+                            Copy for Excel
+                        </button>
+                    )}
+                </div>
+            )}
+        </div>
     );
 };
 

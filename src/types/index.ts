@@ -3,6 +3,8 @@ export type CellType = 'code' | 'markdown';
 export interface Output {
   type: 'text' | 'latex' | 'image' | 'error';
   value: string;
+  rawText?: string;
+  tsv?: string;
   timestamp: number;
 }
 
