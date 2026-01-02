@@ -46,30 +46,35 @@ npm run dev
 ```
 By default, the application will be available at `http://localhost:5173/`.
 
-## Running with Python (Static Hosting)
+## Pythonを使用したサーバーの起動 (静的ホスティング)
 
-If you prefer to use Python for hosting (e.g., in an environment where you don't want to keep Node.js running), you can serve the production build using Python's built-in HTTP server.
+Node.js (npm) を常駐させたくない場合や、Python環境メインで利用したい場合は、ビルド済みの静的ファイルをPythonで配信できます。
 
-### 1. Build the project (Requires Node.js once)
-First, generate the static files:
+### 1. ビルド (初回またはコード変更時のみ)
+ソースコードをブラウザが解読できる形式に変換するため、一度だけNode.js環境でビルドを行います。
 ```bash
 npm run build
 ```
-This creates a `dist` directory with all necessary files.
+これにより、公開用の全ファイルが `dist` フォルダに出力されます。
 
-### 2. Start the Python Server
-Navigate to the `dist` directory and start the server:
+### 2. Pythonスクリプトによる起動 (推奨)
+Windows環境などでJavaScriptファイルが正しく認識されない（MIMEタイプエラー）のを防ぐため、専用の起動スクリプトを用意しています。
+```bash
+python serve.py
+```
+実行後、ブラウザで `http://localhost:8000` を開いてください。
+
+### 3. Python標準コマンドによる起動
+スクリプトを使わず、標準のワンライナーでも起動可能です（`dist`内に移動して実行します）。
 ```bash
 cd dist
 python -m http.server 8000
 ```
-Then open `http://localhost:8000` in your browser.
 
-> [!TIP]
-> This method is ideal for quick demonstrations or local sharing without the overhead of a development server.
-
-### 3. Python-only Deployment (No Node.js on Server)
-If you are deploying to a server that only has Python, you can simply upload the contents of the `dist` folder to that server and run the command above. The application itself runs entirely in the client's browser, so the server only needs to provide the static files.
+### なぜPythonサーバーが便利なのか？
+- **軽量**: Node.jsの重いプロセスを動かし続ける必要がありません。
+- **ポータビリティ**: `dist` フォルダと `serve.py` さえあれば、PythonがインストールされているどのPCでも LogosEngine を動かせます。USBメモリに入れて持ち運ぶことも可能です。
+- **デプロイの容易さ**: 公開サーバーがPythonのみをサポートしている場合でも、`dist` の中身をアップロードするだけで公開が完了します。
 
 ### 4. Access the Notebook
 1. Open your web browser and navigate to the address shown (usually `http://localhost:8000`).
