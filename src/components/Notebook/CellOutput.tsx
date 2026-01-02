@@ -18,7 +18,7 @@ export const CellOutput: React.FC<CellOutputProps> = ({ outputs, executionCount 
         <div className="mt-1 space-y-4 border-l-2 border-gray-100 pl-4 py-2 bg-gray-50/30 rounded-r-lg">
             {validOutputs.map((output, idx) => (
                 <div key={`${output.timestamp}-${idx}`} className="group relative flex gap-4 animate-in fade-in slide-in-from-top-1 duration-300">
-                    {/* Mathematica style Output Label */}
+                    {/* Output Label */}
                     <div className="flex-shrink-0 w-12 pt-1 text-right">
                         <span className="text-[10px] font-bold text-gray-400 font-mono tracking-tighter opacity-70">
                             {executionCount ? `Out [${executionCount}]:` : 'Out:'}

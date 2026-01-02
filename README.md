@@ -1,6 +1,6 @@
 # LogosEngine
 
-A Mathematica-like computational notebook that runs entirely in your browser using WebAssembly.
+A scientific computational notebook that runs entirely in your browser using WebAssembly.
 
 🚀 **[Live Demo](https://logosengine.tosihihiroiguchigithub.workers.dev/)**
 
@@ -205,4 +205,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 - Built with [Pyodide](https://pyodide.org/)
 - Powered by [SymPy](https://www.sympy.org/)
-- Inspired by Mathematica and Jupyter Notebook
+- Inspired by scientific computational notebooks and Jupyter Notebook
