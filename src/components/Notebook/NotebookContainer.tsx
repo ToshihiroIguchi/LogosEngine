@@ -120,7 +120,7 @@ export const NotebookContainer: React.FC = () => {
                     </div>
                 </div>
             </header>
-            <main className="flex-1 w-full max-w-4xl mx-auto px-6 py-12">
+            <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-12">
                 <div className="space-y-4">
                     {cells.map((cell, index) => <CellItem key={cell.id} cell={cell} index={index} />)}
                 </div>
