@@ -79,9 +79,9 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                         </button>
                     </div>
                 </div>
-                <div className="relative min-h-[100px]">
+                <div className="relative">
                     <MonacoEditor
-                        height="100px"
+                        height={Math.max(100, (cell.content.split('\n').length + 1) * 19 + 32) + 'px'}
                         language="python"
                         value={cell.content}
                         onChange={(value) => updateCell(cell.id, value || '')}
@@ -100,13 +100,24 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                             padding: { top: 16, bottom: 16 },
                             wordWrap: 'on',
                             scrollbar: {
-                                vertical: 'hidden',
+                                vertical: 'auto',
                                 horizontal: 'hidden',
-                                handleMouseWheel: false
                             },
                             overviewRulerLanes: 0,
                             hideCursorInOverviewRuler: true,
                             overviewRulerBorder: false,
+                            suggest: {
+                                showKeywords: true,
+                                showSnippets: false,
+                            },
+                            quickSuggestions: {
+                                other: true,
+                                comments: false,
+                                strings: false
+                            },
+                            suggestOnTriggerCharacters: true,
+                            acceptSuggestionOnEnter: 'on',
+                            tabCompletion: 'on',
                         }}
                         theme="vs"
                     />

@@ -5,12 +5,16 @@ export function registerPythonCompletionProvider(
     monaco: typeof import('monaco-editor'),
     getCompletions: (code: string, position: number) => Promise<CompletionResponse>
 ): void {
+    console.log('[Monaco] Registering Python completion provider');
     monaco.languages.registerCompletionItemProvider('python', {
         provideCompletionItems: async (model, position) => {
+            console.log('[Monaco] provideCompletionItems called');
             const code = model.getValue();
             const offset = model.getOffsetAt(position);
+            console.log('[Monaco] Code:', code, 'Offset:', offset);
 
             const response = await getCompletions(code, offset);
+            console.log('[Monaco] Got completions:', response);
 
             const suggestions: languages.CompletionItem[] = response.completions.map(item => {
                 let kind: languages.CompletionItemKind;
@@ -44,6 +48,7 @@ export function registerPythonCompletionProvider(
                 };
             });
 
+            console.log('[Monaco] Returning suggestions:', suggestions);
             return { suggestions };
         }
     });
