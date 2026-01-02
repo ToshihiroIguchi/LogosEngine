@@ -34,8 +34,8 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
     return (
         <div className="group relative mb-6">
             <div className={cn(
-                "flex flex-col border rounded-xl transition-all duration-200 bg-white relative",
-                cell.isExecuting ? (isQueued ? "ring-2 ring-amber-400 border-amber-400 shadow-md z-20" : "ring-2 ring-blue-400 border-blue-400 shadow-md z-20") : "border-gray-200 shadow-sm hover:border-gray-300 hover:z-10 focus-within:z-30"
+                "flex flex-col border rounded-xl transition-colors transition-shadow duration-200 bg-white relative overflow-visible",
+                cell.isExecuting ? (isQueued ? "ring-2 ring-amber-400 border-amber-400 shadow-md z-20" : "ring-2 ring-blue-400 border-blue-400 shadow-md z-20") : "border-gray-200 shadow-sm hover:border-gray-300 hover:z-[50] focus-within:z-[50]"
             )}>
                 <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50/50 border-b border-gray-100 opacity-60 group-hover:opacity-100 transition-opacity rounded-t-xl">
                     <div className="flex items-center gap-3">
