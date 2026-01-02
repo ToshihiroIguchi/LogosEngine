@@ -46,7 +46,8 @@ const LatexRenderer: React.FC<{ value: string }> = ({ value }) => {
             try {
                 katex.render(value, containerRef.current, {
                     throwOnError: false,
-                    displayMode: true
+                    displayMode: true,
+                    fleqn: true // Align to the left (Mathematica style)
                 });
             } catch (err) {
                 containerRef.current.textContent = value;
@@ -54,5 +55,9 @@ const LatexRenderer: React.FC<{ value: string }> = ({ value }) => {
         }
     }, [value]);
 
-    return <div ref={containerRef} className="overflow-x-auto py-1 text-blue-900" />;
+    return (
+        <div className="overflow-x-auto py-1 text-blue-900 text-left">
+            <div ref={containerRef} />
+        </div>
+    );
 };
