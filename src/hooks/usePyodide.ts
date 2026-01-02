@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { WorkerRequest, WorkerResponse } from '../worker/workerTypes';
+import type { WorkerRequest, WorkerResponse, CompletionRequest, CompletionResponse } from '../worker/workerTypes';
 
 export function usePyodide() {
     const [isReady, setIsReady] = useState(false);
     const workerRef = useRef<Worker | null>(null);
-    const resolversRef = useRef<Map<string, (response: WorkerResponse) => void>>(new Map());
-    const queueRef = useRef<Array<{ id: string; code: string; resolve: (response: WorkerResponse) => void }>>([]);
+    const resolversRef = useRef<Map<string, (response: WorkerResponse | CompletionResponse) => void>>(new Map());
+    const queueRef = useRef<Array<{ id: string; code: string; resolve: (response: WorkerResponse | CompletionResponse) => void }>>([]);
 
     const initWorker = useCallback(() => {
         setIsReady(false);
@@ -56,11 +56,9 @@ export function usePyodide() {
 
         return new Promise((resolve) => {
             if (!isReady) {
-                // Queue the execution for when the engine becomes ready
-                queueRef.current.push({ id, code, resolve });
+                queueRef.current.push({ id, code, resolve: resolve as any });
             } else {
-                // Execute immediately
-                resolversRef.current.set(id, resolve);
+                resolversRef.current.set(id, resolve as any);
                 const request: WorkerRequest = { id, action: 'EXECUTE', code };
                 workerRef.current?.postMessage(request);
             }
@@ -87,5 +85,19 @@ export function usePyodide() {
         initWorker();
     }, [initWorker]);
 
-    return { isReady, execute, interrupt };
+    const getCompletions = useCallback((code: string, position: number): Promise<CompletionResponse> => {
+        if (!workerRef.current || !isReady) {
+            return Promise.resolve({ id: '', completions: [] });
+        }
+
+        const id = crypto.randomUUID();
+
+        return new Promise((resolve) => {
+            resolversRef.current.set(id, resolve as any);
+            const request: CompletionRequest = { id, action: 'COMPLETE', code, position };
+            workerRef.current?.postMessage(request);
+        });
+    }, [isReady]);
+
+    return { isReady, execute, interrupt, getCompletions };
 }

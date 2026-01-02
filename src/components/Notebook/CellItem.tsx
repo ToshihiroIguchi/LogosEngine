@@ -1,9 +1,7 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Play, Trash2, PlusCircle, Clock, Square } from 'lucide-react';
-import Editor from 'react-simple-code-editor';
-import { highlight, languages } from 'prismjs';
-import 'prismjs/components/prism-python';
-import 'prismjs/themes/prism.css';
+import MonacoEditor from '@monaco-editor/react';
+import type { editor } from 'monaco-editor';
 import type { Cell } from '../../types';
 import { useNotebook } from '../../context/NotebookContext';
 import { CellOutput } from './CellOutput';
@@ -21,12 +19,19 @@ interface CellItemProps {
 
 export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
     const { updateCell, executeCell, deleteCell, addCell, interrupt, isReady } = useNotebook();
+    const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && e.shiftKey) {
-            e.preventDefault();
-            executeCell(cell.id);
-        }
+    const handleEditorDidMount = (editor: editor.IStandaloneCodeEditor) => {
+        editorRef.current = editor;
+
+        editor.addAction({
+            id: 'execute-cell',
+            label: 'Execute Cell',
+            keybindings: [2048 | 3],
+            run: () => {
+                executeCell(cell.id);
+            }
+        });
     };
 
     const isQueued = cell.isExecuting && !isReady;
@@ -67,20 +72,36 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                         </button>
                     </div>
                 </div>
-                <div className="relative min-h-[100px] p-2">
-                    <Editor
+                <div className="relative min-h-[100px]">
+                    <MonacoEditor
+                        height="100px"
+                        language="python"
                         value={cell.content}
-                        onValueChange={(code) => updateCell(cell.id, code)}
-                        highlight={(code) => highlight(code, languages.python, 'python')}
-                        padding={16}
-                        className="font-mono text-sm leading-relaxed outline-none"
-                        style={{
+                        onChange={(value) => updateCell(cell.id, value || '')}
+                        onMount={handleEditorDidMount}
+                        options={{
+                            minimap: { enabled: false },
+                            lineNumbers: 'off',
+                            glyphMargin: false,
+                            folding: false,
+                            lineDecorationsWidth: 0,
+                            lineNumbersMinChars: 0,
+                            scrollBeyondLastLine: false,
+                            automaticLayout: true,
+                            fontSize: 14,
                             fontFamily: '"JetBrains Mono", "Fira Code", monospace',
-                            minHeight: '80px'
+                            padding: { top: 16, bottom: 16 },
+                            wordWrap: 'on',
+                            scrollbar: {
+                                vertical: 'hidden',
+                                horizontal: 'hidden',
+                                handleMouseWheel: false
+                            },
+                            overviewRulerLanes: 0,
+                            hideCursorInOverviewRuler: true,
+                            overviewRulerBorder: false,
                         }}
-                        textareaId={`editor-${cell.id}`}
-                        textareaClassName="outline-none focus:ring-0"
-                        onKeyDown={handleKeyDown}
+                        theme="vs"
                     />
                 </div>
                 {cell.outputs.length > 0 && (

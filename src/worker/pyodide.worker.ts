@@ -1,5 +1,5 @@
 import { loadPyodide, type PyodideInterface } from 'pyodide';
-import type { WorkerRequest } from './workerTypes';
+import type { WorkerRequest, CompletionRequest } from './workerTypes';
 import type { Output, Variable } from '../types';
 
 let pyodide: PyodideInterface;
@@ -122,6 +122,49 @@ def _get_help(name, ctx):
         "docstring": doc or "No documentation found.",
         "module": module.__name__ if module else None
     }
+
+def _get_completions(prefix, ctx):
+    import builtins
+    completions = []
+    
+    all_names = set(dir(builtins)) | set(ctx.keys())
+    
+    for name in all_names:
+        if name.startswith('_'):
+            continue
+        if not prefix or name.startswith(prefix):
+            try:
+                obj = ctx.get(name) if name in ctx else getattr(builtins, name, None)
+                if obj is None:
+                    continue
+                    
+                obj_type = type(obj).__name__
+                kind = 'Variable'
+                if callable(obj):
+                    if obj_type == 'type':
+                        kind = 'Class'
+                    else:
+                        kind = 'Function'
+                elif obj_type == 'module':
+                    kind = 'Module'
+                    
+                detail = ''
+                try:
+                    import inspect
+                    if callable(obj) and kind == 'Function':
+                        detail = str(inspect.signature(obj))
+                except:
+                    pass
+                    
+                completions.append({
+                    'label': name,
+                    'kind': kind,
+                    'detail': detail
+                })
+            except:
+                pass
+    
+    return completions
 `;
 
 async function initPyodide() {
@@ -152,9 +195,37 @@ async function initPyodide() {
     }
 }
 
-self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
-    const { id, action, code } = event.data;
+self.onmessage = async (event: MessageEvent<WorkerRequest | CompletionRequest>) => {
+    const { id, action } = event.data;
+
+    if (action === 'COMPLETE') {
+        try {
+            if (!pyodide) throw new Error('Engine not ready');
+
+            const { code, position } = event.data as CompletionRequest;
+            const prefix = code.substring(0, position).split(/\s+/).pop() || '';
+
+            const _get_completions = pyodide.globals.get("_get_completions");
+            const completionsProxy = _get_completions(prefix, user_context);
+            const completions = completionsProxy.toJs({ dict_converter: Object.fromEntries });
+            completionsProxy.destroy();
+
+            self.postMessage({
+                id,
+                completions
+            });
+            return;
+        } catch (err: any) {
+            self.postMessage({
+                id,
+                completions: []
+            });
+            return;
+        }
+    }
+
     if (action === 'EXECUTE') {
+        const { code } = event.data as WorkerRequest;
         try {
             if (!pyodide) throw new Error('Engine not ready');
 
