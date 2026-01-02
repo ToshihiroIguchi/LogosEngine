@@ -22,6 +22,7 @@ interface NotebookContextType {
     interrupt: () => void;
     insertExample: (code: string) => void;
     importNotebook: (data: any) => void;
+    getCompletions: (code: string, position: number) => Promise<import('../worker/workerTypes').CompletionResponse>;
 }
 
 const NotebookContext = createContext<NotebookContextType | undefined>(undefined);
@@ -34,7 +35,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     const [activeDocumentation, setActiveDocumentation] = useState<Documentation | null>(null);
     const [activeTab, setActiveTab] = useState<SidebarTab>('variables');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const { isReady, execute, interrupt: pyodideInterrupt } = usePyodide();
+    const { isReady, execute, interrupt: pyodideInterrupt, getCompletions } = usePyodide();
 
     const addCell = useCallback((type: 'code' | 'markdown', index?: number) => {
         const newCell: Cell = { id: crypto.randomUUID(), type, content: '', outputs: [], isExecuting: false };
@@ -133,7 +134,8 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         <NotebookContext.Provider value={{
             cells, variables, activeDocumentation, activeTab, setActiveTab,
             isSidebarOpen, setIsSidebarOpen,
-            isReady, addCell, updateCell, deleteCell, executeCell, executeAll, interrupt, insertExample, importNotebook
+            isReady, addCell, updateCell, deleteCell, executeCell, executeAll, interrupt, insertExample, importNotebook,
+            getCompletions
         }}>
             {children}
         </NotebookContext.Provider>

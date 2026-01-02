@@ -7,6 +7,7 @@ import { useNotebook } from '../../context/NotebookContext';
 import { CellOutput } from './CellOutput';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { registerPythonCompletionProvider } from '../../utils/monacoCompletionProvider';
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -18,11 +19,17 @@ interface CellItemProps {
 }
 
 export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
-    const { updateCell, executeCell, deleteCell, addCell, interrupt, isReady } = useNotebook();
+    const { updateCell, executeCell, deleteCell, addCell, interrupt, isReady, getCompletions } = useNotebook();
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+    const completionProviderRegistered = useRef(false);
 
-    const handleEditorDidMount = (editor: editor.IStandaloneCodeEditor) => {
+    const handleEditorDidMount = (editor: editor.IStandaloneCodeEditor, monaco: typeof import('monaco-editor')) => {
         editorRef.current = editor;
+
+        if (!completionProviderRegistered.current) {
+            registerPythonCompletionProvider(monaco, getCompletions);
+            completionProviderRegistered.current = true;
+        }
 
         editor.addAction({
             id: 'execute-cell',
