@@ -36,7 +36,10 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
         editor.addAction({
             id: 'execute-cell',
             label: 'Execute Cell',
-            keybindings: [2048 | 3],
+            keybindings: [
+                monaco.KeyMod.Shift | monaco.KeyCode.Enter,
+                monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter
+            ],
             run: () => {
                 executeCell(cell.id);
             }
