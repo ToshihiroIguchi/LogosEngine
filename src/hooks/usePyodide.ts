@@ -49,6 +49,19 @@ export function usePyodide() {
         return () => workerRef.current?.terminate();
     }, [initWorker]);
 
+    // Flush queue when engine becomes ready
+    useEffect(() => {
+        if (isReady && workerRef.current && queueRef.current.length > 0) {
+            const queue = queueRef.current;
+            queueRef.current = [];
+            queue.forEach(({ id, code, resolve }) => {
+                resolversRef.current.set(id, resolve);
+                const request: WorkerRequest = { id, action: 'EXECUTE', code };
+                workerRef.current?.postMessage(request);
+            });
+        }
+    }, [isReady]);
+
     const execute = useCallback((code: string): Promise<WorkerResponse> => {
         if (!workerRef.current) return Promise.reject(new Error('Worker not initialized'));
 

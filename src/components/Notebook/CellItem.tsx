@@ -23,6 +23,12 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
     const completionProviderRegistered = useRef(false);
     const monacoRef = useRef<any>(null);
+    const executeCellRef = useRef(executeCell);
+
+    // Keep the ref updated with the latest executeCell function to prevent stale closures
+    React.useEffect(() => {
+        executeCellRef.current = executeCell;
+    }, [executeCell]);
 
     const handleEditorDidMount = (editor: editor.IStandaloneCodeEditor, monaco: typeof import('monaco-editor')) => {
         editorRef.current = editor;
@@ -41,7 +47,7 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                 monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter
             ],
             run: () => {
-                executeCell(cell.id);
+                executeCellRef.current(cell.id);
             }
         });
     };
@@ -97,7 +103,7 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                 <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50/50 border-b border-gray-100 opacity-60 group-hover:opacity-100 transition-opacity rounded-t-xl">
                     <div className="flex items-center gap-3">
                         <span className="text-[10px] font-bold text-gray-400 font-mono tracking-wider uppercase">
-                            {cell.executionCount ? `[${cell.executionCount}]` : 'In [*]'}
+                            {cell.isExecuting ? 'In [*]' : (cell.executionCount ? `In [${cell.executionCount}]` : 'In [ ]')}
                         </span>
                         <span className="text-[10px] font-medium text-gray-500 uppercase tracking-widest bg-gray-200/50 px-1.5 py-0.5 rounded">
                             {cell.type}
