@@ -46,8 +46,33 @@ npm run dev
 ```
 By default, the application will be available at `http://localhost:5173/`.
 
+## Running with Python (Static Hosting)
+
+If you prefer to use Python for hosting (e.g., in an environment where you don't want to keep Node.js running), you can serve the production build using Python's built-in HTTP server.
+
+### 1. Build the project (Requires Node.js once)
+First, generate the static files:
+```bash
+npm run build
+```
+This creates a `dist` directory with all necessary files.
+
+### 2. Start the Python Server
+Navigate to the `dist` directory and start the server:
+```bash
+cd dist
+python -m http.server 8000
+```
+Then open `http://localhost:8000` in your browser.
+
+> [!TIP]
+> This method is ideal for quick demonstrations or local sharing without the overhead of a development server.
+
+### 3. Python-only Deployment (No Node.js on Server)
+If you are deploying to a server that only has Python, you can simply upload the contents of the `dist` folder to that server and run the command above. The application itself runs entirely in the client's browser, so the server only needs to provide the static files.
+
 ### 4. Access the Notebook
-1. Open your web browser and navigate to `http://localhost:5173/`.
+1. Open your web browser and navigate to the address shown (usually `http://localhost:8000`).
 2. **Initialization**: On the first load, the app will download the Pyodide runtime and required Python packages (SymPy, Matplotlib). This can take 30-60 seconds depending on your connection.
 3. **Engine Ready**: Once the status in the header changes to "Engine Ready", you can begin executing Python code.
 4. **Execution**: Type your code in a cell and press `Shift+Enter` to run it.
