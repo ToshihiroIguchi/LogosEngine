@@ -1,6 +1,11 @@
 import React, { useRef } from 'react';
-import { Play, Trash2, PlusCircle, Clock, Square } from 'lucide-react';
+import { Play, Trash2, PlusCircle, Clock, Square, ChevronUp, ChevronDown, Copy, Eraser, Eye } from 'lucide-react';
 import MonacoEditor from '@monaco-editor/react';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import remarkGfm from 'remark-gfm';
+import 'katex/dist/katex.min.css';
 import type { editor } from 'monaco-editor';
 import type { Cell } from '../../types';
 import { useNotebook } from '../../context/NotebookContext';
@@ -21,21 +26,24 @@ interface CellItemProps {
 export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
     const {
         updateCell, executeCell, deleteCell, addCell, interrupt, isReady, getCompletions,
-        focusedCellId, setFocusedCellId, selectNextCell
+        focusedCellId, setFocusedCellId, selectNextCell,
+        setCellEditing, moveCell, duplicateCell, clearCellOutput
     } = useNotebook();
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
     const completionProviderRegistered = useRef(false);
     const monacoRef = useRef<any>(null);
     const executeCellRef = useRef(executeCell);
     const selectNextCellRef = useRef(selectNextCell);
+    const setCellEditingRef = useRef(setCellEditing);
 
     // Keep the refs updated with the latest functions to prevent stale closures
     React.useEffect(() => {
         executeCellRef.current = executeCell;
         selectNextCellRef.current = selectNextCell;
-    }, [executeCell, selectNextCell]);
+        setCellEditingRef.current = setCellEditing;
+    }, [executeCell, selectNextCell, setCellEditing]);
 
-    const handleEditorDidMount = (editor: editor.IStandaloneCodeEditor, monaco: typeof import('monaco-editor')) => {
+    const handleEditorDidMount = React.useCallback((editor: editor.IStandaloneCodeEditor, monaco: typeof import('monaco-editor')) => {
         editorRef.current = editor;
         monacoRef.current = monaco;
 
@@ -52,7 +60,11 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                 monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter
             ],
             run: async () => {
-                await executeCellRef.current(cell.id);
+                if (cell.type === 'markdown') {
+                    setCellEditingRef.current(cell.id, false);
+                } else {
+                    await executeCellRef.current(cell.id);
+                }
                 selectNextCellRef.current(cell.id);
             }
         });
@@ -63,15 +75,16 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
             editor.focus();
             setFocusedCellId(null);
         }
-    };
+    }, [cell.id, cell.type, focusedCellId, setFocusedCellId, getCompletions]);
 
     // Handle focus when this cell is selected as the next cell
     React.useEffect(() => {
-        if (focusedCellId === cell.id && editorRef.current) {
+        const shouldFocus = cell.type === 'code' || cell.isEditing !== false;
+        if (focusedCellId === cell.id && editorRef.current && shouldFocus) {
             editorRef.current.focus();
             setFocusedCellId(null); // Reset after focusing
         }
-    }, [focusedCellId, cell.id, setFocusedCellId]);
+    }, [focusedCellId, cell.id, setFocusedCellId, cell.isEditing, cell.type]);
 
     // Sync error markers
     React.useEffect(() => {
@@ -114,14 +127,16 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
     };
 
     const isQueued = cell.isExecuting && !isReady;
+    const isEditing = cell.isEditing !== false; // For Markdown: true=edit, false=preview. For Code: irrelevant for display but handles undefined safely.
+    const showOutputs = cell.type === 'code' || !isEditing;
 
     return (
         <div className="group relative mb-6">
             <div className={cn(
-                "flex flex-col border rounded-xl transition-colors transition-shadow duration-200 bg-white relative overflow-visible",
+                "flex flex-col border rounded-xl transition-colors transition-shadow duration-200 bg-white relative overflow-visible print:border-none print:shadow-none",
                 cell.isExecuting ? (isQueued ? "ring-2 ring-amber-400 border-amber-400 shadow-md z-20" : "ring-2 ring-blue-400 border-blue-400 shadow-md z-20") : "border-gray-200 shadow-sm hover:border-gray-300 hover:z-[50] focus-within:z-[50]"
             )}>
-                <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50/50 border-b border-gray-100 opacity-60 group-hover:opacity-100 transition-opacity rounded-t-xl">
+                <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50/50 border-b border-gray-100 opacity-60 group-hover:opacity-100 transition-opacity rounded-t-xl print:hidden">
                     <div className="flex items-center gap-3">
                         <span className="text-[10px] font-bold text-gray-400 font-mono tracking-wider uppercase">
                             {cell.isExecuting ? 'In [*]' : (cell.executionCount ? `In [${cell.executionCount}]` : 'In [ ]')}
@@ -136,78 +151,135 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                             </span>
                         )}
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-0.5">
+                        <button onClick={() => moveCell(cell.id, 'up')} className="p-1 px-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors" title="Move Up">
+                            <ChevronUp size={14} />
+                        </button>
+                        <button onClick={() => moveCell(cell.id, 'down')} className="p-1 px-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors" title="Move Down">
+                            <ChevronDown size={14} />
+                        </button>
+                        <div className="w-px h-4 bg-gray-200 mx-1" />
+                        <button onClick={() => duplicateCell(cell.id)} className="p-1 px-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors" title="Duplicate">
+                            <Copy size={14} />
+                        </button>
+                        <button onClick={() => clearCellOutput(cell.id)} className="p-1 px-1.5 text-gray-400 hover:text-amber-500 hover:bg-amber-50 rounded transition-colors" title="Clear Output">
+                            <Eraser size={14} />
+                        </button>
+                        <div className="w-px h-4 bg-gray-200 mx-1" />
+                        {cell.type === 'markdown' && !isEditing && (
+                            <button onClick={() => setCellEditing(cell.id, true)} className="p-1 px-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Edit">
+                                <Eye size={14} />
+                            </button>
+                        )}
                         {cell.isExecuting ? (
-                            <button onClick={interrupt} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors animate-pulse">
+                            <button onClick={interrupt} className="p-1 px-1.5 text-red-600 hover:bg-red-50 rounded transition-colors animate-pulse">
                                 <Square size={14} fill="currentColor" />
                             </button>
                         ) : (
                             <button
                                 onClick={async () => {
-                                    await executeCell(cell.id);
+                                    if (cell.type === 'markdown') {
+                                        setCellEditing(cell.id, false);
+                                    } else {
+                                        await executeCell(cell.id);
+                                    }
                                     selectNextCell(cell.id);
                                 }}
                                 disabled={cell.isExecuting}
-                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-30"
+                                className="p-1 px-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors disabled:opacity-30"
+                                title={cell.type === 'markdown' ? 'Render' : 'Execute'}
                             >
                                 <Play size={14} fill="currentColor" />
                             </button>
                         )}
-                        <button onClick={() => deleteCell(cell.id)} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                        <button onClick={() => deleteCell(cell.id)} className="p-1 px-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors" title="Delete">
                             <Trash2 size={14} />
                         </button>
                     </div>
                 </div>
                 <div className="relative">
-                    <MonacoEditor
-                        height={Math.max(100, (cell.content.split('\n').length + 1) * 19 + 32) + 'px'}
-                        language="python"
-                        value={cell.content}
-                        onChange={handleContentChange}
-                        onMount={handleEditorDidMount}
-                        options={{
-                            minimap: { enabled: false },
-                            lineNumbers: 'off',
-                            glyphMargin: false,
-                            folding: false,
-                            lineDecorationsWidth: 0,
-                            lineNumbersMinChars: 0,
-                            scrollBeyondLastLine: false,
-                            automaticLayout: true,
-                            fontSize: 14,
-                            fontFamily: '"JetBrains Mono", "Fira Code", monospace',
-                            padding: { top: 16, bottom: 16 },
-                            wordWrap: 'on',
-                            scrollbar: {
-                                vertical: 'auto',
-                                horizontal: 'hidden',
-                            },
-                            overviewRulerLanes: 0,
-                            hideCursorInOverviewRuler: true,
-                            overviewRulerBorder: false,
-                            suggest: {
-                                showKeywords: true,
-                                showSnippets: false,
-                            },
-                            quickSuggestions: {
-                                other: true,
-                                comments: false,
-                                strings: false
-                            },
-                            suggestOnTriggerCharacters: true,
-                            acceptSuggestionOnEnter: 'on',
-                            tabCompletion: 'on',
-                        }}
-                        theme="vs"
-                    />
+                    {cell.type === 'markdown' && !isEditing ? (
+                        <div
+                            onDoubleClick={() => setCellEditing(cell.id, true)}
+                            className="p-6 prose prose-slate max-w-none min-h-[50px] cursor-text hover:bg-gray-50/50 transition-colors rounded-b-xl overflow-x-auto"
+                        >
+                            <ReactMarkdown
+                                remarkPlugins={[remarkMath, remarkGfm]}
+                                rehypePlugins={[rehypeKatex]}
+                                components={{
+                                    pre: ({ node, ...props }) => <pre {...props} className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto mb-4" />,
+                                    code: ({ node, inline, ...props }: any) =>
+                                        inline
+                                            ? <code {...props} className="bg-gray-100 text-purple-600 px-1 rounded font-mono text-sm" />
+                                            : <code {...props} className="block w-full" />,
+                                    h1: ({ node, ...props }) => <h1 {...props} className="text-3xl font-bold mb-6 mt-8 border-b pb-2 text-gray-900 first:mt-2" />,
+                                    h2: ({ node, ...props }) => <h2 {...props} className="text-2xl font-bold mb-4 mt-8 text-gray-800" />,
+                                    h3: ({ node, ...props }) => <h3 {...props} className="text-xl font-bold mb-3 mt-6 text-gray-800" />,
+                                    ul: ({ node, ...props }) => <ul {...props} className="list-disc pl-6 mb-4 space-y-1" />,
+                                    ol: ({ node, ...props }) => <ol {...props} className="list-decimal pl-6 mb-4 space-y-1" />,
+                                    p: ({ node, ...props }) => <p {...props} className="mb-4 leading-relaxed text-gray-700" />,
+                                    table: ({ node, ...props }) => <div className="overflow-x-auto mb-4"><table {...props} className="min-w-full divide-y divide-gray-200 border" /></div>,
+                                    th: ({ node, ...props }) => <th {...props} className="px-4 py-2 bg-gray-50 font-bold text-left border" />,
+                                    td: ({ node, ...props }) => <td {...props} className="px-4 py-2 border" />,
+                                    blockquote: ({ node, ...props }) => <blockquote {...props} className="border-l-4 border-blue-500 pl-4 italic text-gray-600 mb-4" />,
+                                }}
+                            >
+                                {cell.content || '*Empty Markdown Cell*'}
+                            </ReactMarkdown>
+                        </div>
+                    ) : (
+                        <MonacoEditor
+                            key={`editor-${index}`}
+                            height={Math.max(100, (cell.content.split('\n').length + 1) * 19 + 32) + 'px'}
+                            language={cell.type === 'markdown' ? 'markdown' : 'python'}
+                            value={cell.content}
+                            onChange={handleContentChange}
+                            onMount={handleEditorDidMount}
+                            options={React.useMemo(() => ({
+                                minimap: { enabled: false },
+                                lineNumbers: 'off',
+                                glyphMargin: false,
+                                folding: false,
+                                lineDecorationsWidth: 0,
+                                lineNumbersMinChars: 0,
+                                scrollBeyondLastLine: false,
+                                automaticLayout: true,
+                                fontSize: 14,
+                                fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+                                padding: { top: 16, bottom: 16 },
+                                wordWrap: 'on',
+                                scrollbar: {
+                                    vertical: 'auto',
+                                    horizontal: 'hidden',
+                                },
+                                overviewRulerLanes: 0,
+                                hideCursorInOverviewRuler: true,
+                                overviewRulerBorder: false,
+                                suggest: {
+                                    showKeywords: true,
+                                    showSnippets: false,
+                                },
+                                quickSuggestions: {
+                                    other: true,
+                                    comments: false,
+                                    strings: false
+                                },
+                                suggestOnTriggerCharacters: true,
+                                acceptSuggestionOnEnter: 'on',
+                                tabCompletion: 'on',
+                                readOnly: cell.isExecuting
+                            }), [cell.isExecuting])}
+                            theme="vs"
+                        />
+                    )}
                 </div>
-                {cell.outputs.length > 0 && (
-                    <div className="border-t border-gray-50 rounded-b-xl">
+                {cell.outputs.length > 0 && showOutputs && (
+                    <div className="border-t border-gray-50 rounded-b-xl print:border-none">
                         <CellOutput outputs={cell.outputs} executionCount={cell.executionCount} />
                     </div>
                 )}
             </div>
-            <div className="absolute -bottom-4 left-0 right-0 flex justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 z-10 pointer-events-none">
+            <div className="absolute -bottom-4 left-0 right-0 flex justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 z-10 pointer-events-none print:hidden">
                 <button onClick={() => addCell('code', index)} className="pointer-events-auto bg-white border border-gray-200 text-gray-400 hover:text-blue-500 hover:border-blue-300 hover:shadow-lg rounded-full p-1.5 transition-all transform hover:scale-110">
                     <PlusCircle size={18} />
                 </button>

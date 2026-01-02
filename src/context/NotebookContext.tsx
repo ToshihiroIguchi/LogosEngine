@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import type { Cell, Variable, Documentation } from '../types';
 import { usePyodide } from '../hooks/usePyodide';
 import { WELCOME_CODE } from '../constants/examples';
@@ -25,6 +25,11 @@ interface NotebookContextType {
     insertExample: (code: string) => void;
     importNotebook: (data: any) => void;
     selectNextCell: (currentId: string) => void;
+    setCellEditing: (id: string, isEditing: boolean) => void;
+    moveCell: (id: string, direction: 'up' | 'down') => void;
+    duplicateCell: (id: string) => void;
+    clearCellOutput: (id: string) => void;
+    clearAllOutputs: () => void;
     getCompletions: (code: string, position: number) => Promise<import('../worker/workerTypes').CompletionResponse>;
 }
 
@@ -40,10 +45,46 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [focusedCellId, setFocusedCellId] = useState<string | null>(null);
     const { isReady, execute, interrupt: pyodideInterrupt, getCompletions } = usePyodide();
+    const isInitialMount = useRef(true);
+
+    // Initial Load
+    useEffect(() => {
+        const saved = localStorage.getItem('logos-engine-notebook');
+        if (saved) {
+            try {
+                const { cells: savedCells } = JSON.parse(saved);
+                if (Array.isArray(savedCells) && savedCells.length > 0) {
+                    // Reset execution state but keep content/outputs
+                    setCells(savedCells.map(c => ({ ...c, isExecuting: false })));
+                }
+            } catch (err) {
+                console.error('Failed to load saved notebook:', err);
+            }
+        }
+        isInitialMount.current = false;
+    }, []);
+
+    // Auto-save
+    useEffect(() => {
+        if (isInitialMount.current) return;
+
+        const timer = setTimeout(() => {
+            localStorage.setItem('logos-engine-notebook', JSON.stringify({ cells }));
+        }, 1000); // Debounce save
+
+        return () => clearTimeout(timer);
+    }, [cells]);
 
     const addCell = useCallback((type: 'code' | 'markdown', index?: number) => {
         const id = crypto.randomUUID();
-        const newCell: Cell = { id, type, content: '', outputs: [], isExecuting: false };
+        const newCell: Cell = {
+            id,
+            type,
+            content: '',
+            outputs: [],
+            isExecuting: false,
+            isEditing: type === 'markdown'
+        };
         setCells(prev => {
             if (index === undefined) return [...prev, newCell];
             const next = [...prev];
@@ -51,6 +92,50 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             return next;
         });
         return id;
+    }, []);
+
+    const setCellEditing = useCallback((id: string, isEditing: boolean) => {
+        setCells(prev => prev.map(c => c.id === id ? { ...c, isEditing } : c));
+    }, []);
+
+    const moveCell = useCallback((id: string, direction: 'up' | 'down') => {
+        setCells(prev => {
+            const index = prev.findIndex(c => c.id === id);
+            if (index === -1) return prev;
+            if (direction === 'up' && index === 0) return prev;
+            if (direction === 'down' && index === prev.length - 1) return prev;
+
+            const next = [...prev];
+            const targetIndex = direction === 'up' ? index - 1 : index + 1;
+            [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+            return next;
+        });
+    }, []);
+
+    const duplicateCell = useCallback((id: string) => {
+        setCells(prev => {
+            const index = prev.findIndex(c => c.id === id);
+            if (index === -1) return prev;
+            const original = prev[index];
+            const newCell: Cell = {
+                ...original,
+                id: crypto.randomUUID(),
+                outputs: [],
+                executionCount: undefined,
+                isExecuting: false
+            };
+            const next = [...prev];
+            next.splice(index + 1, 0, newCell);
+            return next;
+        });
+    }, []);
+
+    const clearCellOutput = useCallback((id: string) => {
+        setCells(prev => prev.map(c => c.id === id ? { ...c, outputs: [], executionCount: undefined } : c));
+    }, []);
+
+    const clearAllOutputs = useCallback(() => {
+        setCells(prev => prev.map(c => ({ ...c, outputs: [], executionCount: undefined })));
     }, []);
 
     const updateCell = useCallback((id: string, content: string) => {
@@ -157,6 +242,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             isReady, focusedCellId, setFocusedCellId,
             addCell, updateCell, deleteCell, executeCell, executeAll, interrupt, insertExample, importNotebook,
             selectNextCell,
+            setCellEditing, moveCell, duplicateCell, clearCellOutput, clearAllOutputs,
             getCompletions
         }}>
             {children}

@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
-import { Download, PlayCircle, Plus, Loader2, Info, BookOpen, ChevronDown, Upload, Square, Database } from 'lucide-react';
+import { Download, PlayCircle, Loader2, Info, BookOpen, ChevronDown, Upload, Square, Database, Printer, Eraser, FileText, Code } from 'lucide-react';
 import { useNotebook } from '../../context/NotebookContext';
 import { CellItem } from './CellItem';
+import { ErrorBoundary } from '../ErrorBoundary';
 import { DisclaimerModal } from './DisclaimerModal';
 import { Sidebar } from './Sidebar';
 import { EXAMPLES } from '../../constants/examples';
@@ -9,7 +10,7 @@ import { EXAMPLES } from '../../constants/examples';
 export const NotebookContainer: React.FC = () => {
     const {
         cells, addCell, executeAll, interrupt, isReady, insertExample, importNotebook,
-        isSidebarOpen, setIsSidebarOpen
+        isSidebarOpen, setIsSidebarOpen, clearAllOutputs
     } = useNotebook();
     const [showExamples, setShowExamples] = useState(false);
     const [showDisclaimer, setShowDisclaimer] = useState(false);
@@ -26,6 +27,10 @@ export const NotebookContainer: React.FC = () => {
         link.download = `notebook-${new Date().toISOString().slice(0, 10)}.json`;
         link.click();
         URL.revokeObjectURL(url);
+    };
+
+    const handlePrint = () => {
+        window.print();
     };
 
     const handleImport = () => {
@@ -57,7 +62,7 @@ export const NotebookContainer: React.FC = () => {
     };
 
     return (
-        <div className="h-screen bg-[#FDFDFD] flex flex-col overflow-hidden">
+        <div id="app-root" className="h-screen bg-[#FDFDFD] flex flex-col overflow-hidden">
             <input
                 ref={fileInputRef}
                 type="file"
@@ -131,6 +136,13 @@ export const NotebookContainer: React.FC = () => {
                         <button onClick={handleExport} className="flex items-center gap-2 px-4 py-1.5 text-gray-600 rounded-lg hover:bg-white transition-all font-medium text-xs">
                             <Download size={14} />Export
                         </button>
+                        <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-1.5 text-gray-600 rounded-lg hover:bg-white transition-all font-medium text-xs">
+                            <Printer size={14} />PDF
+                        </button>
+                        <div className="h-6 w-px bg-gray-200 mx-1" />
+                        <button onClick={clearAllOutputs} className="flex items-center gap-2 px-4 py-1.5 text-amber-600 rounded-lg hover:bg-amber-50 transition-all font-medium text-xs">
+                            <Eraser size={14} />Clear All
+                        </button>
                     </div>
                 </div>
             </header>
@@ -138,16 +150,37 @@ export const NotebookContainer: React.FC = () => {
             {/* Main Content Area + Sidebar */}
             <div className="flex-1 flex overflow-hidden">
                 {/* Scrollable Notebook Area */}
-                <div className="flex-1 flex flex-col min-w-0 overflow-y-auto scroll-smooth">
+                <div id="notebook-scroll-area" className="flex-1 flex flex-col min-w-0 overflow-y-auto scroll-smooth">
                     <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-12">
                         <div className="space-y-4">
-                            {cells.map((cell, index) => <CellItem key={cell.id} cell={cell} index={index} />)}
+                            {cells.map((cell, index) => (
+                                <ErrorBoundary key={cell.id}>
+                                    <CellItem cell={cell} index={index} />
+                                </ErrorBoundary>
+                            ))}
                         </div>
-                        <div className="mt-12 flex justify-center pb-24">
-                            <button onClick={() => addCell('code')} className="group flex flex-col items-center gap-3 text-gray-300 hover:text-blue-500 transition-all">
-                                <div className="p-3 border-2 border-dashed border-gray-200 rounded-2xl group-hover:border-blue-200 group-hover:bg-blue-50/50 transition-all"><Plus size={24} /></div>
-                                <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Add Computational Block</span>
-                            </button>
+                        <div className="mt-12 flex flex-col items-center gap-6 pb-24 print:hidden">
+                            <div className="flex items-center gap-4">
+                                <button
+                                    onClick={() => addCell('code')}
+                                    className="group flex flex-col items-center gap-2 text-gray-300 hover:text-blue-500 transition-all"
+                                >
+                                    <div className="p-3 border-2 border-dashed border-gray-200 rounded-2xl group-hover:border-blue-200 group-hover:bg-blue-50/50 transition-all">
+                                        <Code size={20} />
+                                    </div>
+                                    <span className="text-[9px] font-bold uppercase tracking-widest">Code Cell</span>
+                                </button>
+                                <div className="h-10 w-px bg-gray-100" />
+                                <button
+                                    onClick={() => addCell('markdown')}
+                                    className="group flex flex-col items-center gap-2 text-gray-300 hover:text-purple-500 transition-all"
+                                >
+                                    <div className="p-3 border-2 border-dashed border-gray-200 rounded-2xl group-hover:border-purple-200 group-hover:bg-purple-50/50 transition-all">
+                                        <FileText size={20} />
+                                    </div>
+                                    <span className="text-[9px] font-bold uppercase tracking-widest">Markdown Cell</span>
+                                </button>
+                            </div>
                         </div>
                     </main>
                     <footer className="py-6 px-8 border-t border-gray-100 flex items-center justify-between bg-gray-50/50 mt-auto">

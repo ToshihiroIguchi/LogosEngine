@@ -18,6 +18,7 @@ export interface Cell {
   outputs: Output[];
   executionCount?: number;
   isExecuting: boolean;
+  isEditing?: boolean; // Used for Markdown cells
 }
 
 export interface NotebookState {
