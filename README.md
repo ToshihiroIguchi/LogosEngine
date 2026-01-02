@@ -76,10 +76,16 @@ python -m http.server 8300
 - **Portability**: All you need are the `dist` folder and `serve.py`. LogosEngine can run on any PC with Python installed, even from a USB drive.
 - **Ease of Deployment**: Even if your production server only supports Python, you can deploy by simply uploading the contents of the `dist` folder.
 
-### 4. Access the Notebook
-1. Open your web browser and navigate to the address shown (usually `http://localhost:8300`).
-2. **Initialization**: On the first load, the app will download the Pyodide runtime and required Python packages (SymPy, Matplotlib). This can take 30-60 seconds depending on your connection.
-3. **Engine Ready**: Once the status in the header changes to "Engine Ready", you can begin executing Python code.
+### 4. Setup Complete
+Once the server is running (either via Node.js or Python), proceed to the **First Run Guide** below.
+
+## First Run Guide
+
+ Regardless of how you started the server, follow these steps to begin:
+
+1. **Open Browser**: Navigate to your local server address (e.g., `http://localhost:5173` for Node.js or `http://localhost:8300` for Python).
+2. **Initialization**: On the first load, the app will download the Pyodide runtime and required Python packages (SymPy, Matplotlib). **This can take 30-60 seconds.**
+3. **Engine Ready**: Wait for the status indicator in the header to turn **green** ("Engine Ready").
 4. **Execution**: Type your code in a cell and press `Shift+Enter` to run it.
 
 ## Usage Examples
