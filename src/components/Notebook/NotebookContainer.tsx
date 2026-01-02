@@ -2,11 +2,13 @@ import React, { useState, useRef } from 'react';
 import { Download, PlayCircle, Plus, Loader2, Info, BookOpen, ChevronDown, Upload, Square } from 'lucide-react';
 import { useNotebook } from '../../context/NotebookContext';
 import { CellItem } from './CellItem';
+import { DisclaimerModal } from './DisclaimerModal';
 import { EXAMPLES } from '../../constants/examples';
 
 export const NotebookContainer: React.FC = () => {
     const { cells, addCell, executeAll, interrupt, isReady, insertExample, importNotebook } = useNotebook();
     const [showExamples, setShowExamples] = useState(false);
+    const [showDisclaimer, setShowDisclaimer] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const isExecutingAny = cells.some(c => c.isExecuting);
@@ -133,10 +135,19 @@ export const NotebookContainer: React.FC = () => {
                 <div className="flex items-center gap-3 text-xs text-gray-400 font-mono">
                     <span>PYTHON 3.11</span><span className="opacity-30">•</span><span>SYMPY CORE</span><span className="opacity-30">•</span><span>BROWSER-WASM</span>
                 </div>
-                <div className="flex items-center gap-1.5 px-3 py-1 bg-white border border-gray-200 rounded-full shadow-sm cursor-help hover:border-blue-300 transition-colors">
-                    <Info size={12} className="text-blue-500" /><span className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">Computational Notebook Environment</span>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setShowDisclaimer(true)}
+                        className="text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-tighter hover:underline transition-all"
+                    >
+                        Legal & Risk
+                    </button>
+                    <div className="flex items-center gap-1.5 px-3 py-1 bg-white border border-gray-200 rounded-full shadow-sm cursor-help hover:border-blue-300 transition-colors">
+                        <Info size={12} className="text-blue-500" /><span className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">Computational Notebook Environment</span>
+                    </div>
                 </div>
             </footer>
+            <DisclaimerModal isOpen={showDisclaimer} onClose={() => setShowDisclaimer(false)} />
         </div>
     );
 };
