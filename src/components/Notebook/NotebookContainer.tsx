@@ -77,7 +77,7 @@ export const NotebookContainer: React.FC = () => {
                     <div className="bg-white p-1 rounded-lg border border-gray-100 shadow-sm"><img src="/logo.png" alt="LogosEngine" className="w-8 h-8 object-contain" /></div>
                     <div>
                         <h1 className="text-lg font-bold text-gray-900 tracking-tight">LogosEngine</h1>
-                        <p className="text-[10px] text-gray-400 font-medium tracking-widest uppercase -mt-0.5">Computational Knowledge System</p>
+                        <p className="text-[10px] text-gray-400 font-medium tracking-widest uppercase -mt-0.5">Symbolic Reasoning Environment</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
