@@ -6,6 +6,8 @@ let pyodide: PyodideInterface;
 
 // Isolated context for user variables (Python dictionary)
 let user_context: any;
+// Keys present in the context before user execution (SymPy functions, etc.)
+let ambient_keys: Set<string> = new Set();
 
 const INITIAL_PYTHON_CODE = `
 import sys
@@ -97,6 +99,10 @@ async function initPyodide() {
         setup_context(user_context);
         setup_context.destroy();
 
+        // Capture ambient keys to hide them from the Variable Inspector
+        const initialKeys = pyodide.globals.get('list')(user_context.keys()).toJs();
+        ambient_keys = new Set(initialKeys);
+
         console.log('Worker: Engine Ready.');
         self.postMessage({ type: 'READY' });
     } catch (err) {
@@ -163,7 +169,8 @@ function getVariables(): Variable[] {
         const keys = pyodide.globals.get('list')(user_context.keys()).toJs();
 
         for (const key of keys) {
-            if (typeof key !== 'string' || ignored.has(key) || key.startsWith('_')) continue;
+            // Skip ambient keys (SymPy functions, etc.), internal symbols, or non-string keys
+            if (typeof key !== 'string' || ambient_keys.has(key) || ignored.has(key) || key.startsWith('_')) continue;
 
             try {
                 const val = user_context.get(key);
