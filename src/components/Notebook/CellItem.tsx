@@ -34,10 +34,10 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
     return (
         <div className="group relative mb-6">
             <div className={cn(
-                "flex flex-col border rounded-xl overflow-hidden transition-all duration-200 bg-white",
-                cell.isExecuting ? (isQueued ? "ring-2 ring-amber-400 border-amber-400 shadow-md" : "ring-2 ring-blue-400 border-blue-400 shadow-md") : "border-gray-200 shadow-sm hover:border-gray-300"
+                "flex flex-col border rounded-xl transition-all duration-200 bg-white relative",
+                cell.isExecuting ? (isQueued ? "ring-2 ring-amber-400 border-amber-400 shadow-md z-20" : "ring-2 ring-blue-400 border-blue-400 shadow-md z-20") : "border-gray-200 shadow-sm hover:border-gray-300 hover:z-10 focus-within:z-30"
             )}>
-                <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50/50 border-b border-gray-100 opacity-60 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50/50 border-b border-gray-100 opacity-60 group-hover:opacity-100 transition-opacity rounded-t-xl">
                     <div className="flex items-center gap-3">
                         <span className="text-[10px] font-bold text-gray-400 font-mono tracking-wider uppercase">
                             {cell.executionCount ? `[${cell.executionCount}]` : 'In [*]'}
@@ -84,7 +84,7 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                     />
                 </div>
                 {cell.outputs.length > 0 && (
-                    <div className="border-t border-gray-50">
+                    <div className="border-t border-gray-50 rounded-b-xl overflow-hidden">
                         <CellOutput outputs={cell.outputs} executionCount={cell.executionCount} />
                     </div>
                 )}
