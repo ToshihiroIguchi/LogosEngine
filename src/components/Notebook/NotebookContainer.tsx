@@ -3,14 +3,16 @@ import { Download, PlayCircle, Plus, Loader2, Info, BookOpen, ChevronDown, Uploa
 import { useNotebook } from '../../context/NotebookContext';
 import { CellItem } from './CellItem';
 import { DisclaimerModal } from './DisclaimerModal';
-import { VariableInspector } from './VariableInspector';
+import { Sidebar } from './Sidebar';
 import { EXAMPLES } from '../../constants/examples';
 
 export const NotebookContainer: React.FC = () => {
-    const { cells, addCell, executeAll, interrupt, isReady, insertExample, importNotebook } = useNotebook();
+    const {
+        cells, addCell, executeAll, interrupt, isReady, insertExample, importNotebook,
+        isSidebarOpen, setIsSidebarOpen
+    } = useNotebook();
     const [showExamples, setShowExamples] = useState(false);
     const [showDisclaimer, setShowDisclaimer] = useState(false);
-    const [showVariables, setShowVariables] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const isExecutingAny = cells.some(c => c.isExecuting);
@@ -87,8 +89,8 @@ export const NotebookContainer: React.FC = () => {
                     <div className="flex items-center bg-gray-100/50 p-1 rounded-xl border border-gray-200/50 gap-1">
                         <div className="relative">
                             <button
-                                onClick={() => setShowVariables(!showVariables)}
-                                className={`flex items-center gap-2 px-4 py-1.5 rounded-lg shadow-sm border transition-all font-medium text-xs ${showVariables ? 'bg-purple-600 text-white border-purple-700 shadow-purple-100' : 'bg-white text-purple-600 border-gray-200 hover:bg-purple-50'}`}
+                                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                                className={`flex items-center gap-2 px-4 py-1.5 rounded-lg shadow-sm border transition-all font-medium text-xs ${isSidebarOpen ? 'bg-purple-600 text-white border-purple-700 shadow-purple-100' : 'bg-white text-purple-600 border-gray-200 hover:bg-purple-50'}`}
                             >
                                 <Database size={14} />Variables
                             </button>
@@ -167,7 +169,7 @@ export const NotebookContainer: React.FC = () => {
                 </div>
 
                 {/* Docked Sidebar */}
-                <VariableInspector isOpen={showVariables} onClose={() => setShowVariables(false)} />
+                <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
             </div>
 
             <DisclaimerModal isOpen={showDisclaimer} onClose={() => setShowDisclaimer(false)} />

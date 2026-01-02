@@ -105,6 +105,23 @@ def get_tsv(val):
     except:
         pass
     return None
+def _get_help(name, ctx):
+    import inspect
+    if name not in ctx:
+        return None
+    obj = ctx[name]
+    try:
+        sig = str(inspect.signature(obj))
+    except:
+        sig = ""
+    doc = inspect.getdoc(obj)
+    module = inspect.getmodule(obj)
+    return {
+        "name": name,
+        "signature": sig,
+        "docstring": doc or "No documentation found.",
+        "module": module.__name__ if module else None
+    }
 `;
 
 async function initPyodide() {
@@ -140,6 +157,25 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
     if (action === 'EXECUTE') {
         try {
             if (!pyodide) throw new Error('Engine not ready');
+
+            // Documentation interceptor: Check if code starts with '?'
+            const trimmedCode = code.trim();
+            if (trimmedCode.startsWith('?')) {
+                const symbolName = trimmedCode.substring(1).trim();
+                const _get_help = pyodide.globals.get("_get_help");
+                const docProxy = _get_help(symbolName, user_context);
+                const doc = docProxy ? docProxy.toJs({ dict_converter: Object.fromEntries }) : null;
+                if (docProxy) docProxy.destroy();
+
+                self.postMessage({
+                    id,
+                    status: 'SUCCESS',
+                    results: [],
+                    documentation: doc
+                });
+                return;
+            }
+
             const execute_cell = pyodide.globals.get("execute_cell");
             const resultProxy = execute_cell(code, user_context);
             const result = resultProxy.toJs({ dict_converter: Object.fromEntries });

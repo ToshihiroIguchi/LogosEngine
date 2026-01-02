@@ -1,11 +1,18 @@
 import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
-import type { Cell, Variable } from '../types';
+import type { Cell, Variable, Documentation } from '../types';
 import { usePyodide } from '../hooks/usePyodide';
 import { WELCOME_CODE } from '../constants/examples';
+
+export type SidebarTab = 'variables' | 'documentation';
 
 interface NotebookContextType {
     cells: Cell[];
     variables: Variable[];
+    activeDocumentation: Documentation | null;
+    activeTab: SidebarTab;
+    setActiveTab: (tab: SidebarTab) => void;
+    isSidebarOpen: boolean;
+    setIsSidebarOpen: (isOpen: boolean) => void;
     isReady: boolean;
     addCell: (type: 'code' | 'markdown', index?: number) => void;
     updateCell: (id: string, content: string) => void;
@@ -24,6 +31,9 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         { id: '1', type: 'code', content: WELCOME_CODE, outputs: [], isExecuting: false }
     ]);
     const [variables, setVariables] = useState<Variable[]>([]);
+    const [activeDocumentation, setActiveDocumentation] = useState<Documentation | null>(null);
+    const [activeTab, setActiveTab] = useState<SidebarTab>('variables');
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const { isReady, execute, interrupt: pyodideInterrupt } = usePyodide();
 
     const addCell = useCallback((type: 'code' | 'markdown', index?: number) => {
@@ -58,8 +68,15 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             setCells(prev => prev.map(c =>
                 c.id === id ? { ...c, outputs: response.results, isExecuting: false, executionCount: (c.executionCount || 0) + 1 } : c
             ));
+
             if (response.variables) {
                 setVariables(response.variables);
+            }
+
+            if (response.documentation) {
+                setActiveDocumentation(response.documentation);
+                setActiveTab('documentation');
+                setIsSidebarOpen(true);
             }
         } catch (err: any) {
             setCells(prev => prev.map(c => c.id === id ? { ...c, outputs: [{ type: 'error', value: err.message, timestamp: Date.now() }], isExecuting: false } : c));
@@ -113,7 +130,11 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     }, []);
 
     return (
-        <NotebookContext.Provider value={{ cells, variables, isReady, addCell, updateCell, deleteCell, executeCell, executeAll, interrupt, insertExample, importNotebook }}>
+        <NotebookContext.Provider value={{
+            cells, variables, activeDocumentation, activeTab, setActiveTab,
+            isSidebarOpen, setIsSidebarOpen,
+            isReady, addCell, updateCell, deleteCell, executeCell, executeAll, interrupt, insertExample, importNotebook
+        }}>
             {children}
         </NotebookContext.Provider>
     );

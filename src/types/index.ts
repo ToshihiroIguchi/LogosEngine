@@ -26,3 +26,10 @@ export interface Variable {
   type: string;
   value: string;
 }
+
+export interface Documentation {
+  name: string;
+  signature: string;
+  docstring: string;
+  module?: string;
+}
