@@ -9,4 +9,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  worker: {
+    format: 'es',
+  },
 })
