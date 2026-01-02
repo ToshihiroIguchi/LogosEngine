@@ -84,7 +84,7 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                     />
                 </div>
                 {cell.outputs.length > 0 && (
-                    <div className="border-t border-gray-50 rounded-b-xl overflow-hidden">
+                    <div className="border-t border-gray-50 rounded-b-xl">
                         <CellOutput outputs={cell.outputs} executionCount={cell.executionCount} />
                     </div>
                 )}
