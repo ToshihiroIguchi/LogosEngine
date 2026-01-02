@@ -13,9 +13,7 @@ const INITIAL_PYTHON_CODE = `
 import sys
 import io
 import base64
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
+# Matplotlib imports removed for concurrent loading
 from sympy import *
 
 # Setup the user context with default symbols and functions
@@ -24,12 +22,12 @@ def setup_context(ctx):
     exec("from sympy import *", {}, ctx)
     # Default symbols
     ctx['x'], ctx['y'], ctx['z'], ctx['t'] = ctx['symbols']('x y z t')
-    # Shortcuts
-    ctx['plt'] = plt
+    # plt is injected later when ready
 
 def execute_cell(code, ctx):
-    # Close previous figures
-    plt.close('all')
+    # Close previous figures only if plt is available
+    if 'plt' in ctx:
+        ctx['plt'].close('all')
     
     stdout_buffer = io.StringIO()
     sys.stdout = stdout_buffer
@@ -66,12 +64,13 @@ def execute_cell(code, ctx):
             pass
             
     img_base64 = None
-    if plt.get_fignums():
+    if 'plt' in ctx and ctx['plt'].get_fignums():
+        plt_local = ctx['plt']
         buf = io.BytesIO()
-        plt.savefig(buf, format='png', bbox_inches='tight')
+        plt_local.savefig(buf, format='png', bbox_inches='tight')
         buf.seek(0)
         img_base64 = base64.b64encode(buf.read()).decode('utf-8')
-        plt.close('all')
+        plt_local.close('all')
         
     return {
         "stdout": stdout_content,
@@ -105,6 +104,7 @@ def get_tsv(val):
     except:
         pass
     return None
+
 def _get_help(name, ctx):
     import inspect
     if name not in ctx:
@@ -167,15 +167,27 @@ def _get_completions(prefix, ctx):
     return completions
 `;
 
+// Flag to track if Matplotlib is ready
+let matplotlib_ready = false;
+
 async function initPyodide() {
+    const start = performance.now();
     console.log('Worker: Initializing Pyodide (v0.29.0)...');
     try {
+        const t1 = performance.now();
         pyodide = await loadPyodide({
             indexURL: "https://cdn.jsdelivr.net/pyodide/v0.29.0/full/"
         });
-        console.log('Worker: Pyodide loaded. Loading packages...');
-        await pyodide.loadPackage(['sympy', 'matplotlib']);
-        console.log('Worker: Packages loaded. Running initial Python code...');
+        console.log(`Worker: Pyodide core loaded in ${(performance.now() - t1).toFixed(0)}ms`);
+
+        console.log('Worker: Loading critical packages (sympy)...');
+        const t2 = performance.now();
+        // STAGE 1: Load only critical packages
+        await pyodide.loadPackage(['sympy']);
+        console.log(`Worker: Critical packages loaded in ${(performance.now() - t2).toFixed(0)}ms`);
+
+        console.log('Worker: Running initial Python code...');
+        const t3 = performance.now();
         await pyodide.runPythonAsync(INITIAL_PYTHON_CODE);
 
         // Initialize user context as a Python dictionary
@@ -187,9 +199,37 @@ async function initPyodide() {
         // Capture ambient keys to hide them from the Variable Inspector
         const initialKeys = pyodide.globals.get('list')(user_context.keys()).toJs();
         ambient_keys = new Set(initialKeys);
+        console.log(`Worker: Context setup in ${(performance.now() - t3).toFixed(0)}ms`);
 
-        console.log('Worker: Engine Ready.');
+        const total = performance.now() - start;
+        console.log(`Worker: Engine Ready (SymPy only). Total init time: ${total.toFixed(0)}ms`);
         self.postMessage({ type: 'READY' });
+
+        // STAGE 2: Load heavy packages in background
+        console.log('Worker: Starting background load of matplotlib...');
+        const tBackground = performance.now();
+        try {
+            await pyodide.loadPackage(['matplotlib']);
+
+            // Post-load setup for matplotlib
+            await pyodide.runPythonAsync(`
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+def inject_plt(ctx):
+    ctx['plt'] = plt
+            `);
+
+            const inject_plt = pyodide.globals.get('inject_plt');
+            inject_plt(user_context);
+            inject_plt.destroy();
+
+            matplotlib_ready = true;
+            console.log(`Worker: Matplotlib loaded in background in ${(performance.now() - tBackground).toFixed(0)}ms`);
+        } catch (e) {
+            console.error('Worker: Failed to load background packages', e);
+        }
+
     } catch (err) {
         console.error('Worker: Initialization failed:', err);
     }
