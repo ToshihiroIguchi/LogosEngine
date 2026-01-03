@@ -30,6 +30,7 @@ interface NotebookContextType {
     duplicateCell: (id: string) => void;
     clearCellOutput: (id: string) => void;
     clearAllOutputs: () => void;
+    resetNotebook: () => void;
     getCompletions: (code: string, position: number) => Promise<import('../worker/workerTypes').CompletionResponse>;
 }
 
@@ -142,6 +143,21 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         setCells(prev => prev.map(c => c.id === id ? { ...c, content } : c));
     }, []);
 
+    const resetNotebook = useCallback(() => {
+        const newId = crypto.randomUUID();
+        const newCell: Cell = {
+            id: newId,
+            type: 'code',
+            content: '',
+            outputs: [],
+            isExecuting: false
+        };
+        setCells([newCell]);
+        setVariables([]);
+        setActiveDocumentation(null);
+        setFocusedCellId(newId);
+    }, []);
+
     const deleteCell = useCallback((id: string) => {
         setCells(prev => {
             if (prev.length === 1) return prev.map(c => c.id === id ? { ...c, content: '', outputs: [] } : c);
@@ -242,7 +258,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             isReady, focusedCellId, setFocusedCellId,
             addCell, updateCell, deleteCell, executeCell, executeAll, interrupt, insertExample, importNotebook,
             selectNextCell,
-            setCellEditing, moveCell, duplicateCell, clearCellOutput, clearAllOutputs,
+            setCellEditing, moveCell, duplicateCell, clearCellOutput, clearAllOutputs, resetNotebook,
             getCompletions
         }}>
             {children}

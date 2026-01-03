@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Download, PlayCircle, Loader2, Info, BookOpen, ChevronDown, Upload, Square, Database, Printer, Eraser, FileText, Code } from 'lucide-react';
+import { Download, PlayCircle, Loader2, Info, BookOpen, ChevronDown, Upload, Square, Database, Printer, Eraser, FileText, Code, RefreshCw } from 'lucide-react';
 import { useNotebook } from '../../context/NotebookContext';
 import { CellItem } from './CellItem';
 import { ErrorBoundary } from '../ErrorBoundary';
@@ -10,13 +10,19 @@ import { EXAMPLES } from '../../constants/examples';
 export const NotebookContainer: React.FC = () => {
     const {
         cells, addCell, executeAll, interrupt, isReady, insertExample, importNotebook,
-        isSidebarOpen, setIsSidebarOpen, clearAllOutputs
+        isSidebarOpen, setIsSidebarOpen, clearAllOutputs, resetNotebook
     } = useNotebook();
     const [showExamples, setShowExamples] = useState(false);
     const [showDisclaimer, setShowDisclaimer] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const isExecutingAny = cells.some(c => c.isExecuting);
+
+    const handleReset = () => {
+        if (confirm('Are you sure you want to reset the notebook? All your work will be lost.')) {
+            resetNotebook();
+        }
+    };
 
     const handleExport = () => {
         const data = JSON.stringify({ cells, version: '1.0' }, null, 2);
@@ -141,7 +147,11 @@ export const NotebookContainer: React.FC = () => {
                         </button>
                         <div className="h-6 w-px bg-gray-200 mx-1" />
                         <button onClick={clearAllOutputs} className="flex items-center gap-2 px-4 py-1.5 text-amber-600 rounded-lg hover:bg-amber-50 transition-all font-medium text-xs">
-                            <Eraser size={14} />Clear All
+                            <Eraser size={14} />Clear Outputs
+                        </button>
+                        <div className="h-6 w-px bg-gray-200 mx-1" />
+                        <button onClick={handleReset} className="flex items-center gap-2 px-4 py-1.5 text-red-600 rounded-lg hover:bg-red-50 transition-all font-medium text-xs" title="Reset Notebook">
+                            <RefreshCw size={14} />Reset
                         </button>
                     </div>
                 </div>
