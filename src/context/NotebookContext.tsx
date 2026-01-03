@@ -217,14 +217,45 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     }, [pyodideInterrupt]);
 
     const insertExample = useCallback((code: string) => {
-        const newCell: Cell = {
-            id: crypto.randomUUID(),
-            type: 'code',
-            content: code,
-            outputs: [],
-            isExecuting: false
-        };
-        setCells(prev => [...prev, newCell]);
+        setCells(prev => {
+            const lastCell = prev[prev.length - 1];
+
+            // If the last cell is an empty code cell, reuse it
+            if (lastCell && lastCell.type === 'code' && !lastCell.content.trim()) {
+                // Focus the existing last cell
+                setFocusedCellId(lastCell.id);
+                return prev.map(c => c.id === lastCell.id ? { ...c, content: code } : c);
+            }
+
+            // Otherwise, check if we need to add a new cell
+            const newCell: Cell = {
+                id: crypto.randomUUID(),
+                type: 'code',
+                content: code,
+                outputs: [],
+                isExecuting: false
+            };
+
+            // We need to set focus in a useEffect or similar if we want to be 100% sure, 
+            // but setting state here usually triggers the effect in CellItem for "newly created cell" logic 
+            // if we handle it right. 
+            // NOTE: The Context API doesn't allow setting side-effect (setFocusedCellId for new ID) 
+            // synchronously inside setCells callback easily for the *new* ID without finding it out first.
+            // But since we generate ID here...
+
+            // To properly handle focus for NEW cell, we should do it outside the setCells updater if possible,
+            // or use the effect we have. Let's do it like the original unique-id flow.
+
+            return [...prev, newCell];
+        });
+
+        // Note: For the "New Cell" case, we can't easily set focus inside the setCells callback 
+        // to the *new* ID because we return the state. 
+        // However, the original implementation didn't strictly focus the new example cell explicitly 
+        // in logic shown (it just appended). 
+        // Implementation Plan logic used a simplified return. 
+        // Let's stick to the Plan's logic but ensure we handle the 'Reuse' case's focus explicitly as desired.
+
     }, []);
 
     const importNotebook = useCallback((data: any) => {
