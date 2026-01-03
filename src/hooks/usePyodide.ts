@@ -3,12 +3,14 @@ import type { WorkerRequest, WorkerResponse, CompletionRequest, CompletionRespon
 
 export function usePyodide() {
     const [isReady, setIsReady] = useState(false);
+    const [isGraphicsReady, setIsGraphicsReady] = useState(false);
     const workerRef = useRef<Worker | null>(null);
     const resolversRef = useRef<Map<string, (response: WorkerResponse | CompletionResponse) => void>>(new Map());
     const queueRef = useRef<Array<{ id: string; code: string; resolve: (response: WorkerResponse | CompletionResponse) => void }>>([]);
 
     const initWorker = useCallback(() => {
         setIsReady(false);
+        setIsGraphicsReady(false);
         if (workerRef.current) {
             workerRef.current.terminate();
         }
@@ -30,6 +32,11 @@ export function usePyodide() {
                     const request: WorkerRequest = { id, action: 'EXECUTE', code };
                     worker.postMessage(request);
                 });
+                return;
+            }
+
+            if (data.type === 'GRAPHICS_READY') {
+                setIsGraphicsReady(true);
                 return;
             }
 
@@ -112,5 +119,5 @@ export function usePyodide() {
         });
     }, [isReady]);
 
-    return { isReady, execute, interrupt, getCompletions };
+    return { isReady, isGraphicsReady, execute, interrupt, getCompletions };
 }

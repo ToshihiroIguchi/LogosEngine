@@ -10,7 +10,7 @@ import { EXAMPLES } from '../../constants/examples';
 export const NotebookContainer: React.FC = () => {
     const {
         cells, addCell, executeAll, interrupt, isReady, insertExample, importNotebook,
-        isSidebarOpen, setIsSidebarOpen, clearAllOutputs, resetNotebook
+        isSidebarOpen, setIsSidebarOpen, clearAllOutputs, resetNotebook, isGraphicsReady
     } = useNotebook();
     const [showExamples, setShowExamples] = useState(false);
     const [showDisclaimer, setShowDisclaimer] = useState(false);
@@ -92,8 +92,19 @@ export const NotebookContainer: React.FC = () => {
                             <Loader2 className="animate-spin text-amber-500" size={14} /><span className="text-xs font-semibold text-amber-600">Initializing...</span>
                         </div>
                     ) : (
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 rounded-full border border-green-100/50">
-                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div><span className="text-xs font-semibold text-green-600">Engine Ready</span>
+                        <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 rounded-full border border-green-100/50">
+                                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div><span className="text-xs font-semibold text-green-600">Engine Ready</span>
+                            </div>
+                            {!isGraphicsReady ? (
+                                <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50/50 rounded-full border border-blue-100/30">
+                                    <Loader2 className="animate-spin text-blue-400" size={12} /><span className="text-[10px] font-semibold text-blue-500">Graphics Loading...</span>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 rounded-full border border-indigo-100/50">
+                                    <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></div><span className="text-xs font-semibold text-indigo-600">Graphics Ready</span>
+                                </div>
+                            )}
                         </div>
                     )}
                     <div className="h-6 w-px bg-gray-200 mx-2" />

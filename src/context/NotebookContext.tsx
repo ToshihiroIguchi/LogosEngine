@@ -31,6 +31,7 @@ interface NotebookContextType {
     clearCellOutput: (id: string) => void;
     clearAllOutputs: () => void;
     resetNotebook: () => void;
+    isGraphicsReady: boolean;
     getCompletions: (code: string, position: number) => Promise<import('../worker/workerTypes').CompletionResponse>;
 }
 
@@ -45,7 +46,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     const [activeTab, setActiveTab] = useState<SidebarTab>('variables');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [focusedCellId, setFocusedCellId] = useState<string | null>(null);
-    const { isReady, execute, interrupt: pyodideInterrupt, getCompletions } = usePyodide();
+    const { isReady, isGraphicsReady, execute, interrupt: pyodideInterrupt, getCompletions } = usePyodide();
     const isInitialMount = useRef(true);
 
     // Initial Load
@@ -290,6 +291,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             addCell, updateCell, deleteCell, executeCell, executeAll, interrupt, insertExample, importNotebook,
             selectNextCell,
             setCellEditing, moveCell, duplicateCell, clearCellOutput, clearAllOutputs, resetNotebook,
+            isGraphicsReady,
             getCompletions
         }}>
             {children}

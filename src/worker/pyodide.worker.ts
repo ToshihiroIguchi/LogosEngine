@@ -8,6 +8,8 @@ let pyodide: PyodideInterface;
 let user_context: any;
 // Keys present in the context before user execution (SymPy functions, etc.)
 let ambient_keys: Set<string> = new Set();
+let matplotlibReady = false;
+let matplotlibPromise: Promise<void> | null = null;
 
 const INITIAL_PYTHON_CODE = `
 import sys
@@ -262,26 +264,30 @@ async function initPyodide() {
         // STAGE 2: Load heavy packages in background
         console.log('Worker: Starting background load of matplotlib...');
         const tBackground = performance.now();
-        try {
-            await pyodide.loadPackage(['matplotlib']);
+        matplotlibPromise = (async () => {
+            try {
+                await pyodide.loadPackage(['matplotlib']);
 
-            // Post-load setup for matplotlib
-            await pyodide.runPythonAsync(`
+                // Post-load setup for matplotlib
+                await pyodide.runPythonAsync(`
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 def inject_plt(ctx):
     ctx['plt'] = plt
-            `);
+                `);
 
-            const inject_plt = pyodide.globals.get('inject_plt');
-            inject_plt(user_context);
-            inject_plt.destroy();
+                const inject_plt = pyodide.globals.get('inject_plt');
+                inject_plt(user_context);
+                inject_plt.destroy();
 
-            console.log(`Worker: Matplotlib loaded in background in ${(performance.now() - tBackground).toFixed(0)}ms`);
-        } catch (e) {
-            console.error('Worker: Failed to load background packages', e);
-        }
+                matplotlibReady = true;
+                self.postMessage({ type: 'GRAPHICS_READY' });
+                console.log(`Worker: Matplotlib loaded in background in ${(performance.now() - tBackground).toFixed(0)}ms`);
+            } catch (e) {
+                console.error('Worker: Failed to load background packages', e);
+            }
+        })();
 
     } catch (err) {
         console.error('Worker: Initialization failed:', err);
@@ -321,6 +327,13 @@ self.onmessage = async (event: MessageEvent<WorkerRequest | CompletionRequest>) 
         const { code } = event.data as WorkerRequest;
         try {
             if (!pyodide) throw new Error('Engine not ready');
+
+            // If the code uses plotting functions, wait for matplotlib if it's still loading
+            const containsPlotting = code.includes('plot') || code.includes('plt.');
+            if (containsPlotting && !matplotlibReady && matplotlibPromise) {
+                console.log('Worker: Waiting for graphics engine to load before executing plot...');
+                await matplotlibPromise;
+            }
 
             // Documentation interceptor: Check if code starts with '?'
             const trimmedCode = code.trim();
