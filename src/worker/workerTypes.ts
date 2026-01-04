@@ -1,11 +1,12 @@
 import type { Output, Variable, Documentation } from '../types';
 
-export type WorkerAction = 'EXECUTE' | 'INTERRUPT' | 'COMPLETE';
+export type WorkerAction = 'EXECUTE' | 'INTERRUPT' | 'COMPLETE' | 'RESET_CONTEXT';
 
 export interface WorkerRequest {
     id: string;
     action: WorkerAction;
     code: string;
+    notebookId?: string;
 }
 
 export interface WorkerResponse {
@@ -33,6 +34,7 @@ export interface CompletionRequest {
     action: 'COMPLETE';
     code: string;
     position: number;
+    notebookId?: string;
 }
 
 export interface CompletionResponse {

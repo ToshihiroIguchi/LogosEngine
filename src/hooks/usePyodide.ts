@@ -69,21 +69,7 @@ export function usePyodide() {
         }
     }, [isReady]);
 
-    const execute = useCallback((code: string): Promise<WorkerResponse> => {
-        if (!workerRef.current) return Promise.reject(new Error('Worker not initialized'));
 
-        const id = crypto.randomUUID();
-
-        return new Promise((resolve) => {
-            if (!isReady) {
-                queueRef.current.push({ id, code, resolve: resolve as any });
-            } else {
-                resolversRef.current.set(id, resolve as any);
-                const request: WorkerRequest = { id, action: 'EXECUTE', code };
-                workerRef.current?.postMessage(request);
-            }
-        });
-    }, [isReady]);
 
     const interrupt = useCallback(() => {
         // Clear all pending state
@@ -105,19 +91,38 @@ export function usePyodide() {
         initWorker();
     }, [initWorker]);
 
-    const getCompletions = useCallback((code: string, position: number): Promise<CompletionResponse> => {
-        if (!workerRef.current || !isReady) {
-            return Promise.resolve({ id: '', completions: [] });
-        }
+    const execute = useCallback((code: string, notebookId?: string): Promise<WorkerResponse> => {
+        if (!workerRef.current || !isReady) return Promise.reject(new Error('Engine not ready'));
 
         const id = crypto.randomUUID();
-
         return new Promise((resolve) => {
-            resolversRef.current.set(id, resolve as any);
-            const request: CompletionRequest = { id, action: 'COMPLETE', code, position };
+            resolversRef.current.set(id, resolve as unknown as (response: WorkerResponse | CompletionResponse) => void);
+            const request: WorkerRequest = { id, action: 'EXECUTE', code, notebookId };
             workerRef.current?.postMessage(request);
         });
     }, [isReady]);
 
-    return { isReady, isGraphicsReady, execute, interrupt, getCompletions };
+    const getCompletions = useCallback((code: string, position: number, notebookId?: string): Promise<CompletionResponse> => {
+        if (!workerRef.current || !isReady) return Promise.resolve({ id: '', completions: [] });
+
+        const id = crypto.randomUUID();
+        return new Promise((resolve) => {
+            resolversRef.current.set(id, (response) => resolve(response as CompletionResponse));
+            const request: CompletionRequest = { id, action: 'COMPLETE', code, position, notebookId };
+            workerRef.current?.postMessage(request);
+        });
+    }, [isReady]);
+
+    const resetContext = useCallback((notebookId?: string): Promise<void> => {
+        if (!workerRef.current || !isReady) return Promise.resolve();
+
+        const id = crypto.randomUUID();
+        return new Promise((resolve) => {
+            resolversRef.current.set(id, () => resolve());
+            const request: WorkerRequest = { id, action: 'RESET_CONTEXT', code: '', notebookId };
+            workerRef.current?.postMessage(request);
+        });
+    }, [isReady]);
+
+    return { isReady, isGraphicsReady, execute, interrupt, getCompletions, resetContext };
 }

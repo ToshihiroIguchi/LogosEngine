@@ -150,6 +150,8 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         setCurrentNotebookId(id);
         setIsDirty(false);
         setVariables([]);
+        // No longer resetting context on switch - we want persistence!
+        // await resetContext(); // REMOVED
         setActiveDocumentation(null);
     };
 
@@ -161,6 +163,8 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             setCells(notebook.cells.map(c => ({ ...c, isExecuting: false })));
             setCurrentNotebookId(id);
             setVariables([]);
+            // No longer resetting context on switch - we want persistence!
+            // await resetContext(); // REMOVED
             setActiveDocumentation(null);
             setIsDirty(false);
         }
@@ -269,7 +273,11 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         setCells(prev => prev.map(c => c.id === id ? { ...c, isExecuting: true } : c));
 
         try {
-            const response = await execute(cell.content);
+            // Execute code via Pyodide
+            // Pass the currentNotebookId to ensure code runs in the correct namespace
+            // The worker will handle creating/retrieving the context for this ID
+            const response = await execute(cell.content, currentNotebookId || 'default');
+
             setCells(prev => prev.map(c =>
                 c.id === id ? { ...c, outputs: response.results, isExecuting: false, executionCount: (c.executionCount || 0) + 1 } : c
             ));
@@ -286,7 +294,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         } catch (err: any) {
             setCells(prev => prev.map(c => c.id === id ? { ...c, outputs: [{ type: 'error', value: err.message, timestamp: Date.now() }], isExecuting: false } : c));
         }
-    }, [cells, execute]);
+    }, [cells, execute, currentNotebookId]);
 
     const selectNextCell = useCallback((currentId: string) => {
         const currentIndex = cells.findIndex(c => c.id === currentId);

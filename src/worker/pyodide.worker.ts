@@ -5,7 +5,44 @@ import type { Output, Variable } from '../types';
 let pyodide: PyodideInterface;
 
 // Isolated context for user variables (Python dictionary)
-let user_context: any;
+// Isolated context for user variables (Python dictionary)
+let contexts = new Map<string, any>();
+let active_context: any;
+
+// Context management helper
+function getContext(notebookId?: string) {
+    if (!notebookId) {
+        // Fallback for requests without ID (should be rare) or initial setup
+        if (!active_context) {
+            active_context = pyodide.runPython("{}");
+            const setup_context = pyodide.globals.get("setup_context");
+            setup_context(active_context);
+            setup_context.destroy();
+        }
+        return active_context;
+    }
+
+    if (!contexts.has(notebookId)) {
+        console.log(`Worker: Creating new context for notebook ${notebookId}`);
+        const new_ctx = pyodide.runPython("{}");
+        const setup_context = pyodide.globals.get("setup_context");
+        setup_context(new_ctx);
+        setup_context.destroy();
+
+        // Inject plt if ready
+        if (matplotlibReady) {
+            const inject_plt = pyodide.globals.get('inject_plt');
+            if (inject_plt) {
+                inject_plt(new_ctx);
+                inject_plt.destroy();
+            }
+        }
+        contexts.set(notebookId, new_ctx);
+    }
+
+    active_context = contexts.get(notebookId);
+    return active_context;
+}
 // Keys present in the context before user execution (SymPy functions, etc.)
 let ambient_keys: Set<string> = new Set();
 let matplotlibReady = false;
@@ -226,6 +263,7 @@ def _get_completions(prefix, ctx):
 
 // initPyodide starting
 
+initPyodide();
 async function initPyodide() {
     const start = performance.now();
     console.log('Worker: Initializing Pyodide (v0.29.0)...');
@@ -246,15 +284,16 @@ async function initPyodide() {
         const t3 = performance.now();
         await pyodide.runPythonAsync(INITIAL_PYTHON_CODE);
 
-        // Initialize user context as a Python dictionary
-        user_context = pyodide.runPython("{}");
+        // Initialize default context
+        active_context = pyodide.runPython("{}");
         const setup_context = pyodide.globals.get("setup_context");
-        setup_context(user_context);
+        setup_context(active_context);
         setup_context.destroy();
 
         // Capture ambient keys to hide them from the Variable Inspector
-        const initialKeys = pyodide.globals.get('list')(user_context.keys()).toJs();
-        ambient_keys = new Set(initialKeys);
+        ambient_keys = new Set(); // Re-declare ambient_keys
+        const keys = pyodide.globals.get('list')(active_context.keys()).toJs();
+        for (const key of keys) ambient_keys.add(key);
         console.log(`Worker: Context setup in ${(performance.now() - t3).toFixed(0)}ms`);
 
         const total = performance.now() - start;
@@ -278,7 +317,10 @@ def inject_plt(ctx):
                 `);
 
                 const inject_plt = pyodide.globals.get('inject_plt');
-                inject_plt(user_context);
+                // Inject into the default/active context for now, or just hold off until needed
+                if (active_context) {
+                    inject_plt(active_context);
+                }
                 inject_plt.destroy();
 
                 matplotlibReady = true;
@@ -288,9 +330,9 @@ def inject_plt(ctx):
                 console.error('Worker: Failed to load background packages', e);
             }
         })();
-
-    } catch (err) {
-        console.error('Worker: Initialization failed:', err);
+    } catch (err: any) {
+        console.error('Worker: Pyodide initialization failed', err);
+        self.postMessage({ type: 'ERROR', message: `Pyodide initialization failed: ${err.message}` });
     }
 }
 
@@ -301,11 +343,12 @@ self.onmessage = async (event: MessageEvent<WorkerRequest | CompletionRequest>) 
         try {
             if (!pyodide) throw new Error('Engine not ready');
 
-            const { code, position } = event.data as CompletionRequest;
+            const { code, position, notebookId } = event.data as CompletionRequest;
             const prefix = code.substring(0, position).split(/\s+/).pop() || '';
 
+            const ctx = getContext(notebookId);
             const _get_completions = pyodide.globals.get("_get_completions");
-            const completionsProxy = _get_completions(prefix, user_context);
+            const completionsProxy = _get_completions(prefix, ctx);
             const completions = completionsProxy.toJs({ dict_converter: Object.fromEntries });
             completionsProxy.destroy();
 
@@ -323,10 +366,60 @@ self.onmessage = async (event: MessageEvent<WorkerRequest | CompletionRequest>) 
         }
     }
 
-    if (action === 'EXECUTE') {
-        const { code } = event.data as WorkerRequest;
+    if (action === 'RESET_CONTEXT') {
+        const { notebookId } = event.data as WorkerRequest;
         try {
             if (!pyodide) throw new Error('Engine not ready');
+
+            console.log(`Worker: Resetting context for notebook ${notebookId}...`);
+
+            if (notebookId && contexts.has(notebookId)) {
+                const ctx = contexts.get(notebookId);
+                ctx.destroy();
+                contexts.delete(notebookId);
+                // Creating a new one automatically via getContext next time it's needed
+                getContext(notebookId);
+            } else if (!notebookId && active_context) {
+                // Legacy behavior or fallback? clear active
+                active_context.destroy();
+                active_context = undefined;
+                getContext(); // Recreate default
+            }
+
+            console.log('Worker: Context reset complete');
+
+            // Re-inject plt if matplotlib is ready
+            if (matplotlibReady) {
+                const inject_plt = pyodide.globals.get('inject_plt');
+                if (inject_plt) {
+                    inject_plt(getContext(notebookId)); // Inject into the (newly created) context
+                    inject_plt.destroy();
+                }
+            }
+
+            self.postMessage({
+                id,
+                status: 'SUCCESS',
+                results: []
+            });
+            return;
+        } catch (err: any) {
+            console.error('Worker: Reset failed', err);
+            self.postMessage({
+                id,
+                status: 'ERROR',
+                results: [{ type: 'error', value: 'Context reset failed: ' + err.message, timestamp: Date.now() }]
+            });
+            return;
+        }
+    }
+
+    if (action === 'EXECUTE') {
+        const { code, notebookId } = event.data as WorkerRequest;
+        try {
+            if (!pyodide) throw new Error('Engine not ready');
+
+            const ctx = getContext(notebookId);
 
             // If the code uses plotting functions, wait for matplotlib if it's still loading
             const containsPlotting = code.includes('plot') || code.includes('plt.');
@@ -340,7 +433,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest | CompletionRequest>) 
             if (trimmedCode.startsWith('?')) {
                 const symbolName = trimmedCode.substring(1).trim();
                 const _get_help = pyodide.globals.get("_get_help");
-                const docProxy = _get_help(symbolName, user_context);
+                const docProxy = _get_help(symbolName, ctx);
                 const doc = docProxy ? docProxy.toJs({ dict_converter: Object.fromEntries }) : null;
                 if (docProxy) docProxy.destroy();
 
@@ -354,7 +447,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest | CompletionRequest>) 
             }
 
             const execute_cell = pyodide.globals.get("execute_cell");
-            const resultProxy = execute_cell(code, user_context);
+            const resultProxy = execute_cell(code, ctx);
             const result = resultProxy.toJs({ dict_converter: Object.fromEntries });
             resultProxy.destroy();
 
@@ -414,10 +507,11 @@ self.onmessage = async (event: MessageEvent<WorkerRequest | CompletionRequest>) 
             });
         }
     }
+
 };
 
 function getVariables(): Variable[] {
-    if (!pyodide || !user_context) return [];
+    if (!pyodide || !active_context) return []; // Use active_context
 
     const vars: Variable[] = [];
     const ignored = new Set([
@@ -426,14 +520,14 @@ function getVariables(): Variable[] {
     ]);
 
     try {
-        const keys = pyodide.globals.get('list')(user_context.keys()).toJs();
+        const keys = pyodide.globals.get('list')(active_context.keys()).toJs();
 
         for (const key of keys) {
             // Skip ambient keys (SymPy functions, etc.), internal symbols, or non-string keys
             if (typeof key !== 'string' || ambient_keys.has(key) || ignored.has(key) || key.startsWith('_')) continue;
 
             try {
-                const val = user_context.get(key);
+                const val = active_context.get(key);
                 if (typeof val === 'function') continue;
 
                 const typeName = pyodide.globals.get('type')(val).__name__;
@@ -450,5 +544,3 @@ function getVariables(): Variable[] {
     }
     return vars;
 }
-
-initPyodide();
