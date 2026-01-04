@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import type { Cell, Variable, Documentation, NotebookMeta } from '../types';
 import { usePyodide } from '../hooks/usePyodide';
 import { WELCOME_CODE } from '../constants/examples';
-import { storage, migrateFromLocalStorage } from '../services/storage';
+import { storage } from '../services/storage';
 
 export type SidebarTab = 'variables' | 'documentation' | 'files';
 
@@ -66,20 +66,15 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     const [isDirty, setIsDirty] = useState(false);
     const isInitialMount = useRef(true);
 
-    // Initial Load & Migration
+    // Initial Load
     useEffect(() => {
         const init = async () => {
-            // 1. Try migration
-            let targetId = await migrateFromLocalStorage();
-
-            // 2. Load file list
+            // 1. Load file list
             const metaList = await storage.getAllMeta();
             setFileList(metaList.sort((a, b) => b.updatedAt - a.updatedAt));
 
-            // 3. Load last active or new
-            if (!targetId) {
-                targetId = localStorage.getItem('logos-engine-last-id');
-            }
+            // 2. Load last active or new
+            let targetId = localStorage.getItem('logos-engine-last-id');
 
             if (targetId && metaList.some(m => m.id === targetId)) {
                 const notebook = await storage.getNotebook(targetId);

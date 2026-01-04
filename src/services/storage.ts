@@ -78,32 +78,4 @@ export const storage = {
     }
 };
 
-export const migrateFromLocalStorage = async (): Promise<string | null> => {
-    const oldSaved = localStorage.getItem('logos-engine-notebook');
-    if (!oldSaved) return null;
 
-    try {
-        const { cells } = JSON.parse(oldSaved);
-        if (Array.isArray(cells) && cells.length > 0) {
-            const id = crypto.randomUUID();
-            const now = Date.now();
-            const meta: NotebookMeta = {
-                id,
-                title: 'Migrated Notebook',
-                createdAt: now,
-                updatedAt: now,
-            };
-            const content: NotebookContent = {
-                id,
-                cells,
-            };
-
-            await storage.saveNotebook(meta, content);
-            localStorage.removeItem('logos-engine-notebook');
-            return id;
-        }
-    } catch (err) {
-        console.error('Migration failed:', err);
-    }
-    return null;
-};
