@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
-import type { Cell, Variable, Documentation } from '../types';
+import type { Cell, Variable, Documentation, NotebookMeta } from '../types';
 import { usePyodide } from '../hooks/usePyodide';
 import { WELCOME_CODE } from '../constants/examples';
+import { storage, migrateFromLocalStorage } from '../services/storage';
 
-export type SidebarTab = 'variables' | 'documentation';
+export type SidebarTab = 'variables' | 'documentation' | 'files';
 
 interface NotebookContextType {
     cells: Cell[];
@@ -33,6 +34,15 @@ interface NotebookContextType {
     resetNotebook: () => void;
     isGraphicsReady: boolean;
     getCompletions: (code: string, position: number) => Promise<import('../worker/workerTypes').CompletionResponse>;
+
+    // Multi-notebook support
+    fileList: NotebookMeta[];
+    currentNotebookId: string | null;
+    isDirty: boolean;
+    createNotebook: (title?: string) => Promise<void>;
+    openNotebook: (id: string) => Promise<void>;
+    deleteNotebook: (id: string) => Promise<void>;
+    renameNotebook: (id: string, title: string) => Promise<void>;
 }
 
 const NotebookContext = createContext<NotebookContextType | undefined>(undefined);
@@ -47,54 +57,144 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [focusedCellId, setFocusedCellId] = useState<string | null>(null);
     const { isReady, isGraphicsReady, execute, interrupt: pyodideInterrupt, getCompletions } = usePyodide();
+
+    const [fileList, setFileList] = useState<NotebookMeta[]>([]);
+    const [currentNotebookId, setCurrentNotebookId] = useState<string | null>(null);
+    const [isDirty, setIsDirty] = useState(false);
     const isInitialMount = useRef(true);
 
-    // Initial Load
+    // Initial Load & Migration
     useEffect(() => {
-        const saved = localStorage.getItem('logos-engine-notebook');
-        if (saved) {
-            try {
-                const { cells: savedCells } = JSON.parse(saved);
-                if (Array.isArray(savedCells) && savedCells.length > 0) {
-                    // Reset execution state but keep content/outputs
-                    setCells(savedCells.map(c => ({ ...c, isExecuting: false })));
-                }
-            } catch (err) {
-                console.error('Failed to load saved notebook:', err);
+        const init = async () => {
+            // 1. Try migration
+            let targetId = await migrateFromLocalStorage();
+
+            // 2. Load file list
+            const metaList = await storage.getAllMeta();
+            setFileList(metaList.sort((a, b) => b.updatedAt - a.updatedAt));
+
+            // 3. Load last active or new
+            if (!targetId) {
+                targetId = localStorage.getItem('logos-engine-last-id');
             }
-        }
-        isInitialMount.current = false;
+
+            if (targetId && metaList.some(m => m.id === targetId)) {
+                const notebook = await storage.getNotebook(targetId);
+                if (notebook) {
+                    setCells(notebook.cells.map(c => ({ ...c, isExecuting: false })));
+                    setCurrentNotebookId(targetId);
+                }
+            } else if (metaList.length > 0) {
+                const notebook = await storage.getNotebook(metaList[0].id);
+                if (notebook) {
+                    setCells(notebook.cells.map(c => ({ ...c, isExecuting: false })));
+                    setCurrentNotebookId(metaList[0].id);
+                }
+            } else {
+                // Completely fresh start
+                await createNotebook('Welcome Notebook');
+            }
+            isInitialMount.current = false;
+        };
+        init();
     }, []);
 
     // Auto-save
     useEffect(() => {
-        if (isInitialMount.current) return;
+        if (isInitialMount.current || !currentNotebookId) return;
 
-        const timer = setTimeout(() => {
-            localStorage.setItem('logos-engine-notebook', JSON.stringify({ cells }));
-        }, 1000); // Debounce save
+        const timer = setTimeout(async () => {
+            const currentMeta = fileList.find(m => m.id === currentNotebookId);
+            if (currentMeta) {
+                const now = Date.now();
+                const updatedMeta = { ...currentMeta, updatedAt: now };
+                await storage.saveNotebook(updatedMeta, { id: currentNotebookId, cells });
 
+                setFileList(prev => prev.map(m => m.id === currentNotebookId ? updatedMeta : m).sort((a, b) => b.updatedAt - a.updatedAt));
+                setIsDirty(false);
+            }
+        }, 1000);
+
+        setIsDirty(true);
         return () => clearTimeout(timer);
-    }, [cells]);
+    }, [cells, currentNotebookId]);
+
+    // Keep track of last opened notebook
+    useEffect(() => {
+        if (currentNotebookId) {
+            localStorage.setItem('logos-engine-last-id', currentNotebookId);
+        }
+    }, [currentNotebookId]);
+
+    const createCell = useCallback((type: 'code' | 'markdown', content = ''): Cell => ({
+        id: crypto.randomUUID(),
+        type,
+        content,
+        outputs: [],
+        isExecuting: false,
+        isEditing: type === 'markdown'
+    }), []);
+
+    const createNotebook = async (title: string = 'Untitled Note') => {
+        const id = crypto.randomUUID();
+        const now = Date.now();
+        const meta: NotebookMeta = { id, title, createdAt: now, updatedAt: now };
+        const initialCells = [{ id: '1', type: 'code' as const, content: WELCOME_CODE, outputs: [], isExecuting: false }];
+
+        await storage.saveNotebook(meta, { id, cells: initialCells });
+        setFileList(prev => [meta, ...prev]);
+        setCells(initialCells);
+        setCurrentNotebookId(id);
+        setIsDirty(false);
+        setVariables([]);
+        setActiveDocumentation(null);
+    };
+
+    const openNotebook = async (id: string) => {
+        if (id === currentNotebookId) return;
+        const notebook = await storage.getNotebook(id);
+        if (notebook) {
+            // Save current one first if needed (already handled by auto-save debounce usually, but good to be safe)
+            setCells(notebook.cells.map(c => ({ ...c, isExecuting: false })));
+            setCurrentNotebookId(id);
+            setVariables([]);
+            setActiveDocumentation(null);
+            setIsDirty(false);
+        }
+    };
+
+    const deleteNotebook = async (id: string) => {
+        await storage.deleteNotebook(id);
+        setFileList(prev => prev.filter(m => m.id !== id));
+        if (currentNotebookId === id) {
+            const metaList = await storage.getAllMeta();
+            if (metaList.length > 0) {
+                await openNotebook(metaList[0].id);
+            } else {
+                await createNotebook();
+            }
+        }
+    };
+
+    const renameNotebook = async (id: string, title: string) => {
+        const meta = fileList.find(m => m.id === id);
+        if (meta) {
+            const updated = { ...meta, title, updatedAt: Date.now() };
+            await storage.updateMeta(updated);
+            setFileList(prev => prev.map(m => m.id === id ? updated : m).sort((a, b) => b.updatedAt - a.updatedAt));
+        }
+    };
 
     const addCell = useCallback((type: 'code' | 'markdown', index?: number) => {
-        const id = crypto.randomUUID();
-        const newCell: Cell = {
-            id,
-            type,
-            content: '',
-            outputs: [],
-            isExecuting: false,
-            isEditing: type === 'markdown'
-        };
+        const newCell = createCell(type);
         setCells(prev => {
             if (index === undefined) return [...prev, newCell];
             const next = [...prev];
             next.splice(index + 1, 0, newCell);
             return next;
         });
-        return id;
-    }, []);
+        return newCell.id;
+    }, [createCell]);
 
     const setCellEditing = useCallback((id: string, isEditing: boolean) => {
         setCells(prev => prev.map(c => c.id === id ? { ...c, isEditing } : c));
@@ -145,19 +245,12 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     }, []);
 
     const resetNotebook = useCallback(() => {
-        const newId = crypto.randomUUID();
-        const newCell: Cell = {
-            id: newId,
-            type: 'code',
-            content: '',
-            outputs: [],
-            isExecuting: false
-        };
+        const newCell = createCell('code');
         setCells([newCell]);
         setVariables([]);
         setActiveDocumentation(null);
-        setFocusedCellId(newId);
-    }, []);
+        setFocusedCellId(newCell.id);
+    }, [createCell]);
 
     const deleteCell = useCallback((id: string) => {
         setCells(prev => {
@@ -229,35 +322,10 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             }
 
             // Otherwise, check if we need to add a new cell
-            const newCell: Cell = {
-                id: crypto.randomUUID(),
-                type: 'code',
-                content: code,
-                outputs: [],
-                isExecuting: false
-            };
-
-            // We need to set focus in a useEffect or similar if we want to be 100% sure, 
-            // but setting state here usually triggers the effect in CellItem for "newly created cell" logic 
-            // if we handle it right. 
-            // NOTE: The Context API doesn't allow setting side-effect (setFocusedCellId for new ID) 
-            // synchronously inside setCells callback easily for the *new* ID without finding it out first.
-            // But since we generate ID here...
-
-            // To properly handle focus for NEW cell, we should do it outside the setCells updater if possible,
-            // or use the effect we have. Let's do it like the original unique-id flow.
-
+            const newCell = createCell('code', code);
             return [...prev, newCell];
         });
-
-        // Note: For the "New Cell" case, we can't easily set focus inside the setCells callback 
-        // to the *new* ID because we return the state. 
-        // However, the original implementation didn't strictly focus the new example cell explicitly 
-        // in logic shown (it just appended). 
-        // Implementation Plan logic used a simplified return. 
-        // Let's stick to the Plan's logic but ensure we handle the 'Reuse' case's focus explicitly as desired.
-
-    }, []);
+    }, [createCell]);
 
     const importNotebook = useCallback((data: any) => {
         try {
@@ -265,23 +333,22 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
                 throw new Error('Invalid notebook format: missing cells array');
             }
 
-            const importedCells: Cell[] = data.cells.map((cell: any) => ({
-                id: crypto.randomUUID(),
-                type: cell.type || 'code',
-                content: cell.content || '',
-                outputs: [],
-                isExecuting: false
-            }));
+            const importedCells: Cell[] = data.cells.map((cell: any) =>
+                createCell(cell.type || 'code', cell.content || '')
+            );
 
             if (importedCells.length === 0) {
                 throw new Error('No cells found in the imported file');
             }
 
+            // Clear previous state before loading new notebook
+            setVariables([]);
+            setActiveDocumentation(null);
             setCells(importedCells);
         } catch (err: any) {
             alert(`Import failed: ${err.message}`);
         }
-    }, []);
+    }, [createCell]);
 
     return (
         <NotebookContext.Provider value={{
@@ -292,7 +359,8 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             selectNextCell,
             setCellEditing, moveCell, duplicateCell, clearCellOutput, clearAllOutputs, resetNotebook,
             isGraphicsReady,
-            getCompletions
+            getCompletions,
+            fileList, currentNotebookId, isDirty, createNotebook, openNotebook, deleteNotebook, renameNotebook
         }}>
             {children}
         </NotebookContext.Provider>

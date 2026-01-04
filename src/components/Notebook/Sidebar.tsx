@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNotebook } from '../../context/NotebookContext';
-import { Database, X, Hash, BookCopy, Info } from 'lucide-react';
+import { Database, X, Hash, BookCopy, Info, FolderOpen } from 'lucide-react';
+import { FileExplorer } from './FileExplorer';
 
 interface SidebarProps {
     isOpen: boolean;
@@ -8,7 +9,7 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
-    const { variables, activeDocumentation, activeTab, setActiveTab } = useNotebook();
+    const { variables, activeDocumentation, activeTab, setActiveTab, fileList } = useNotebook();
 
     if (!isOpen) return null;
 
@@ -17,10 +18,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             {/* Tab Header */}
             <div className="flex border-b border-gray-100 bg-gray-50/30">
                 <button
+                    onClick={() => setActiveTab('files')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-bold uppercase tracking-wider transition-all border-b-2 ${activeTab === 'files'
+                        ? 'border-purple-600 text-purple-600 bg-white'
+                        : 'border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-100/50'
+                        }`}
+                >
+                    <FolderOpen size={14} />
+                    Files
+                </button>
+                <button
                     onClick={() => setActiveTab('variables')}
                     className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-bold uppercase tracking-wider transition-all border-b-2 ${activeTab === 'variables'
-                            ? 'border-purple-600 text-purple-600 bg-white'
-                            : 'border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-100/50'
+                        ? 'border-purple-600 text-purple-600 bg-white'
+                        : 'border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-100/50'
                         }`}
                 >
                     <Database size={14} />
@@ -29,8 +40,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 <button
                     onClick={() => setActiveTab('documentation')}
                     className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-bold uppercase tracking-wider transition-all border-b-2 ${activeTab === 'documentation'
-                            ? 'border-blue-600 text-blue-600 bg-white'
-                            : 'border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-100/50'
+                        ? 'border-blue-600 text-blue-600 bg-white'
+                        : 'border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-100/50'
                         }`}
                 >
                     <BookCopy size={14} />
@@ -45,7 +56,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             </div>
 
             <div className="flex-1 overflow-y-auto">
-                {activeTab === 'variables' ? (
+                {activeTab === 'files' ? (
+                    <FileExplorer />
+                ) : activeTab === 'variables' ? (
                     variables.length === 0 ? (
                         <div className="h-full flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500">
                             <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-4">
@@ -110,9 +123,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
             <div className="p-4 bg-gray-50 border-t border-gray-100">
                 <div className="text-[10px] text-gray-400 font-mono uppercase tracking-widest text-center">
-                    {activeTab === 'variables'
-                        ? `${variables.length} Active ${variables.length === 1 ? 'Symbol' : 'Symbols'}`
-                        : activeDocumentation ? 'Viewing Documentation' : 'Ready for help (?)'}
+                    {activeTab === 'files'
+                        ? `${fileList.length} Notebooks`
+                        : activeTab === 'variables'
+                            ? `${variables.length} Active ${variables.length === 1 ? 'Symbol' : 'Symbols'}`
+                            : activeDocumentation ? 'Viewing Documentation' : 'Ready for help (?)'}
                 </div>
             </div>
         </div>

@@ -37,3 +37,10 @@ export interface Documentation {
   docstring: string;
   module?: string;
 }
+
+export interface NotebookMeta {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+}

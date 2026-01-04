@@ -13,6 +13,7 @@
     "@monaco-editor/react": "^4.7.0",
     "@tailwindcss/vite": "^4.1.18",
     "clsx": "^2.1.1",
+    "idb": "^8.0.3",
     "katex": "^0.16.27",
     "lucide-react": "^0.562.0",
     "monaco-editor": "^0.55.1",

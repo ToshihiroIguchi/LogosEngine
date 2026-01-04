@@ -1,5 +1,9 @@
-import React, { useState, useRef } from 'react';
-import { Download, PlayCircle, Loader2, Info, BookOpen, ChevronDown, Upload, Square, Database, Printer, Eraser, FileText, Code, RefreshCw } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import {
+    Download, PlayCircle, Loader2, Info, BookOpen, ChevronDown, Upload,
+    Square, Database, Printer, Eraser, FileText, Code, RefreshCw,
+    Pencil, Check, CheckCircle2, CloudUpload, FolderOpen
+} from 'lucide-react';
 import { useNotebook } from '../../context/NotebookContext';
 import { CellItem } from './CellItem';
 import { ErrorBoundary } from '../ErrorBoundary';
@@ -10,11 +14,22 @@ import { EXAMPLES } from '../../constants/examples';
 export const NotebookContainer: React.FC = () => {
     const {
         cells, addCell, executeAll, interrupt, isReady, insertExample, importNotebook,
-        isSidebarOpen, setIsSidebarOpen, clearAllOutputs, resetNotebook, isGraphicsReady
+        isSidebarOpen, setIsSidebarOpen, clearAllOutputs, resetNotebook, isGraphicsReady,
+        fileList, currentNotebookId, isDirty, renameNotebook, setActiveTab
     } = useNotebook();
     const [showExamples, setShowExamples] = useState(false);
     const [showDisclaimer, setShowDisclaimer] = useState(false);
+    const [isEditingTitle, setIsEditingTitle] = useState(false);
+    const [editTitleValue, setEditTitleValue] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const currentNotebook = fileList.find(m => m.id === currentNotebookId);
+
+    useEffect(() => {
+        if (currentNotebook) {
+            setEditTitleValue(currentNotebook.title);
+        }
+    }, [currentNotebook]);
 
     const isExecutingAny = cells.some(c => c.isExecuting);
 
@@ -30,7 +45,7 @@ export const NotebookContainer: React.FC = () => {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `notebook-${new Date().toISOString().slice(0, 10)}.json`;
+        link.download = `${currentNotebook?.title || 'notebook'}-${new Date().toISOString().slice(0, 10)}.json`;
         link.click();
         URL.revokeObjectURL(url);
     };
@@ -67,6 +82,18 @@ export const NotebookContainer: React.FC = () => {
         setShowExamples(false);
     };
 
+    const handleSaveTitle = async () => {
+        if (editTitleValue.trim() && currentNotebookId) {
+            await renameNotebook(currentNotebookId, editTitleValue.trim());
+        }
+        setIsEditingTitle(false);
+    };
+
+    const toggleSidebarTab = (tab: 'files' | 'variables') => {
+        setActiveTab(tab);
+        setIsSidebarOpen(true);
+    };
+
     return (
         <div id="app-root" className="h-screen bg-[#FDFDFD] flex flex-col overflow-hidden">
             <input
@@ -79,13 +106,58 @@ export const NotebookContainer: React.FC = () => {
 
             {/* Header - Fixed at top */}
             <header className="flex-none bg-white/80 backdrop-blur-md border-b border-gray-200/60 px-6 py-3 flex items-center justify-between shadow-sm z-30">
-                <div className="flex items-center gap-4">
-                    <div className="bg-white p-1 rounded-lg border border-gray-100 shadow-sm"><img src="/logo.png" alt="LogosEngine" className="w-8 h-8 object-contain" /></div>
-                    <div>
-                        <h1 className="text-lg font-bold text-gray-900 tracking-tight">LogosEngine</h1>
-                        <p className="text-[10px] text-gray-400 font-medium tracking-widest uppercase -mt-0.5">Symbolic Reasoning Environment</p>
+                <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-white p-1.5 rounded-xl border border-gray-100 shadow-sm"><img src="/logo.png" alt="LogosEngine" className="w-8 h-8 object-contain" /></div>
+                        <div className="flex items-center">
+                            <h1 className="text-xl font-black text-gray-900 tracking-tighter">Logos<span className="text-purple-600">Engine</span></h1>
+                        </div>
+                    </div>
+
+                    <div className="h-8 w-px bg-gray-200" />
+
+                    <div className="flex items-center gap-3">
+                        {isEditingTitle ? (
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="text"
+                                    value={editTitleValue}
+                                    onChange={(e) => setEditTitleValue(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleSaveTitle()}
+                                    onBlur={handleSaveTitle}
+                                    autoFocus
+                                    className="bg-gray-50 border border-purple-200 rounded-lg px-3 py-1 text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-100 min-w-[200px]"
+                                />
+                                <button onClick={handleSaveTitle} className="text-green-600 hover:bg-green-50 p-1.5 rounded-lg transition-colors"><Check size={16} /></button>
+                            </div>
+                        ) : (
+                            <div
+                                className="group flex items-center gap-2 cursor-pointer hover:bg-gray-50 px-3 py-1.5 rounded-xl transition-all"
+                                onClick={() => setIsEditingTitle(true)}
+                            >
+                                <span className="text-lg font-bold text-gray-900 tracking-tight">
+                                    {currentNotebook?.title || 'Loading...'}
+                                </span>
+                                <Pencil size={14} className="text-gray-300 group-hover:text-purple-400 opacity-0 group-hover:opacity-100 transition-all" />
+                            </div>
+                        )}
+
+                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                            {isDirty ? (
+                                <div className="flex items-center gap-1.5 text-amber-500 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100/50">
+                                    <CloudUpload size={12} className="animate-bounce" />
+                                    <span>Saving...</span>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-1.5 text-green-500 bg-green-50 px-2 py-0.5 rounded-full border border-green-100/50">
+                                    <CheckCircle2 size={12} />
+                                    <span>Saved</span>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
+
                 <div className="flex items-center gap-2">
                     {!isReady ? (
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 rounded-full border border-amber-100/50">
@@ -109,14 +181,19 @@ export const NotebookContainer: React.FC = () => {
                     )}
                     <div className="h-6 w-px bg-gray-200 mx-2" />
                     <div className="flex items-center bg-gray-100/50 p-1 rounded-xl border border-gray-200/50 gap-1">
-                        <div className="relative">
-                            <button
-                                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                                className={`flex items-center gap-2 px-4 py-1.5 rounded-lg shadow-sm border transition-all font-medium text-xs ${isSidebarOpen ? 'bg-purple-600 text-white border-purple-700 shadow-purple-100' : 'bg-white text-purple-600 border-gray-200 hover:bg-purple-50'}`}
-                            >
-                                <Database size={14} />Variables
-                            </button>
-                        </div>
+                        <button
+                            onClick={() => toggleSidebarTab('files')}
+                            className="flex items-center gap-2 px-4 py-1.5 bg-white text-gray-600 rounded-lg shadow-sm border border-gray-200 hover:bg-gray-50 transition-all font-medium text-xs"
+                        >
+                            <FolderOpen size={14} />Notebooks
+                        </button>
+                        <button
+                            onClick={() => toggleSidebarTab('variables')}
+                            className="flex items-center gap-2 px-4 py-1.5 bg-white text-purple-600 rounded-lg shadow-sm border border-gray-200 hover:bg-purple-50 transition-all font-medium text-xs"
+                        >
+                            <Database size={14} />Variables
+                        </button>
+
                         <div className="relative">
                             <button
                                 onClick={() => setShowExamples(!showExamples)}
