@@ -156,20 +156,25 @@ def execute_cell(code, ctx):
         except:
             pass
             
-    img_base64 = None
-    if 'plt' in ctx and ctx['plt'].get_fignums():
+    images = []
+    if 'plt' in ctx:
         plt_local = ctx['plt']
-        buf = io.BytesIO()
-        plt_local.savefig(buf, format='png', bbox_inches='tight')
-        buf.seek(0)
-        img_base64 = base64.b64encode(buf.read()).decode('utf-8')
+        # Iterate over all figure numbers
+        for fignum in plt_local.get_fignums():
+            plt_local.figure(fignum) # Set as current figure to save
+            buf = io.BytesIO()
+            plt_local.savefig(buf, format='png', bbox_inches='tight')
+            buf.seek(0)
+            img_str = base64.b64encode(buf.read()).decode('utf-8')
+            images.append(img_str)
+        # Close all figures after capturing
         plt_local.close('all')
         
     return {
         "stdout": stdout_content,
         "result": str(result_val) if result_val is not None else None,
         "latex": latex_res,
-        "image": img_base64,
+        "images": images,
         "error": error_data,
         "tsv": get_tsv(result_val)
     }
@@ -489,7 +494,11 @@ self.onmessage = async (event: MessageEvent<WorkerRequest | CompletionRequest>) 
                     });
                 }
 
-                if (result.image) {
+                if (result.images && Array.isArray(result.images)) {
+                    result.images.forEach((img: string) => {
+                        outputs.push({ type: 'image', value: `data:image/png;base64,${img}`, timestamp });
+                    });
+                } else if (result.image) {
                     outputs.push({ type: 'image', value: `data:image/png;base64,${result.image}`, timestamp });
                 }
             }
