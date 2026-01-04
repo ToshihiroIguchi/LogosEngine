@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
     Download, PlayCircle, Loader2, Info, BookOpen, ChevronDown, Upload,
     Square, Database, Printer, Eraser, FileText, Code, RefreshCw,
-    Pencil, Check, CheckCircle2, CloudUpload, FolderOpen
+    Pencil, Check, CheckCircle2, CloudUpload, FolderOpen, MoreVertical
 } from 'lucide-react';
 import { useNotebook } from '../../context/NotebookContext';
 import { CellItem } from './CellItem';
@@ -18,6 +18,7 @@ export const NotebookContainer: React.FC = () => {
         fileList, currentNotebookId, isDirty, renameNotebook, setActiveTab
     } = useNotebook();
     const [showExamples, setShowExamples] = useState(false);
+    const [showMenu, setShowMenu] = useState(false);
     const [showDisclaimer, setShowDisclaimer] = useState(false);
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [editTitleValue, setEditTitleValue] = useState('');
@@ -183,21 +184,22 @@ export const NotebookContainer: React.FC = () => {
                     <div className="flex items-center bg-gray-100/50 p-1 rounded-xl border border-gray-200/50 gap-1">
                         <button
                             onClick={() => toggleSidebarTab('files')}
-                            className="flex items-center gap-2 px-4 py-1.5 bg-white text-gray-600 rounded-lg shadow-sm border border-gray-200 hover:bg-gray-50 transition-all font-medium text-xs"
+                            className="flex items-center gap-2 px-3 py-1.5 bg-white text-gray-600 rounded-lg shadow-sm border border-gray-200 hover:bg-gray-50 transition-all font-medium text-xs whitespace-nowrap"
+                            title="Open Notebook Explorer"
                         >
                             <FolderOpen size={14} />Notebooks
                         </button>
                         <button
                             onClick={() => toggleSidebarTab('variables')}
-                            className="flex items-center gap-2 px-4 py-1.5 bg-white text-purple-600 rounded-lg shadow-sm border border-gray-200 hover:bg-purple-50 transition-all font-medium text-xs"
+                            className="flex items-center gap-2 px-3 py-1.5 bg-white text-purple-600 rounded-lg shadow-sm border border-gray-200 hover:bg-purple-50 transition-all font-medium text-xs whitespace-nowrap"
                         >
                             <Database size={14} />Variables
                         </button>
 
                         <div className="relative">
                             <button
-                                onClick={() => setShowExamples(!showExamples)}
-                                className="flex items-center gap-2 px-4 py-1.5 bg-white text-purple-600 rounded-lg shadow-sm border border-gray-200 hover:bg-purple-50 transition-all font-medium text-xs"
+                                onClick={() => { setShowExamples(!showExamples); setShowMenu(false); }}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-white text-purple-600 rounded-lg shadow-sm border border-gray-200 hover:bg-purple-50 transition-all font-medium text-xs whitespace-nowrap"
                             >
                                 <BookOpen size={14} />Examples<ChevronDown size={12} className={`transition-transform ${showExamples ? 'rotate-180' : ''}`} />
                             </button>
@@ -216,31 +218,62 @@ export const NotebookContainer: React.FC = () => {
                                 </div>
                             )}
                         </div>
+
+                        <div className="h-6 w-px bg-gray-200 mx-1" />
+
                         {isExecutingAny && (
                             <button onClick={interrupt} className="flex items-center gap-2 px-4 py-1.5 bg-red-50 text-red-600 rounded-lg shadow-sm border border-red-200 hover:bg-red-100 transition-all font-medium text-xs animate-pulse">
                                 <Square size={14} fill="currentColor" />Stop
                             </button>
                         )}
-                        <button onClick={executeAll} disabled={!isReady || isExecutingAny} className="flex items-center gap-2 px-4 py-1.5 bg-white text-blue-600 rounded-lg shadow-sm border border-gray-200 hover:bg-blue-50 transition-all font-medium text-xs disabled:opacity-50">
+                        <button
+                            onClick={executeAll}
+                            disabled={!isReady || isExecutingAny}
+                            className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white rounded-lg shadow-md border border-blue-500 hover:bg-blue-700 transition-all font-bold text-xs disabled:opacity-50"
+                        >
                             <PlayCircle size={14} />Run All
                         </button>
-                        <button onClick={handleImport} className="flex items-center gap-2 px-4 py-1.5 text-gray-600 rounded-lg hover:bg-white transition-all font-medium text-xs">
-                            <Upload size={14} />Import
-                        </button>
-                        <button onClick={handleExport} className="flex items-center gap-2 px-4 py-1.5 text-gray-600 rounded-lg hover:bg-white transition-all font-medium text-xs">
-                            <Download size={14} />Export
-                        </button>
-                        <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-1.5 text-gray-600 rounded-lg hover:bg-white transition-all font-medium text-xs">
-                            <Printer size={14} />PDF
-                        </button>
+
                         <div className="h-6 w-px bg-gray-200 mx-1" />
-                        <button onClick={clearAllOutputs} className="flex items-center gap-2 px-4 py-1.5 text-amber-600 rounded-lg hover:bg-amber-50 transition-all font-medium text-xs">
-                            <Eraser size={14} />Clear Outputs
-                        </button>
-                        <div className="h-6 w-px bg-gray-200 mx-1" />
-                        <button onClick={handleReset} className="flex items-center gap-2 px-4 py-1.5 text-red-600 rounded-lg hover:bg-red-50 transition-all font-medium text-xs" title="Reset Notebook">
-                            <RefreshCw size={14} />Reset
-                        </button>
+
+                        <div className="relative">
+                            <button
+                                onClick={() => { setShowMenu(!showMenu); setShowExamples(false); }}
+                                className={`p-1.5 rounded-lg transition-all ${showMenu ? 'bg-gray-200 text-gray-900' : 'text-gray-500 hover:bg-gray-200/50'}`}
+                                title="More Actions"
+                            >
+                                <MoreVertical size={18} />
+                            </button>
+
+                            {showMenu && (
+                                <>
+                                    <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+                                    <div className="absolute top-full mt-2 right-0 bg-white border border-gray-200 rounded-xl shadow-xl w-56 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                                        <button onClick={() => { handleImport(); setShowMenu(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                                            <Upload size={14} />Import Notebook
+                                        </button>
+                                        <button onClick={() => { handleExport(); setShowMenu(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                                            <Download size={14} />Export JSON
+                                        </button>
+                                        <button onClick={() => { handlePrint(); setShowMenu(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                                            <Printer size={14} />Print / PDF
+                                        </button>
+
+                                        <div className="h-px bg-gray-100 my-2" />
+
+                                        <button onClick={() => { clearAllOutputs(); setShowMenu(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-amber-600 hover:bg-amber-50 transition-colors">
+                                            <Eraser size={14} />Clear All Outputs
+                                        </button>
+
+                                        <div className="h-px bg-gray-100 my-2" />
+
+                                        <button onClick={() => { handleReset(); setShowMenu(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                                            <RefreshCw size={14} />Reset Notebook
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     </div>
                 </div>
             </header>
