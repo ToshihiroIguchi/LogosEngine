@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
     Download, PlayCircle, Loader2, Info, BookOpen, ChevronDown, Upload,
     Square, Database, Printer, Eraser, FileText, Code, RefreshCw,
-    Pencil, Check, CheckCircle2, CloudUpload, FolderOpen, MoreVertical, Zap
+    Pencil, Check, CheckCircle2, CloudUpload, FolderOpen, MoreVertical
 } from 'lucide-react';
 import { useNotebook } from '../../context/NotebookContext';
 import { CellItem } from './CellItem';
@@ -167,7 +167,7 @@ export const NotebookContainer: React.FC = () => {
                         </div>
                     ) : !isGraphicsReady ? (
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-full border border-blue-100/50">
-                            <Zap className="text-blue-500 animate-pulse" size={14} fill="currentColor" />
+                            <Loader2 className="animate-spin text-blue-500" size={14} />
                             <span className="text-xs font-semibold text-blue-600">Engine Ready</span>
                         </div>
                     ) : (
