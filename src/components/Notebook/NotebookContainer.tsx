@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
     Download, PlayCircle, Loader2, Info, BookOpen, ChevronDown, Upload,
     Square, Database, Printer, Eraser, FileText, Code, RefreshCw,
-    Pencil, Check, CheckCircle2, CloudUpload, FolderOpen, MoreVertical
+    Pencil, Check, CheckCircle2, CloudUpload, FolderOpen, MoreVertical, Zap
 } from 'lucide-react';
 import { useNotebook } from '../../context/NotebookContext';
 import { CellItem } from './CellItem';
@@ -162,22 +162,18 @@ export const NotebookContainer: React.FC = () => {
                 <div className="flex items-center gap-2">
                     {!isReady ? (
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 rounded-full border border-amber-100/50">
-                            <Loader2 className="animate-spin text-amber-500" size={14} /><span className="text-xs font-semibold text-amber-600">Initializing...</span>
+                            <Loader2 className="animate-spin text-amber-500" size={14} />
+                            <span className="text-xs font-semibold text-amber-600">Initializing...</span>
+                        </div>
+                    ) : !isGraphicsReady ? (
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-full border border-blue-100/50">
+                            <Zap className="text-blue-500 animate-pulse" size={14} fill="currentColor" />
+                            <span className="text-xs font-semibold text-blue-600">Engine Ready</span>
                         </div>
                     ) : (
-                        <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 rounded-full border border-green-100/50">
-                                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div><span className="text-xs font-semibold text-green-600">Engine Ready</span>
-                            </div>
-                            {!isGraphicsReady ? (
-                                <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50/50 rounded-full border border-blue-100/30">
-                                    <Loader2 className="animate-spin text-blue-400" size={12} /><span className="text-[10px] font-semibold text-blue-500">Graphics Loading...</span>
-                                </div>
-                            ) : (
-                                <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 rounded-full border border-indigo-100/50">
-                                    <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></div><span className="text-xs font-semibold text-indigo-600">Graphics Ready</span>
-                                </div>
-                            )}
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 rounded-full border border-green-100/50">
+                            <CheckCircle2 className="text-green-500" size={14} />
+                            <span className="text-xs font-semibold text-green-600">Ready</span>
                         </div>
                     )}
                     <div className="h-6 w-px bg-gray-200 mx-2" />
