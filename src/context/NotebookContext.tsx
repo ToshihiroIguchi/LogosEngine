@@ -54,7 +54,10 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     const [variables, setVariables] = useState<Variable[]>([]);
     const [activeDocumentation, setActiveDocumentation] = useState<Documentation | null>(null);
     const [activeTab, setActiveTab] = useState<SidebarTab>('variables');
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+        const saved = localStorage.getItem('logos-engine-sidebar-open');
+        return saved === 'true';
+    });
     const [focusedCellId, setFocusedCellId] = useState<string | null>(null);
     const { isReady, isGraphicsReady, execute, interrupt: pyodideInterrupt, getCompletions } = usePyodide();
 
@@ -98,6 +101,11 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         };
         init();
     }, []);
+
+    // Sidebar state persistence
+    useEffect(() => {
+        localStorage.setItem('logos-engine-sidebar-open', isSidebarOpen.toString());
+    }, [isSidebarOpen]);
 
     // Auto-save
     useEffect(() => {
