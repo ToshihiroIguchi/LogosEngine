@@ -1,4 +1,4 @@
-export const WELCOME_CODE = `# LogosEngine - Interactive Computational Notebook
+export const WELCOME_CODE = `# LogosCalc - Interactive Computational Notebook
 # Symbolic math powered by SymPy
 
 # Example: Symbolic Differentiation

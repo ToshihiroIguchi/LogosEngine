@@ -1,4 +1,4 @@
-# LogosEngine
+# LogosCalc
 
 A scientific computational notebook that runs entirely in your browser using WebAssembly.
 

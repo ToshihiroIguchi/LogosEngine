@@ -109,9 +109,9 @@ export const NotebookContainer: React.FC = () => {
             <header className="flex-none bg-white/80 backdrop-blur-md border-b border-gray-200/60 px-6 py-3 flex items-center justify-between shadow-sm z-30">
                 <div className="flex items-center gap-6">
                     <div className="flex items-center gap-3">
-                        <div className="bg-white p-1.5 rounded-xl border border-gray-100 shadow-sm"><img src="/logo.png" alt="LogosEngine" className="w-8 h-8 object-contain" /></div>
+                        <div className="bg-white p-1.5 rounded-xl border border-gray-100 shadow-sm"><img src="/logo.png" alt="LogosCalc" className="w-8 h-8 object-contain" /></div>
                         <div className="flex items-center">
-                            <h1 className="text-xl font-black text-gray-900 tracking-tighter">Logos<span className="text-purple-600">Engine</span></h1>
+                            <h1 className="text-xl font-black text-gray-900 tracking-tighter">Logos<span className="text-purple-600">Calc</span></h1>
                         </div>
                     </div>
 

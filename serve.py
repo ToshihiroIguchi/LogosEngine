@@ -28,7 +28,7 @@ if not os.path.exists(DIRECTORY):
     print("Please run 'npm run build' first to generate the production files.")
     sys.exit(1)
 
-print(f"Serving LogosEngine at http://localhost:{PORT}")
+print(f"Serving LogosCalc at http://localhost:{PORT}")
 print(f"Reading files from: {os.path.abspath(DIRECTORY)}")
 
 with socketserver.TCPServer(("", PORT), Handler) as httpd:

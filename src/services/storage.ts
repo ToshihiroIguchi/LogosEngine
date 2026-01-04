@@ -13,7 +13,7 @@ export interface NotebookContent {
     cells: Cell[];
 }
 
-interface LogosEngineDB extends DBSchema {
+interface LogosCalcDB extends DBSchema {
     meta: {
         key: string;
         value: NotebookMeta;
@@ -24,14 +24,14 @@ interface LogosEngineDB extends DBSchema {
     };
 }
 
-const DB_NAME = 'logos-engine-db';
+const DB_NAME = 'logos-calc-db';
 const DB_VERSION = 1;
 
-let dbPromise: Promise<IDBPDatabase<LogosEngineDB>> | null = null;
+let dbPromise: Promise<IDBPDatabase<LogosCalcDB>> | null = null;
 
 export const getDB = () => {
     if (!dbPromise) {
-        dbPromise = openDB<LogosEngineDB>(DB_NAME, DB_VERSION, {
+        dbPromise = openDB<LogosCalcDB>(DB_NAME, DB_VERSION, {
             upgrade(db) {
                 db.createObjectStore('meta', { keyPath: 'id' });
                 db.createObjectStore('notebooks', { keyPath: 'id' });
