@@ -62,7 +62,7 @@ We provide a dedicated serving script to prevent issues like MIME type errors (c
 ```bash
 python serve.py
 ```
-After running the script, open `http://localhost:8300` in your browser.
+After running the script, open `http://localhost:8300` in your browser. Wait for the "Engine Ready" indicator to appear.
 
 ### 3. Serve using Standard Python Command
 You can also serve the files using a standard one-liner (execute this from within the `dist` directory).
