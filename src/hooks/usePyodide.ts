@@ -6,7 +6,7 @@ export function usePyodide() {
     const [isGraphicsReady, setIsGraphicsReady] = useState(false);
     const workerRef = useRef<Worker | null>(null);
     const resolversRef = useRef<Map<string, (response: WorkerResponse | CompletionResponse) => void>>(new Map());
-    const queueRef = useRef<Array<{ id: string; code: string; resolve: (response: WorkerResponse | CompletionResponse) => void }>>([]);
+    const queueRef = useRef<Array<{ id: string; code: string; notebookId?: string; resolve: (response: WorkerResponse | CompletionResponse) => void }>>([]);
 
     const initWorker = useCallback(() => {
         setIsReady(false);
@@ -27,9 +27,9 @@ export function usePyodide() {
                 // Process queued executions
                 const queue = queueRef.current;
                 queueRef.current = [];
-                queue.forEach(({ id, code, resolve }) => {
+                queue.forEach(({ id, code, notebookId, resolve }) => {
                     resolversRef.current.set(id, resolve);
-                    const request: WorkerRequest = { id, action: 'EXECUTE', code };
+                    const request: WorkerRequest = { id, action: 'EXECUTE', code, notebookId };
                     worker.postMessage(request);
                 });
                 return;
@@ -61,9 +61,9 @@ export function usePyodide() {
         if (isReady && workerRef.current && queueRef.current.length > 0) {
             const queue = queueRef.current;
             queueRef.current = [];
-            queue.forEach(({ id, code, resolve }) => {
+            queue.forEach(({ id, code, notebookId, resolve }) => {
                 resolversRef.current.set(id, resolve);
-                const request: WorkerRequest = { id, action: 'EXECUTE', code };
+                const request: WorkerRequest = { id, action: 'EXECUTE', code, notebookId };
                 workerRef.current?.postMessage(request);
             });
         }
@@ -92,13 +92,20 @@ export function usePyodide() {
     }, [initWorker]);
 
     const execute = useCallback((code: string, notebookId?: string): Promise<WorkerResponse> => {
-        if (!workerRef.current || !isReady) return Promise.reject(new Error('Engine not ready'));
-
         const id = crypto.randomUUID();
         return new Promise((resolve) => {
-            resolversRef.current.set(id, resolve as unknown as (response: WorkerResponse | CompletionResponse) => void);
-            const request: WorkerRequest = { id, action: 'EXECUTE', code, notebookId };
-            workerRef.current?.postMessage(request);
+            const executeTask = () => {
+                resolversRef.current.set(id, resolve as unknown as (response: WorkerResponse | CompletionResponse) => void);
+                const request: WorkerRequest = { id, action: 'EXECUTE', code, notebookId };
+                workerRef.current?.postMessage(request);
+            };
+
+            if (!workerRef.current || !isReady) {
+                // Queue the execution
+                queueRef.current.push({ id, code, notebookId, resolve: resolve as any });
+            } else {
+                executeTask();
+            }
         });
     }, [isReady]);
 

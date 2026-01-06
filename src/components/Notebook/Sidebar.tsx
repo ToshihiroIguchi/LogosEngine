@@ -121,13 +121,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 )}
             </div>
 
-            <div className="p-4 bg-gray-50 border-t border-gray-100">
-                <div className="text-[10px] text-gray-400 font-mono uppercase tracking-widest text-center">
+            <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
+                <div className="text-[10px] text-gray-400 font-mono uppercase tracking-widest text-center flex-1">
                     {activeTab === 'files'
                         ? `${fileList.length} Notebooks`
                         : activeTab === 'variables'
                             ? `${variables.length} Active ${variables.length === 1 ? 'Symbol' : 'Symbols'}`
                             : activeDocumentation ? 'Viewing Documentation' : 'Ready for help (?)'}
+                </div>
+                <div className="text-[9px] text-gray-300 font-mono ml-2" title={`Commit: ${__COMMIT_HASH__}`}>
+                    v{__APP_VERSION__}-{__COMMIT_HASH__}
                 </div>
             </div>
         </div>
