@@ -7,6 +7,7 @@ export interface WorkerRequest {
     action: WorkerAction;
     code: string;
     notebookId?: string;
+    executionCount?: number;
 }
 
 export interface WorkerResponse {

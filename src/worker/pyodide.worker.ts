@@ -63,6 +63,12 @@ def setup_context(ctx):
     exec("from sympy import *", {}, ctx)
     # Default symbols
     ctx['x'], ctx['y'], ctx['z'], ctx['t'] = ctx['symbols']('x y z t')
+    
+    # Initialize Out dictionary and _ variable
+    # We use a dedicated dictionary for Out to prevent accidental overwrites
+    ctx['Out'] = {}
+    ctx['_'] = None
+    
     # plt is injected later when ready
 
 def format_error(e):
@@ -108,7 +114,7 @@ def format_error(e):
         "traceback": formatted_tb
     }
 
-def execute_cell(code, ctx):
+def execute_cell(code, ctx, execution_count=None):
     # Close previous figures only if plt is available
     if 'plt' in ctx:
         ctx['plt'].close('all')
@@ -118,6 +124,9 @@ def execute_cell(code, ctx):
     error_data = None
     result_val = None
     latex_res = None
+    
+    # DEBUG: Check context consistency
+    # print(f"Worker DEBUG: Execution Count: {execution_count}")
     
     try:
         # AST-based execution for accurate line numbers and REPL-style eval/exec split
@@ -142,7 +151,21 @@ def execute_cell(code, ctx):
                 # If the last node is not an expression (e.g. assignment), just exec all
                 exec(compile(tree, '<string>', 'exec'), ctx)
                 result_val = None
-
+            
+            # Update Out reference if we have a result and execution count
+            if result_val is not None:
+                 # Update _ (last result)
+                 ctx['_'] = result_val
+                 
+                 if execution_count is not None:
+                    # Ensure Out exists
+                    if 'Out' not in ctx:
+                        ctx['Out'] = {}
+                    
+                    ctx['Out'][execution_count] = result_val
+                    ctx[f'_{execution_count}'] = result_val
+                    # print(f"Worker DEBUG: Saved to Out[{execution_count}]")
+    
     except Exception as e:
         error_data = format_error(e)
         result_val = None
@@ -298,6 +321,8 @@ async function initPyodide() {
         // Capture ambient keys to hide them from the Variable Inspector
         ambient_keys = new Set(); // Re-declare ambient_keys
         const keys = pyodide.globals.get('list')(active_context.keys()).toJs();
+        // Also exclude hidden Out variables
+        ambient_keys.add('Out');
         for (const key of keys) ambient_keys.add(key);
         console.log(`Worker: Context setup in ${(performance.now() - t3).toFixed(0)}ms`);
 
@@ -420,7 +445,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest | CompletionRequest>) 
     }
 
     if (action === 'EXECUTE') {
-        const { code, notebookId } = event.data as WorkerRequest;
+        const { code, notebookId, executionCount } = event.data as WorkerRequest;
         try {
             if (!pyodide) throw new Error('Engine not ready');
 
@@ -452,7 +477,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest | CompletionRequest>) 
             }
 
             const execute_cell = pyodide.globals.get("execute_cell");
-            const resultProxy = execute_cell(code, ctx);
+            const resultProxy = execute_cell(code, ctx, executionCount);
             const result = resultProxy.toJs({ dict_converter: Object.fromEntries });
             resultProxy.destroy();
 
@@ -525,7 +550,7 @@ function getVariables(): Variable[] {
     const vars: Variable[] = [];
     const ignored = new Set([
         '__builtins__', 'symbols', 'Matrix', 'Rational', 'Integer', 'Float',
-        'Symbol', 'Function', 'plt', 'x', 'y', 'z', 't', 'setup_context', 'execute_cell', 'format_error'
+        'Symbol', 'Function', 'plt', 'x', 'y', 'z', 't', 'setup_context', 'execute_cell', 'format_error', 'Out'
     ]);
 
     try {

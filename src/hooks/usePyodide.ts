@@ -6,7 +6,8 @@ export function usePyodide() {
     const [isGraphicsReady, setIsGraphicsReady] = useState(false);
     const workerRef = useRef<Worker | null>(null);
     const resolversRef = useRef<Map<string, (response: WorkerResponse | CompletionResponse) => void>>(new Map());
-    const queueRef = useRef<Array<{ id: string; code: string; notebookId?: string; resolve: (response: WorkerResponse | CompletionResponse) => void }>>([]);
+    // Queue now includes executionCount to ensure persistence
+    const queueRef = useRef<Array<{ id: string; code: string; notebookId?: string; executionCount?: number; resolve: (response: WorkerResponse | CompletionResponse) => void }>>([]);
 
     const initWorker = useCallback(() => {
         setIsReady(false);
@@ -24,12 +25,12 @@ export function usePyodide() {
             if (data.type === 'READY') {
                 setIsReady(true);
 
-                // Process queued executions
+                // Process queued executions with their original executionCount
                 const queue = queueRef.current;
                 queueRef.current = [];
-                queue.forEach(({ id, code, notebookId, resolve }) => {
+                queue.forEach(({ id, code, notebookId, executionCount, resolve }) => {
                     resolversRef.current.set(id, resolve);
-                    const request: WorkerRequest = { id, action: 'EXECUTE', code, notebookId };
+                    const request: WorkerRequest = { id, action: 'EXECUTE', code, notebookId, executionCount };
                     worker.postMessage(request);
                 });
                 return;
@@ -61,15 +62,13 @@ export function usePyodide() {
         if (isReady && workerRef.current && queueRef.current.length > 0) {
             const queue = queueRef.current;
             queueRef.current = [];
-            queue.forEach(({ id, code, notebookId, resolve }) => {
+            queue.forEach(({ id, code, notebookId, executionCount, resolve }) => {
                 resolversRef.current.set(id, resolve);
-                const request: WorkerRequest = { id, action: 'EXECUTE', code, notebookId };
+                const request: WorkerRequest = { id, action: 'EXECUTE', code, notebookId, executionCount };
                 workerRef.current?.postMessage(request);
             });
         }
     }, [isReady]);
-
-
 
     const interrupt = useCallback(() => {
         // Clear all pending state
@@ -91,18 +90,18 @@ export function usePyodide() {
         initWorker();
     }, [initWorker]);
 
-    const execute = useCallback((code: string, notebookId?: string): Promise<WorkerResponse> => {
+    const execute = useCallback((code: string, notebookId?: string, executionCount?: number): Promise<WorkerResponse> => {
         const id = crypto.randomUUID();
         return new Promise((resolve) => {
             const executeTask = () => {
                 resolversRef.current.set(id, resolve as unknown as (response: WorkerResponse | CompletionResponse) => void);
-                const request: WorkerRequest = { id, action: 'EXECUTE', code, notebookId };
+                const request: WorkerRequest = { id, action: 'EXECUTE', code, notebookId, executionCount };
                 workerRef.current?.postMessage(request);
             };
 
             if (!workerRef.current || !isReady) {
-                // Queue the execution
-                queueRef.current.push({ id, code, notebookId, resolve: resolve as any });
+                // Queue the execution including executionCount
+                queueRef.current.push({ id, code, notebookId, executionCount, resolve: resolve as any });
             } else {
                 executeTask();
             }

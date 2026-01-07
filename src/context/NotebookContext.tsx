@@ -65,6 +65,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     const [currentNotebookId, setCurrentNotebookId] = useState<string | null>(null);
     const [isDirty, setIsDirty] = useState(false);
     const isInitialMount = useRef(true);
+    const executionCountRef = useRef(1);
 
     // Initial Load
     useEffect(() => {
@@ -75,23 +76,34 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
 
             // 2. Load last active or new
             let targetId = localStorage.getItem('logos-engine-last-id');
+            let initialCells: Cell[] = [];
 
             if (targetId && metaList.some(m => m.id === targetId)) {
                 const notebook = await storage.getNotebook(targetId);
                 if (notebook) {
-                    setCells(notebook.cells.map(c => ({ ...c, isExecuting: false })));
+                    initialCells = notebook.cells.map(c => ({ ...c, isExecuting: false }));
                     setCurrentNotebookId(targetId);
                 }
             } else if (metaList.length > 0) {
                 const notebook = await storage.getNotebook(metaList[0].id);
                 if (notebook) {
-                    setCells(notebook.cells.map(c => ({ ...c, isExecuting: false })));
+                    initialCells = notebook.cells.map(c => ({ ...c, isExecuting: false }));
                     setCurrentNotebookId(metaList[0].id);
                 }
             } else {
                 // Completely fresh start
                 await createNotebook('Welcome Notebook');
+                return; // createNotebook handles the rest
             }
+
+            setCells(initialCells);
+
+            // Initialize global execution count from the max count in existing cells
+            // This ensures we continue numbering where we left off
+            const maxCount = initialCells.reduce((max, cell) =>
+                Math.max(max, cell.executionCount || 0), 0);
+            executionCountRef.current = maxCount + 1;
+
             isInitialMount.current = false;
         };
         init();
@@ -150,8 +162,8 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         setCurrentNotebookId(id);
         setIsDirty(false);
         setVariables([]);
-        // No longer resetting context on switch - we want persistence!
-        // await resetContext(); // REMOVED
+        // Reset counter for new notebook
+        executionCountRef.current = 1;
         setActiveDocumentation(null);
     };
 
@@ -159,14 +171,17 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         if (id === currentNotebookId) return;
         const notebook = await storage.getNotebook(id);
         if (notebook) {
-            // Save current one first if needed (already handled by auto-save debounce usually, but good to be safe)
-            setCells(notebook.cells.map(c => ({ ...c, isExecuting: false })));
+            const newCells = notebook.cells.map(c => ({ ...c, isExecuting: false }));
+            setCells(newCells);
             setCurrentNotebookId(id);
             setVariables([]);
-            // No longer resetting context on switch - we want persistence!
-            // await resetContext(); // REMOVED
             setActiveDocumentation(null);
             setIsDirty(false);
+
+            // Sync execution count to this notebook's state
+            const maxCount = newCells.reduce((max, cell) =>
+                Math.max(max, cell.executionCount || 0), 0);
+            executionCountRef.current = maxCount + 1;
         }
     };
 
@@ -257,6 +272,8 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         setVariables([]);
         setActiveDocumentation(null);
         setFocusedCellId(newCell.id);
+        // Reset counter
+        executionCountRef.current = 1;
     }, [createCell]);
 
     const deleteCell = useCallback((id: string) => {
@@ -273,13 +290,16 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         setCells(prev => prev.map(c => c.id === id ? { ...c, isExecuting: true } : c));
 
         try {
+            // Get AND increment monotonic execution count
+            const currentCount = executionCountRef.current;
+            executionCountRef.current += 1;
+
             // Execute code via Pyodide
-            // Pass the currentNotebookId to ensure code runs in the correct namespace
-            // The worker will handle creating/retrieving the context for this ID
-            const response = await execute(cell.content, currentNotebookId || 'default');
+            // Pass executionCount so the worker can index Out[] correctly
+            const response = await execute(cell.content, currentNotebookId || 'default', currentCount);
 
             setCells(prev => prev.map(c =>
-                c.id === id ? { ...c, outputs: response.results, isExecuting: false, executionCount: (c.executionCount || 0) + 1 } : c
+                c.id === id ? { ...c, outputs: response.results, isExecuting: false, executionCount: currentCount } : c
             ));
 
             if (response.variables) {
