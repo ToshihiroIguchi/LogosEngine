@@ -79,53 +79,53 @@ class CodeAnalyzer(ast.NodeVisitor):
         self.reserved = set(dir(builtins)) | set(keyword.kwlist) | \
                         {'I', 'E', 'N', 'S', 'O', 'pi', 'oo', 'zoo', 'nan', 'true', 'false'} # SymPy constants
 
+    def enter_scope(self, scope_name):
+        self.scope_stack.append(scope_name)
+        self.defined_in_scope[scope_name] = set()
+
+    def exit_scope(self):
+        self.scope_stack.pop()
+
     def visit_FunctionDef(self, node):
         self.defined_in_scope['global'].add(node.name)
-        self.scope_stack.append('function')
-        self.defined_in_scope['function'] = set()
+        self.enter_scope('function')
         for arg in node.args.args:
             self.defined_in_scope['function'].add(arg.arg)
         self.generic_visit(node)
-        self.scope_stack.pop()
+        self.exit_scope()
 
     def visit_ClassDef(self, node):
         self.defined_in_scope['global'].add(node.name)
-        self.scope_stack.append('class')
-        self.defined_in_scope['class'] = set()
+        self.enter_scope('class')
         self.generic_visit(node)
-        self.scope_stack.pop()
+        self.exit_scope()
     
     def visit_Lambda(self, node):
-        self.scope_stack.append('lambda')
-        self.defined_in_scope['lambda'] = set()
+        self.enter_scope('lambda')
         for arg in node.args.args:
             self.defined_in_scope['lambda'].add(arg.arg)
         self.generic_visit(node)
-        self.scope_stack.pop()
+        self.exit_scope()
     
     def visit_ListComp(self, node):
-        self.scope_stack.append('listcomp')
-        self.defined_in_scope['listcomp'] = set()
+        self.enter_scope('listcomp')
         self.generic_visit(node)
-        self.scope_stack.pop()
+        self.exit_scope()
 
     def visit_SetComp(self, node):
-        self.scope_stack.append('setcomp')
-        self.defined_in_scope['setcomp'] = set()
+        self.enter_scope('setcomp')
         self.generic_visit(node)
-        self.scope_stack.pop()
+        self.exit_scope()
     
     def visit_DictComp(self, node):
-        self.scope_stack.append('dictcomp')
-        self.defined_in_scope['dictcomp'] = set()
+        self.enter_scope('dictcomp')
         self.generic_visit(node)
-        self.scope_stack.pop()
+        self.exit_scope()
         
     def visit_GeneratorExp(self, node):
-        self.scope_stack.append('genexp')
-        self.defined_in_scope['genexp'] = set()
+        self.enter_scope('genexp')
         self.generic_visit(node)
-        self.scope_stack.pop()
+        self.exit_scope()
 
     def visit_Name(self, node):
         current_scope = self.scope_stack[-1]
