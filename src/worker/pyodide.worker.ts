@@ -54,8 +54,154 @@ import io
 import base64
 import traceback
 import ast
+import re as _re
+import builtins
+import keyword
 # Matplotlib imports removed for concurrent loading
 from sympy import *
+
+# Code Analyzer for Smart Batch Fix
+class CodeAnalyzer(ast.NodeVisitor):
+    def __init__(self, ctx_keys):
+        self.ctx_keys = set(ctx_keys) if ctx_keys else set()
+        self.scope_stack = ['global']
+        
+        # Variables defined in the code (exclusions)
+        self.defined_in_scope = {'global': set()}
+        
+        # Candidates for symbolic definition (Name in Load context)
+        self.candidates = set()
+        
+        # Excluded names (Used as function, attribute, etc.)
+        self.excluded = set()
+        
+        # Builtins and keywords are permanently excluded
+        self.reserved = set(dir(builtins)) | set(keyword.kwlist) | \
+                        {'I', 'E', 'N', 'S', 'O', 'pi', 'oo', 'zoo', 'nan', 'true', 'false'} # SymPy constants
+
+    def visit_FunctionDef(self, node):
+        self.defined_in_scope['global'].add(node.name)
+        self.scope_stack.append('function')
+        self.defined_in_scope['function'] = set()
+        for arg in node.args.args:
+            self.defined_in_scope['function'].add(arg.arg)
+        self.generic_visit(node)
+        self.scope_stack.pop()
+
+    def visit_ClassDef(self, node):
+        self.defined_in_scope['global'].add(node.name)
+        self.scope_stack.append('class')
+        self.defined_in_scope['class'] = set()
+        self.generic_visit(node)
+        self.scope_stack.pop()
+    
+    def visit_Lambda(self, node):
+        self.scope_stack.append('lambda')
+        self.defined_in_scope['lambda'] = set()
+        for arg in node.args.args:
+            self.defined_in_scope['lambda'].add(arg.arg)
+        self.generic_visit(node)
+        self.scope_stack.pop()
+    
+    def visit_ListComp(self, node):
+        self.scope_stack.append('listcomp')
+        self.defined_in_scope['listcomp'] = set()
+        self.generic_visit(node)
+        self.scope_stack.pop()
+
+    def visit_SetComp(self, node):
+        self.scope_stack.append('setcomp')
+        self.defined_in_scope['setcomp'] = set()
+        self.generic_visit(node)
+        self.scope_stack.pop()
+    
+    def visit_DictComp(self, node):
+        self.scope_stack.append('dictcomp')
+        self.defined_in_scope['dictcomp'] = set()
+        self.generic_visit(node)
+        self.scope_stack.pop()
+        
+    def visit_GeneratorExp(self, node):
+        self.scope_stack.append('genexp')
+        self.defined_in_scope['genexp'] = set()
+        self.generic_visit(node)
+        self.scope_stack.pop()
+
+    def visit_Name(self, node):
+        current_scope = self.scope_stack[-1]
+        
+        # If Store, add to current scope definition
+        if isinstance(node.ctx, ast.Store):
+            if current_scope == 'global':
+                 # If global store, it's defined globally (even if appearing later)
+                 self.defined_in_scope['global'].add(node.id)
+            else:
+                 self.defined_in_scope.setdefault(current_scope, set()).add(node.id)
+
+        # If Load in global scope, it is a candidate
+        elif isinstance(node.ctx, ast.Load):
+             if current_scope == 'global':
+                 self.candidates.add(node.id)
+
+    def visit_Call(self, node):
+        # Exclude function name from being a candidate
+        # e.g. f(x) -> f is excluded
+        if isinstance(node.func, ast.Name):
+            self.excluded.add(node.func.id)
+        self.generic_visit(node)
+
+    def visit_Attribute(self, node):
+        # Exclude object name in obj.prop
+        if isinstance(node.value, ast.Name):
+             self.excluded.add(node.value.id)
+        self.generic_visit(node)
+
+    def analyze(self):
+        # Final set of variables to recommend
+        valid_vars = set()
+        allowed_greek = {'alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'eta', 'theta', 'iota', 'kappa', 'lamda', 'lambda', 'mu', 'nu', 'xi', 'omicron', 'pi', 'rho', 'sigma', 'tau', 'upsilon', 'phi', 'chi', 'psi', 'omega'}
+        
+        # Debugging
+        # print("DEBUG: Candidates:", self.candidates)
+        
+        for var in self.candidates:
+            if var in self.defined_in_scope['global']: 
+                # print(f"DEBUG: {var} defined in global")
+                continue
+            if var in self.excluded: 
+                # print(f"DEBUG: {var} excluded")
+                continue
+            if var in self.reserved: 
+                # print(f"DEBUG: {var} reserved")
+                continue
+            
+            # Context check: 
+            if var in self.ctx_keys:
+                if var not in allowed_greek:
+                    # print(f"DEBUG: {var} in ctx (defined)")
+                    continue
+            
+            # Whitelist / Heuristics
+            # 1. Single character (a-z, A-Z)
+            if len(var) == 1:
+                valid_vars.add(var)
+            # 2. Known Greek letters
+            elif var in allowed_greek:
+                valid_vars.add(var)
+            # 3. Math-like variables (x1, val1, etc.)
+            elif _re.match(r'^[a-zA-Z]+\\d+$', var):
+                # print(f"DEBUG: {var} matched alphanumeric")
+                valid_vars.add(var)
+            # 4. Math-like variables with subscripts (x_1, val_2)
+            elif _re.match(r'^[a-zA-Z]+_\\d+$', var):
+                valid_vars.add(var)
+            # else:
+                # print(f"DEBUG: {var} rejected by whitelist")
+                     
+        return sorted(list(valid_vars))
+                     
+        return sorted(list(valid_vars))
+
 
 # Setup the user context with default symbols and functions
 def setup_context(ctx):
@@ -71,7 +217,7 @@ def setup_context(ctx):
     
     # plt is injected later when ready
 
-def format_error(e):
+def format_error(e, code=None, ctx_keys=None):
     # Get exception info
     exc_type, exc_value, exc_traceback = sys.exc_info()
     
@@ -88,8 +234,7 @@ def format_error(e):
         # Filter out internal Pyodide and worker internal frames
         tb_list = traceback.extract_tb(exc_traceback)
         for frame in reversed(tb_list):
-            # compile uses <string>, and we want to stop at the first user-code frame
-            if frame.filename == '<string>':
+            if frame.filename == '<string>' or frame.filename == '<exec>':
                 line_no = frame.lineno
                 break
     
@@ -107,11 +252,25 @@ def format_error(e):
         
     formatted_tb = "".join(filtered_tb)
     
+    # Extract missing variables for NameError (Smart Batch Fix)
+    missing_vars = []
+    
+    if error_name == 'NameError' and code is not None:
+        try:
+            tree = ast.parse(code)
+            analyzer = CodeAnalyzer(ctx_keys)
+            analyzer.visit(tree)
+            missing_vars = analyzer.analyze()
+        except:
+            # Fallback for parsing error
+            pass
+
     return {
         "errorName": error_name,
         "message": message,
         "lineNo": line_no,
-        "traceback": formatted_tb
+        "traceback": formatted_tb,
+        "missingVariables": missing_vars
     }
 
 def execute_cell(code, ctx, execution_count=None):
@@ -167,7 +326,7 @@ def execute_cell(code, ctx, execution_count=None):
                     # print(f"Worker DEBUG: Saved to Out[{execution_count}]")
     
     except Exception as e:
-        error_data = format_error(e)
+        error_data = format_error(e, code=code, ctx_keys=list(ctx.keys()))
         result_val = None
         
     sys.stdout = sys.__stdout__
@@ -498,6 +657,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest | CompletionRequest>) 
                     errorName: errorVal.errorName,
                     lineNo: errorVal.lineNo,
                     traceback: errorVal.traceback,
+                    missingVariables: errorVal.missingVariables,
                     timestamp
                 });
             } else {

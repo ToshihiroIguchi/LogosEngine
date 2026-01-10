@@ -126,6 +126,20 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
         }
     };
 
+    const handleFixError = (variables: string[]) => {
+        if (!variables || variables.length === 0) return;
+
+        const varsStr = variables.join(', ');
+        const symbolsStr = variables.join(' ');
+        // Insert at the beginning
+        const definitionLine = `${varsStr} = symbols('${symbolsStr}')`;
+        const newContent = `${definitionLine}\n${cell.content}`;
+
+        updateCell(cell.id, newContent);
+        // Execute immediately with the new content
+        executeCell(cell.id, newContent);
+    };
+
     const isQueued = cell.isExecuting && !isReady;
     const isEditing = cell.isEditing !== false; // For Markdown: true=edit, false=preview. For Code: irrelevant for display but handles undefined safely.
     const showOutputs = cell.type === 'code' || !isEditing;
@@ -275,7 +289,9 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                 </div>
                 {cell.outputs.length > 0 && showOutputs && (
                     <div className="border-t border-gray-50 rounded-b-xl print:border-none">
-                        <CellOutput outputs={cell.outputs} executionCount={cell.executionCount} />
+                        <div className="mt-2">
+                            <CellOutput outputs={cell.outputs} executionCount={cell.executionCount} onFixError={handleFixError} />
+                        </div>
                     </div>
                 )}
             </div>

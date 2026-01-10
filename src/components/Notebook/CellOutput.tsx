@@ -7,9 +7,10 @@ import type { Output } from '../../types';
 interface CellOutputProps {
     outputs: Output[];
     executionCount?: number;
+    onFixError?: (variables: string[]) => void;
 }
 
-export const CellOutput: React.FC<CellOutputProps> = ({ outputs, executionCount }) => {
+export const CellOutput: React.FC<CellOutputProps> = ({ outputs, executionCount, onFixError }) => {
     const validOutputs = outputs.filter(o => o.value && o.value.trim().length > 0);
 
     if (validOutputs.length === 0) return null;
@@ -53,6 +54,19 @@ export const CellOutput: React.FC<CellOutputProps> = ({ outputs, executionCount 
                                         <div className="font-mono text-sm font-medium text-[#2D3748] leading-snug select-text">
                                             {output.value}
                                         </div>
+                                        {(output.missingVariables && output.missingVariables.length > 0) && onFixError && (
+                                            <div className="mt-3 pt-2 border-t border-[#FFE3E3]/50">
+                                                <button
+                                                    onClick={() => onFixError!(output.missingVariables!)}
+                                                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-xs font-medium transition-colors border border-blue-200"
+                                                >
+                                                    <span className="text-lg">💡</span>
+                                                    Define <span className="font-mono bg-blue-100 px-1 rounded mx-0.5 font-bold">
+                                                        {output.missingVariables.join(', ')}
+                                                    </span> as Symbol(s) & Insert
+                                                </button>
+                                            </div>
+                                        )}
                                         {output.traceback && (
                                             <div className="mt-3 pt-2 border-t border-[#FFE3E3]/50">
                                                 <details className="group">

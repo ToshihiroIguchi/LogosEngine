@@ -20,7 +20,7 @@ interface NotebookContextType {
     addCell: (type: 'code' | 'markdown', index?: number) => string;
     updateCell: (id: string, content: string) => void;
     deleteCell: (id: string) => void;
-    executeCell: (id: string) => Promise<void>;
+    executeCell: (id: string, codeOverride?: string) => Promise<void>;
     executeAll: () => Promise<void>;
     interrupt: () => void;
     insertExample: (code: string) => void;
@@ -283,9 +283,9 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         });
     }, []);
 
-    const executeCell = useCallback(async (id: string) => {
+    const executeCell = useCallback(async (id: string, codeOverride?: string) => {
         const cell = cells.find(c => c.id === id);
-        if (!cell || cell.type !== 'code' || !cell.content.trim()) return;
+        if (!cell || cell.type !== 'code' || (!codeOverride && !cell.content.trim())) return;
 
         setCells(prev => prev.map(c => c.id === id ? { ...c, isExecuting: true } : c));
 
@@ -296,7 +296,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
 
             // Execute code via Pyodide
             // Pass executionCount so the worker can index Out[] correctly
-            const response = await execute(cell.content, currentNotebookId || 'default', currentCount);
+            const response = await execute(codeOverride || cell.content, currentNotebookId || 'default', currentCount);
 
             setCells(prev => prev.map(c =>
                 c.id === id ? { ...c, outputs: response.results, isExecuting: false, executionCount: currentCount } : c

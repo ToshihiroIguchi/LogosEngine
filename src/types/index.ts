@@ -8,6 +8,7 @@ export interface Output {
   lineNo?: number;
   traceback?: string;
   errorName?: string;
+  missingVariables?: string[];
   timestamp: number;
 }
 
