@@ -60,6 +60,7 @@ import keyword
 # Matplotlib imports removed for concurrent loading
 from sympy import *
 
+
 # Code Analyzer for Smart Batch Fix
 class CodeAnalyzer(ast.NodeVisitor):
     def __init__(self, ctx_keys):
@@ -189,11 +190,11 @@ class CodeAnalyzer(ast.NodeVisitor):
             elif var in allowed_greek:
                 valid_vars.add(var)
             # 3. Math-like variables (x1, val1, etc.)
-            elif _re.match(r'^[a-zA-Z]+\\d+$', var):
+            elif _re.match(r'^[a-zA-Z]+\d+$', var):
                 # print(f"DEBUG: {var} matched alphanumeric")
                 valid_vars.add(var)
             # 4. Math-like variables with subscripts (x_1, val_2)
-            elif _re.match(r'^[a-zA-Z]+_\\d+$', var):
+            elif _re.match(r'^[a-zA-Z]+_\d+$', var):
                 valid_vars.add(var)
             # else:
                 # print(f"DEBUG: {var} rejected by whitelist")
@@ -453,19 +454,25 @@ def _get_completions(prefix, ctx):
 initPyodide();
 async function initPyodide() {
     const start = performance.now();
+    const timings: Record<string, number> = {};
+    const logTime = (label: string, duration: number) => {
+        timings[label] = duration;
+        console.log(`Worker: ${label} took ${duration.toFixed(0)}ms`);
+    };
+
     console.log('Worker: Initializing Pyodide (v0.29.0)...');
     try {
         const t1 = performance.now();
         pyodide = await loadPyodide({
             indexURL: "https://cdn.jsdelivr.net/pyodide/v0.29.0/full/"
         });
-        console.log(`Worker: Pyodide core loaded in ${(performance.now() - t1).toFixed(0)}ms`);
+        logTime('load_pyodide', performance.now() - t1);
 
         console.log('Worker: Loading critical packages (sympy)...');
         const t2 = performance.now();
         // STAGE 1: Load only critical packages
         await pyodide.loadPackage(['sympy']);
-        console.log(`Worker: Critical packages loaded in ${(performance.now() - t2).toFixed(0)}ms`);
+        logTime('load_sympy', performance.now() - t2);
 
         console.log('Worker: Running initial Python code...');
         const t3 = performance.now();
@@ -483,11 +490,15 @@ async function initPyodide() {
         // Also exclude hidden Out variables
         ambient_keys.add('Out');
         for (const key of keys) ambient_keys.add(key);
-        console.log(`Worker: Context setup in ${(performance.now() - t3).toFixed(0)}ms`);
+
+        logTime('init_context', performance.now() - t3);
 
         const total = performance.now() - start;
+        logTime('total_init', total);
+
         console.log(`Worker: Engine Ready (SymPy only). Total init time: ${total.toFixed(0)}ms`);
         self.postMessage({ type: 'READY' });
+        self.postMessage({ type: 'PROFILE', timings });
 
         // STAGE 2: Load heavy packages in background
         console.log('Worker: Starting background load of matplotlib...');

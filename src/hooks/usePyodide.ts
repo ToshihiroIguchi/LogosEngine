@@ -24,8 +24,7 @@ export function usePyodide() {
             const data = event.data;
             if (data.type === 'READY') {
                 setIsReady(true);
-
-                // Process queued executions with their original executionCount
+                // Process queue...
                 const queue = queueRef.current;
                 queueRef.current = [];
                 queue.forEach(({ id, code, notebookId, executionCount, resolve }) => {
@@ -40,6 +39,8 @@ export function usePyodide() {
                 setIsGraphicsReady(true);
                 return;
             }
+
+
 
             const { id } = data as WorkerResponse;
             const resolver = resolversRef.current.get(id);

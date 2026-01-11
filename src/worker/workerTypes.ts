@@ -20,8 +20,11 @@ export interface WorkerResponse {
 }
 
 export interface WorkerReadyResponse {
-    type: 'READY';
+    type: 'READY' | 'GRAPHICS_READY' | 'ERROR';
+    message?: string;
 }
+
+export type WorkerMessage = WorkerResponse | WorkerReadyResponse;
 
 export interface CompletionItem {
     label: string;
