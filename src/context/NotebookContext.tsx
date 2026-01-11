@@ -34,6 +34,8 @@ interface NotebookContextType {
     resetNotebook: () => void;
     isGraphicsReady: boolean;
     getCompletions: (code: string, position: number) => Promise<import('../worker/workerTypes').CompletionResponse>;
+    deleteVariable: (name: string) => Promise<void>;
+    searchDocs: (query: string) => Promise<void>;
 
     // Multi-notebook support
     fileList: NotebookMeta[];
@@ -59,7 +61,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         return saved === 'true';
     });
     const [focusedCellId, setFocusedCellId] = useState<string | null>(null);
-    const { isReady, isGraphicsReady, execute, interrupt: pyodideInterrupt, getCompletions } = usePyodide();
+    const { isReady, isGraphicsReady, execute, interrupt: pyodideInterrupt, getCompletions, deleteVariable: deleteVarWorker, searchDocs: searchDocsWorker } = usePyodide();
 
     const [fileList, setFileList] = useState<NotebookMeta[]>([]);
     const [currentNotebookId, setCurrentNotebookId] = useState<string | null>(null);
@@ -341,6 +343,30 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         setCells(prev => prev.map(c => ({ ...c, isExecuting: false })));
     }, [pyodideInterrupt]);
 
+    const deleteVariable = useCallback(async (name: string) => {
+        try {
+            const response = await deleteVarWorker(name, currentNotebookId || 'default');
+            if (response.variables) {
+                setVariables(response.variables);
+            }
+        } catch (err) {
+            console.error('Failed to delete variable:', err);
+        }
+    }, [deleteVarWorker, currentNotebookId]);
+
+    const searchDocs = useCallback(async (query: string) => {
+        try {
+            const response = await searchDocsWorker(query, currentNotebookId || 'default');
+            if (response.documentation) {
+                setActiveDocumentation(response.documentation);
+                setActiveTab('documentation');
+                setIsSidebarOpen(true);
+            }
+        } catch (err) {
+            console.error('Failed to search docs:', err);
+        }
+    }, [searchDocsWorker, currentNotebookId]);
+
     const insertExample = useCallback((code: string) => {
         setCells(prev => {
             const lastCell = prev[prev.length - 1];
@@ -391,6 +417,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             setCellEditing, moveCell, duplicateCell, clearCellOutput, clearAllOutputs, resetNotebook,
             isGraphicsReady,
             getCompletions,
+            deleteVariable, searchDocs,
             fileList, currentNotebookId, isDirty, createNotebook, openNotebook, deleteNotebook, renameNotebook
         }}>
             {children}

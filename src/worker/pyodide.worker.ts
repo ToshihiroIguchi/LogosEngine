@@ -755,6 +755,44 @@ self.onmessage = async (event: MessageEvent<WorkerRequest | CompletionRequest>) 
         }
     }
 
+    if (action === 'DELETE_VARIABLE') {
+        const { code, notebookId } = event.data as WorkerRequest; // code will contain variable name
+        const varName = code;
+        try {
+            if (!pyodide) throw new Error('Engine not ready');
+            const ctx = getContext(notebookId);
+
+            console.log(`Worker: Deleting variable ${varName}`);
+
+            // Check if variable exists
+            if (ctx.has(varName)) {
+                // Remove from Python context
+                pyodide.runPython(`
+try:
+    if '${varName}' in locals():
+        del ${varName}
+except:
+    pass
+`, { globals: ctx });
+            }
+
+            // Return updated variables list
+            const variables = getVariables();
+            self.postMessage({
+                id,
+                status: 'SUCCESS',
+                results: [],
+                variables
+            });
+        } catch (err: any) {
+            self.postMessage({
+                id,
+                status: 'ERROR',
+                results: [{ type: 'error', value: `Failed to delete variable: ${err.message}`, timestamp: Date.now() }]
+            });
+        }
+    }
+
 };
 
 function getVariables(): Variable[] {

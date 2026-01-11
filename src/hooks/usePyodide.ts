@@ -131,5 +131,26 @@ export function usePyodide() {
         });
     }, [isReady]);
 
-    return { isReady, isGraphicsReady, execute, interrupt, getCompletions, resetContext };
+    const deleteVariable = useCallback((variableName: string, notebookId?: string): Promise<WorkerResponse> => {
+        if (!workerRef.current || !isReady) return Promise.reject("Worker not ready");
+
+        const id = crypto.randomUUID();
+        return new Promise((resolve) => {
+            resolversRef.current.set(id, (response) => resolve(response as WorkerResponse));
+            const request: WorkerRequest = {
+                id,
+                action: 'DELETE_VARIABLE',
+                code: variableName, // Passing variable name in code field
+                notebookId
+            };
+            workerRef.current?.postMessage(request);
+        });
+    }, [isReady]);
+
+    const searchDocs = useCallback((query: string, notebookId?: string): Promise<WorkerResponse> => {
+        // Reuse execute logic with '?' prefix which the worker interprets as a doc request
+        return execute(`?${query}`, notebookId);
+    }, [execute]);
+
+    return { isReady, isGraphicsReady, execute, interrupt, getCompletions, resetContext, deleteVariable, searchDocs };
 }
