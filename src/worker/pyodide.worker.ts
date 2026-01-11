@@ -73,12 +73,16 @@ class CodeAnalyzer(ast.NodeVisitor):
         # Candidates for symbolic definition (Name in Load context)
         self.candidates = set()
         
-        # Excluded names (Used as function, attribute, etc.)
+        # Excluded names (Used as function, attribute, type hint, decorator, etc.)
         self.excluded = set()
         
-        # Builtins and keywords are permanently excluded
-        self.reserved = set(dir(builtins)) | set(keyword.kwlist) | \
-                        {'I', 'E', 'N', 'S', 'O', 'pi', 'oo', 'zoo', 'nan', 'true', 'false'} # SymPy constants
+        # Setup Runtime Blacklist
+        # 1. Python Reserved Keywords
+        self.reserved = set(keyword.kwlist)
+        # 2. Builtins (print, list, etc.)
+        self.reserved.update(dir(builtins))
+        # 3. SymPy Constants (Critical ones that shouldn't be overridden inadvertently)
+        self.reserved.update({'I', 'E', 'N', 'S', 'O', 'pi', 'oo', 'zoo', 'nan', 'true', 'false'})
 
     def enter_scope(self, scope_name):
         self.scope_stack.append(scope_name)
@@ -89,6 +93,10 @@ class CodeAnalyzer(ast.NodeVisitor):
 
     def visit_FunctionDef(self, node):
         self.defined_in_scope['global'].add(node.name)
+        # Exclude decorators
+        for decorator in node.decorator_list:
+            self._exclude_complex_node(decorator)
+            
         self.enter_scope('function')
         for arg in node.args.args:
             self.defined_in_scope['function'].add(arg.arg)
@@ -97,10 +105,30 @@ class CodeAnalyzer(ast.NodeVisitor):
 
     def visit_ClassDef(self, node):
         self.defined_in_scope['global'].add(node.name)
+        # Exclude decorators
+        for decorator in node.decorator_list:
+            self._exclude_complex_node(decorator)
+        # Exclude base classes
+        for base in node.bases:
+            self._exclude_complex_node(base)
+            
         self.enter_scope('class')
         self.generic_visit(node)
         self.exit_scope()
     
+    def visit_AnnAssign(self, node):
+        # x: int = 10 -> 'int' should be excluded
+        self._exclude_complex_node(node.annotation)
+        self.generic_visit(node)
+
+    def visit_ExceptHandler(self, node):
+        # except Exception as e: -> 'Exception' excluded
+        if node.type:
+            self._exclude_complex_node(node.type)
+        if node.name:
+            self.defined_in_scope.setdefault(self.scope_stack[-1], set()).add(node.name)
+        self.generic_visit(node)
+
     def visit_Lambda(self, node):
         self.enter_scope('lambda')
         for arg in node.args.args:
@@ -146,60 +174,74 @@ class CodeAnalyzer(ast.NodeVisitor):
 
     def visit_Call(self, node):
         # Exclude function name from being a candidate
-        # e.g. f(x) -> f is excluded
-        if isinstance(node.func, ast.Name):
-            self.excluded.add(node.func.id)
+        self._exclude_complex_node(node.func)
         self.generic_visit(node)
 
     def visit_Attribute(self, node):
         # Exclude object name in obj.prop
+        # But allow 'obj' if it's the target of a load, handled by visit_Name? 
+        # Actually visit_Attribute visits value. 
+        # If we have obj.prop, obj is a Name. 
+        # We generally want to treat 'obj' as a VARIABLE if it's not defined.
+        # But wait, if obj is undefined, obj.prop causes NameError on obj.
+        # So obj SHOULD be a candidate.
+        # The previous logic was: exclude obj.prop's obj? No, that prevents 'obj' from being auto-defined.
+        # Wait, if I have 'unknown.prop', and 'unknown' is undefined, I want to define 'unknown'.
+        # The only thing to exclude is 'prop' if that was somehow a candidate (it's not a Name node usually, it's a field).
+        # Ah, previous logic: if isinstance(node.value, ast.Name): self.excluded.add(node.value.id)
+        # This meant: "If you call obj.prop, assume 'obj' is an existing object, don't try to make it a symbol."
+        # Because symbols don't usually have props. 
+        # But if the user wants 'energy.value', and energy is a symbol... symbols DO have props in SymPy.
+        # So disabling this exclusion might be better for flexibility?
+        # Let's keep it safe: if it's used as an object (attribute access), it's likely NOT a simple symbol we should auto-define.
+        # If user writes 'obj.prop', and obj is undefined, making it a Symbol('obj') makes 'obj.prop' into 'Symbol(obj).prop' which works in SymPy?
+        # Yes, SymPy symbols are objects.
+        # However, for typical usage, if someone writes 'np.sin(x)' and imports are missing, defining 'np' as a Symbol is BAD.
+        # So we SHOULD exclude 'names used as objects' to prevent 'np' or 'math' being defined as symbols.
         if isinstance(node.value, ast.Name):
              self.excluded.add(node.value.id)
         self.generic_visit(node)
+        
+    def _exclude_complex_node(self, node):
+        """Helper to recursively find names in a node and exclude them."""
+        if isinstance(node, ast.Name):
+            self.excluded.add(node.id)
+        elif isinstance(node, ast.Attribute):
+            self._exclude_complex_node(node.value)
+        # We can add more logic here if needed for deeper structures
 
     def analyze(self):
         # Final set of variables to recommend
         valid_vars = set()
-        allowed_greek = {'alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'eta', 'theta', 'iota', 'kappa', 'lamda', 'lambda', 'mu', 'nu', 'xi', 'omicron', 'pi', 'rho', 'sigma', 'tau', 'upsilon', 'phi', 'chi', 'psi', 'omega'}
         
         # Debugging
         # print("DEBUG: Candidates:", self.candidates)
+        # print("DEBUG: Excluded:", self.excluded)
         
         for var in self.candidates:
+            # 1. Defined check
             if var in self.defined_in_scope['global']: 
-                # print(f"DEBUG: {var} defined in global")
                 continue
+            
+            # 2. Context exclusion check (Call, Attribute target, Type Hint, etc.)
             if var in self.excluded: 
-                # print(f"DEBUG: {var} excluded")
                 continue
+            
+            # 3. Dynamic Runtime Blacklist Check (Builtins, Keywords, critical SymPy constants)
             if var in self.reserved: 
-                # print(f"DEBUG: {var} reserved")
                 continue
             
-            # Context check: 
+            # 4. Context Check (Already in current session context?)
             if var in self.ctx_keys:
-                if var not in allowed_greek:
-                    # print(f"DEBUG: {var} in ctx (defined)")
-                    continue
-            
-            # Whitelist / Heuristics
-            # 1. Single character (a-z, A-Z)
-            if len(var) == 1:
-                valid_vars.add(var)
-            # 2. Known Greek letters
-            elif var in allowed_greek:
-                valid_vars.add(var)
-            # 3. Math-like variables (x1, val1, etc.)
-            elif _re.match(r'^[a-zA-Z]+\d+$', var):
-                # print(f"DEBUG: {var} matched alphanumeric")
-                valid_vars.add(var)
-            # 4. Math-like variables with subscripts (x_1, val_2)
-            elif _re.match(r'^[a-zA-Z]+_\d+$', var):
-                valid_vars.add(var)
-            # else:
-                # print(f"DEBUG: {var} rejected by whitelist")
-                     
-        return sorted(list(valid_vars))
+                 # If it's already defined in the kernel, we don't need to redefine it
+                 # Unless... well, NameError means it wasn't found. 
+                 # But ctx_keys are passed at init time. 
+                 # If it caused NameError, it's NOT in ctx. 
+                 # So this check is just a safeguard against race conditions or partial updates.
+                 continue
+
+            # 5. Passed all checks -> Valid Candidate (Blacklist approach)
+            valid_vars.add(var)
                      
         return sorted(list(valid_vars))
 
