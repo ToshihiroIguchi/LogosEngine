@@ -1,9 +1,20 @@
-export const WELCOME_CODE = `# LogosCalc - Interactive Computational Notebook
-# Symbolic math powered by SymPy
+export const WELCOME_NOTEBOOK_DATA = [
+    {
+        type: 'code' as const,
+        content: `# Welcome to LogosCalc!
+# Press Shift + Enter (or the Play button) to run this cell.
+# 'x', 'y', 'z', 't' are predefined symbolic variables.
 
-# Example: Symbolic Differentiation
-f = sin(x) * exp(x)
-diff(f, x)`;
+expand((x + 1)**5)`
+    },
+    {
+        type: 'code' as const,
+        content: ``
+    }
+];
+
+// Maintaining backward compatibility for a moment if needed, but Context will update to use DATA.
+export const WELCOME_CODE = WELCOME_NOTEBOOK_DATA[1].content;
 
 export const EXAMPLES = [
     {
@@ -26,6 +37,18 @@ solve(x**2 - 4, x)
 solve([x + y - 2, x - y], [x, y])`
     },
     {
+        title: "3D Surface Plot",
+        code: `# 3D Surface Plot: Sombrero Function
+from sympy.plotting import plot3d
+
+# r is the distance from the origin
+r = sqrt(x**2 + y**2)
+
+# plot3d allows visualizing functions of two variables
+# We use points=80 for a smooth mesh
+plot3d(sin(r)/r, (x, -10, 10), (y, -10, 10), points=80)`
+    },
+    {
         title: "Series Expansion",
         code: `# Taylor series
 series(exp(x), x, 0, 5)
@@ -45,7 +68,7 @@ expand((x + 1)**3)
 factor(x**2 - 4)`
     },
     {
-        title: "Plotting",
+        title: "Plotting (2D)",
         code: `# Simple plot
 plot(sin(x))
 

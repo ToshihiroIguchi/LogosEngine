@@ -144,6 +144,41 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
     const isEditing = cell.isEditing !== false; // For Markdown: true=edit, false=preview. For Code: irrelevant for display but handles undefined safely.
     const showOutputs = cell.type === 'code' || !isEditing;
 
+    const editorOptions = React.useMemo<editor.IStandaloneEditorConstructionOptions>(() => ({
+        minimap: { enabled: false },
+        lineNumbers: 'off',
+        glyphMargin: false,
+        folding: false,
+        lineDecorationsWidth: 0,
+        lineNumbersMinChars: 0,
+        scrollBeyondLastLine: false,
+        automaticLayout: true,
+        fontSize: 14,
+        fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+        padding: { top: 16, bottom: 16 },
+        wordWrap: 'on',
+        scrollbar: {
+            vertical: 'auto',
+            horizontal: 'hidden',
+        },
+        overviewRulerLanes: 0,
+        hideCursorInOverviewRuler: true,
+        overviewRulerBorder: false,
+        suggest: {
+            showKeywords: true,
+            showSnippets: false,
+        },
+        quickSuggestions: {
+            other: true,
+            comments: false,
+            strings: false
+        },
+        suggestOnTriggerCharacters: true,
+        acceptSuggestionOnEnter: 'on',
+        tabCompletion: 'on',
+        readOnly: cell.isExecuting
+    }), [cell.isExecuting]);
+
     return (
         <div className="group relative mb-6">
             <div className={cn(
@@ -249,40 +284,7 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                             value={cell.content}
                             onChange={handleContentChange}
                             onMount={handleEditorDidMount}
-                            options={React.useMemo(() => ({
-                                minimap: { enabled: false },
-                                lineNumbers: 'off',
-                                glyphMargin: false,
-                                folding: false,
-                                lineDecorationsWidth: 0,
-                                lineNumbersMinChars: 0,
-                                scrollBeyondLastLine: false,
-                                automaticLayout: true,
-                                fontSize: 14,
-                                fontFamily: '"JetBrains Mono", "Fira Code", monospace',
-                                padding: { top: 16, bottom: 16 },
-                                wordWrap: 'on',
-                                scrollbar: {
-                                    vertical: 'auto',
-                                    horizontal: 'hidden',
-                                },
-                                overviewRulerLanes: 0,
-                                hideCursorInOverviewRuler: true,
-                                overviewRulerBorder: false,
-                                suggest: {
-                                    showKeywords: true,
-                                    showSnippets: false,
-                                },
-                                quickSuggestions: {
-                                    other: true,
-                                    comments: false,
-                                    strings: false
-                                },
-                                suggestOnTriggerCharacters: true,
-                                acceptSuggestionOnEnter: 'on',
-                                tabCompletion: 'on',
-                                readOnly: cell.isExecuting
-                            }), [cell.isExecuting])}
+                            options={editorOptions}
                             theme="vs"
                         />
                     )}

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import type { Cell, Variable, Documentation, NotebookMeta } from '../types';
 import { usePyodide } from '../hooks/usePyodide';
-import { WELCOME_CODE } from '../constants/examples';
+import { WELCOME_NOTEBOOK_DATA } from '../constants/examples';
 import { storage } from '../services/storage';
 
 export type SidebarTab = 'variables' | 'documentation' | 'files';
@@ -50,9 +50,15 @@ interface NotebookContextType {
 const NotebookContext = createContext<NotebookContextType | undefined>(undefined);
 
 export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const [cells, setCells] = useState<Cell[]>([
-        { id: '1', type: 'code', content: WELCOME_CODE, outputs: [], isExecuting: false }
-    ]);
+    const [cells, setCells] = useState<Cell[]>(
+        WELCOME_NOTEBOOK_DATA.map((data, index) => ({
+            id: crypto.randomUUID(),
+            type: data.type as 'code' | 'markdown',
+            content: data.content,
+            outputs: [],
+            isExecuting: false
+        }))
+    );
     const [variables, setVariables] = useState<Variable[]>([]);
     const [activeDocumentation, setActiveDocumentation] = useState<Documentation | null>(null);
     const [activeTab, setActiveTab] = useState<SidebarTab>('variables');
@@ -156,7 +162,14 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         const id = crypto.randomUUID();
         const now = Date.now();
         const meta: NotebookMeta = { id, title, createdAt: now, updatedAt: now };
-        const initialCells = [{ id: '1', type: 'code' as const, content: WELCOME_CODE, outputs: [], isExecuting: false }];
+
+        const initialCells: Cell[] = WELCOME_NOTEBOOK_DATA.map((data) => ({
+            id: crypto.randomUUID(),
+            type: data.type as 'code' | 'markdown',
+            content: data.content,
+            outputs: [],
+            isExecuting: false
+        }));
 
         await storage.saveNotebook(meta, { id, cells: initialCells });
         setFileList(prev => [meta, ...prev]);
@@ -269,14 +282,21 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     }, []);
 
     const resetNotebook = useCallback(() => {
-        const newCell = createCell('code');
-        setCells([newCell]);
+        const initialCells: Cell[] = WELCOME_NOTEBOOK_DATA.map((data) => ({
+            id: crypto.randomUUID(),
+            type: data.type as 'code' | 'markdown',
+            content: data.content,
+            outputs: [],
+            isExecuting: false
+        }));
+
+        setCells(initialCells);
         setVariables([]);
         setActiveDocumentation(null);
-        setFocusedCellId(newCell.id);
+        setFocusedCellId(initialCells[0].id);
         // Reset counter
         executionCountRef.current = 1;
-    }, [createCell]);
+    }, []);
 
     const deleteCell = useCallback((id: string) => {
         setCells(prev => {
