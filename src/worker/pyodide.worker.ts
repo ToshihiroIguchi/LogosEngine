@@ -59,6 +59,132 @@ import builtins
 import keyword
 # Matplotlib imports removed for concurrent loading
 from sympy import *
+import tokenize
+from io import BytesIO
+
+def preprocess_equation_syntax(code):
+    try:
+        # Encoding check
+        tokens = list(tokenize.tokenize(BytesIO(code.encode('utf-8')).readline))
+    except tokenize.TokenError:
+        return code
+
+    # We will store (type, string) tuples only to avoid coordinate issues
+    result_tokens = []
+    
+    # Target functions that expect Equations
+    TARGET_FUNCS = {'solve', 'dsolve', 'nsolve', 'solveset', 'nonlinsolve', 'linsolve'}
+    
+    # SymPy Reserved Keywords (Single Source of Truth)
+    SYMPY_RESERVED_ARGS = {
+        'check', 'simplify', 'rational', 'manual', 'implicit', 'hint', 
+        'force', 'dict', 'set', 'verify', 'exclude', 'quick', 'cubics', 
+        'quartics', 'quintics', 'domain', 'symbols', 'flags'
+    }
+    
+    call_stack = [] 
+    paren_level = 0
+    
+    i = 0
+    while i < len(tokens):
+        tok = tokens[i]
+        tok_simple = (tok.type, tok.string)
+        
+        if tok.exact_type == tokenize.LPAR: # (
+            prev_tok = tokens[i-1] if i > 0 else None
+            func_name = None
+            if prev_tok and prev_tok.type == tokenize.NAME and prev_tok.string in TARGET_FUNCS:
+                func_name = prev_tok.string
+            
+            call_stack.append(func_name)
+            paren_level += 1
+            result_tokens.append(tok_simple)
+            
+        elif tok.exact_type == tokenize.RPAR: # )
+            paren_level -= 1
+            if call_stack:
+                call_stack.pop()
+            result_tokens.append(tok_simple)
+            
+        elif tok.exact_type == tokenize.EQUAL: # =
+            current_func = call_stack[-1] if call_stack else None
+            
+            if current_func in TARGET_FUNCS:
+                lhs_is_simple_name = False
+                prev_tok = tokens[i-1]
+                
+                if prev_tok.type == tokenize.NAME:
+                    prev_prev = tokens[i-2] if i > 1 else None
+                    if prev_prev:
+                        if prev_prev.exact_type in (tokenize.LPAR, tokenize.COMMA, tokenize.NL, tokenize.NEWLINE, tokenize.INDENT):
+                            lhs_is_simple_name = True
+                    else:
+                        pass
+                
+                should_replace = False
+                if not lhs_is_simple_name:
+                    # LHS is an expression -> Always replace
+                    should_replace = True
+                else:
+                    # LHS is simple name. Check Reserved List.
+                    if prev_tok.string not in SYMPY_RESERVED_ARGS:
+                        should_replace = True
+                    else:
+                        should_replace = False
+                
+                if should_replace:
+                    # REPLACE '=' with '- ('
+                    result_tokens.append((tokenize.OP, '-'))
+                    result_tokens.append((tokenize.OP, '('))
+                    
+                    # SCAN FOR END of RHS to insert ')'
+                    scan_idx = i + 1
+                    rhs_paren_depth = 0
+                    found_end = False
+                    end_idx = scan_idx
+                    
+                    while end_idx < len(tokens):
+                        scan_tok = tokens[end_idx]
+                        
+                        if scan_tok.exact_type == tokenize.LPAR:
+                            rhs_paren_depth += 1
+                        elif scan_tok.exact_type == tokenize.RPAR:
+                            rhs_paren_depth -= 1
+                            
+                        # Stop if function call closes
+                        if rhs_paren_depth < 0:
+                            found_end = True
+                            break
+                        
+                        # Stop if comma at base level
+                        if rhs_paren_depth == 0 and scan_tok.exact_type == tokenize.COMMA:
+                            found_end = True
+                            break
+                            
+                        end_idx += 1
+                    
+                    if found_end:
+                        # Append tokens from i+1 to end_idx (exclusive)
+                        for k in range(i + 1, end_idx):
+                            result_tokens.append((tokens[k].type, tokens[k].string))
+                        
+                        # Insert ')'
+                        result_tokens.append((tokenize.OP, ')'))
+                        
+                        i = end_idx - 1
+                    else:
+                        # Fallback
+                        result_tokens.append(tok_simple)
+                else:
+                    result_tokens.append(tok_simple)
+            else:
+                result_tokens.append(tok_simple)
+        else:
+            result_tokens.append(tok_simple)
+        i += 1
+
+    return tokenize.untokenize(result_tokens).decode('utf-8')
+
 
 
 # Code Analyzer for Smart Batch Fix
@@ -331,6 +457,12 @@ def execute_cell(code, ctx, execution_count=None):
     # print(f"Worker DEBUG: Execution Count: {execution_count}")
     
     try:
+        # Preprocess equation syntax (x+1=0 -> x+1-(0))
+        try:
+            code = preprocess_equation_syntax(code)
+        except:
+            pass
+
         # AST-based execution for accurate line numbers and REPL-style eval/exec split
         tree = ast.parse(code)
         
