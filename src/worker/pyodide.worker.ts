@@ -752,6 +752,29 @@ def _search_docs(query, ctx):
                             count_mentions += 1
             except:
                 pass
+
+    # Sort symbols by relevance:
+    # 1. Exact match (e.g. 'sin' == 'sin')
+    # 2. Prefix match (e.g. 'sin' in 'sinh')
+    # 3. Shortest length (e.g. 'sin' < 'sine_transform')
+    # 4. Alphabetical
+    def symbol_sort_key(item):
+        n = item["name"]
+        n_low = n.lower()
+        q_low = query_lower
+        
+        is_exact = n_low == q_low
+        is_start = n_low.startswith(q_low)
+        
+        # False < True in Python (0 < 1). We want True to be first.
+        # So we use 'not' or negate.
+        # (False, False, ...) comes before (True, ...)
+        # We want: 
+        # Exact=True -> (0, ...)
+        # Exact=False -> (1, ...)
+        return (not is_exact, not is_start, len(n), n)
+
+    symbols.sort(key=symbol_sort_key)
                 
     return {"symbols": symbols[:20], "mentions": mentions}
 `;
