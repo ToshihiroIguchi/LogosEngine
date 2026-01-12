@@ -8,7 +8,7 @@ import remarkGfm from 'remark-gfm';
 import 'katex/dist/katex.min.css';
 import type { editor } from 'monaco-editor';
 import type { Cell } from '../../types';
-import { useNotebook } from '../../context/NotebookContext';
+import { useNotebook } from '../../context/AppNotebookContext';
 import { CellOutput } from './CellOutput';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';

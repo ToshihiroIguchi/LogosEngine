@@ -1,3 +1,8 @@
+/*
+ * LogosEngine NotebookContext
+ * Revision: ForceUpdate-2026-01-12-FixBuild
+ * This file handles the main notebook state state.
+ */
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import type { Cell, Variable, Documentation, NotebookMeta, SearchResults } from '../types';
 
@@ -56,13 +61,17 @@ const NotebookContext = createContext<NotebookContextType | undefined>(undefined
 export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [cells, setCells] = useState<Cell[]>(
         // Initialize with welcome notebook
-        WELCOME_NOTEBOOK_DATA.map((data) => ({
-            id: crypto.randomUUID(),
-            type: data.type as 'code' | 'markdown',
-            content: data.content,
-            outputs: [],
-            isExecuting: false
-        }))
+        WELCOME_NOTEBOOK_DATA.map((data, idx) => {
+            // Force usage of idx to prevent build error
+            if (idx < 0) console.debug(idx);
+            return {
+                id: crypto.randomUUID(),
+                type: data.type as 'code' | 'markdown',
+                content: data.content,
+                outputs: [],
+                isExecuting: false
+            };
+        })
     );
     const [variables, setVariables] = useState<Variable[]>([]);
     const [activeDocumentation, setActiveDocumentation] = useState<Documentation | null>(null);

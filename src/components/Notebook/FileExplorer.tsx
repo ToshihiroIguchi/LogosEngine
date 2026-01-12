@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, FileText, MoreVertical, Pencil, Trash2, Check, X } from 'lucide-react';
-import { useNotebook } from '../../context/NotebookContext';
+import { useNotebook } from '../../context/AppNotebookContext';
 import { clsx } from 'clsx';
 
 export const FileExplorer: React.FC = () => {
