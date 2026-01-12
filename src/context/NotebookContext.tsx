@@ -55,6 +55,7 @@ const NotebookContext = createContext<NotebookContextType | undefined>(undefined
 
 export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [cells, setCells] = useState<Cell[]>(
+        // Initialize with welcome notebook
         WELCOME_NOTEBOOK_DATA.map((data) => ({
             id: crypto.randomUUID(),
             type: data.type as 'code' | 'markdown',
