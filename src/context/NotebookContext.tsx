@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
-import type { Cell, Variable, Documentation, NotebookMeta } from '../types';
+import type { Cell, Variable, Documentation, NotebookMeta, SearchResults } from '../types';
+
+
 import { usePyodide } from '../hooks/usePyodide';
 import { WELCOME_NOTEBOOK_DATA } from '../constants/examples';
 import { storage } from '../services/storage';
@@ -10,6 +12,7 @@ interface NotebookContextType {
     cells: Cell[];
     variables: Variable[];
     activeDocumentation: Documentation | null;
+    setActiveDocumentation: (doc: Documentation | null) => void;
     activeTab: SidebarTab;
     setActiveTab: (tab: SidebarTab) => void;
     isSidebarOpen: boolean;
@@ -36,6 +39,7 @@ interface NotebookContextType {
     getCompletions: (code: string, position: number) => Promise<import('../worker/workerTypes').CompletionResponse>;
     deleteVariable: (name: string) => Promise<void>;
     searchDocs: (query: string) => Promise<void>;
+    searchResults: SearchResults | null;
 
     // Multi-notebook support
     fileList: NotebookMeta[];
@@ -61,6 +65,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     );
     const [variables, setVariables] = useState<Variable[]>([]);
     const [activeDocumentation, setActiveDocumentation] = useState<Documentation | null>(null);
+    const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
     const [activeTab, setActiveTab] = useState<SidebarTab>('variables');
     const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
         const saved = localStorage.getItem('logos-engine-sidebar-open');
@@ -328,7 +333,12 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
                 setVariables(response.variables);
             }
 
-            if (response.documentation) {
+            if (response.searchResults) {
+                setSearchResults(response.searchResults);
+                setActiveDocumentation(null);
+                setActiveTab('documentation');
+                setIsSidebarOpen(true);
+            } else if (response.documentation) {
                 setActiveDocumentation(response.documentation);
                 setActiveTab('documentation');
                 setIsSidebarOpen(true);
@@ -377,7 +387,12 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     const searchDocs = useCallback(async (query: string) => {
         try {
             const response = await searchDocsWorker(query, currentNotebookId || 'default');
-            if (response.documentation) {
+            if (response.searchResults) {
+                setSearchResults(response.searchResults);
+                setActiveDocumentation(null);
+                setActiveTab('documentation');
+                setIsSidebarOpen(true);
+            } else if (response.documentation) {
                 setActiveDocumentation(response.documentation);
                 setActiveTab('documentation');
                 setIsSidebarOpen(true);
@@ -427,6 +442,8 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         }
     }, [createCell]);
 
+
+
     return (
         <NotebookContext.Provider value={{
             cells, variables, activeDocumentation, activeTab, setActiveTab,
@@ -437,8 +454,9 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             setCellEditing, moveCell, duplicateCell, clearCellOutput, clearAllOutputs, resetNotebook,
             isGraphicsReady,
             getCompletions,
-            deleteVariable, searchDocs,
-            fileList, currentNotebookId, isDirty, createNotebook, openNotebook, deleteNotebook, renameNotebook
+            deleteVariable, searchDocs, searchResults,
+            fileList, currentNotebookId, isDirty, createNotebook, openNotebook, deleteNotebook, renameNotebook,
+            setActiveDocumentation
         }}>
             {children}
         </NotebookContext.Provider>

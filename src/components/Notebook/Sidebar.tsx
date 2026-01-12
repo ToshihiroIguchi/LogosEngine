@@ -9,7 +9,7 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
-    const { variables, activeDocumentation, activeTab, setActiveTab, fileList, deleteVariable, searchDocs } = useNotebook();
+    const { variables, activeDocumentation, setActiveDocumentation, activeTab, setActiveTab, fileList, deleteVariable, searchDocs, searchResults } = useNotebook();
     const [searchQuery, setSearchQuery] = React.useState('');
 
     const handleSearch = (e: React.FormEvent) => {
@@ -125,6 +125,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                             </div>
                             {activeDocumentation ? (
                                 <div className="p-5 animate-in fade-in slide-in-from-bottom-2 duration-300 flex-1 overflow-y-auto">
+                                    {searchResults && (
+                                        <button
+                                            onClick={() => setActiveDocumentation(null)}
+                                            className="mb-4 text-xs flex items-center gap-1 text-gray-500 hover:text-blue-600 transition-colors font-medium"
+                                        >
+                                            ← Back to results
+                                        </button>
+                                    )}
                                     <div className="mb-6">
                                         <div className="flex items-center gap-2 mb-1">
                                             <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">{activeDocumentation.module || 'Built-in'}</span>
@@ -146,6 +154,69 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                                             {activeDocumentation.docstring}
                                         </pre>
                                     </div>
+                                </div>
+                            ) : searchResults ? (
+                                <div className="divide-y divide-gray-50 overflow-y-auto flex-1">
+                                    {/* Symbols (Name Match) */}
+                                    {searchResults.symbols.length > 0 && (
+                                        <div className="p-2">
+                                            <div className="px-2 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50/50 rounded flex items-center gap-2">
+                                                <span>Symbols</span>
+                                                <span className="bg-gray-200 text-gray-500 px-1.5 rounded-full text-[9px]">{searchResults.symbols.length}</span>
+                                            </div>
+                                            <div className="mt-1 space-y-0.5">
+                                                {searchResults.symbols.map((doc) => (
+                                                    <button
+                                                        type="button"
+                                                        key={doc.name}
+                                                        onClick={() => setActiveDocumentation(doc)}
+                                                        className="w-full text-left p-2 hover:bg-blue-50 rounded-md group transition-all"
+                                                    >
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="font-mono text-xs font-bold text-blue-600 group-hover:text-blue-700">{doc.name}</span>
+                                                            <span className="text-[9px] text-gray-400 group-hover:text-blue-400">{doc.module}</span>
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Mentions (Docstring Match) */}
+                                    {searchResults.mentions.length > 0 && (
+                                        <div className="p-2">
+                                            <div className="px-2 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50/50 rounded flex items-center gap-2">
+                                                <span>Mentions</span>
+                                                <span className="bg-gray-200 text-gray-500 px-1.5 rounded-full text-[9px]">{searchResults.mentions.length}</span>
+                                            </div>
+                                            <div className="mt-1 space-y-0.5">
+                                                {searchResults.mentions.map((doc, idx) => (
+                                                    <button
+                                                        type="button"
+                                                        key={`${doc.name}-${idx}`}
+                                                        onClick={() => setActiveDocumentation(doc)}
+                                                        className="w-full text-left p-2 hover:bg-purple-50 rounded-md group transition-all"
+                                                    >
+                                                        <div className="flex items-center justify-between mb-1">
+                                                            <span className="font-mono text-xs font-bold text-gray-700 group-hover:text-purple-700">{doc.name}</span>
+                                                            <span className="text-[9px] text-gray-400">{doc.module}</span>
+                                                        </div>
+                                                        {doc.snippet && (
+                                                            <div className="text-[10px] text-gray-500 leading-tight border-l-2 border-gray-200 pl-2 group-hover:border-purple-200 font-sans">
+                                                                {doc.snippet}
+                                                            </div>
+                                                        )}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {searchResults.symbols.length === 0 && searchResults.mentions.length === 0 && (
+                                        <div className="p-8 text-center bg-gray-50 m-4 rounded-lg border border-gray-100">
+                                            <p className="text-xs text-gray-500 font-medium">No results found.</p>
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="h-full flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500">

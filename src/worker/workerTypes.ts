@@ -1,4 +1,4 @@
-import type { Output, Variable, Documentation } from '../types';
+import type { Output, Variable, Documentation, SearchResults } from '../types';
 
 export type WorkerAction = 'EXECUTE' | 'INTERRUPT' | 'COMPLETE' | 'RESET_CONTEXT' | 'DELETE_VARIABLE';
 
@@ -16,6 +16,7 @@ export interface WorkerResponse {
     results: Output[];
     variables?: Variable[];
     documentation?: Documentation;
+    searchResults?: SearchResults;
     error?: string;
 }
 

@@ -620,6 +620,140 @@ def _get_completions(prefix, ctx):
                 pass
     
     return completions
+
+# Search implementation with Dynamic Frequency Analysis (Quote-Free Robust Strategy)
+_search_globals = {
+    "analyzed": False,
+    # Define stop words without multiple quotes to avoid syntax errors
+    "stop_words": set("the a an and or of to in is it that this for with as by on at from".split())
+}
+
+def _analyze_frequencies(ctx):
+    import random
+    import collections
+    import sympy
+    import string
+    
+    if _search_globals["analyzed"]:
+        return
+
+    try:
+        # Sample docstrings from sympy
+        candidates = []
+        for name in dir(sympy):
+            if not name.startswith('_'):
+                try:
+                    candidates.append(getattr(sympy, name))
+                except:
+                    pass
+        
+        candidates_with_doc = [c for c in candidates if hasattr(c, '__doc__') and isinstance(c.__doc__, str)]
+        
+        # Sample 100 docs
+        sample_size = 100
+        if len(candidates_with_doc) > sample_size:
+            sample = random.sample(candidates_with_doc, sample_size)
+        else:
+            sample = candidates_with_doc
+            
+        doc_counts = collections.Counter()
+        for obj in sample:
+            doc = obj.__doc__
+            # Safe split without quotes
+            words = set(doc.lower().split())
+            for w in words:
+                # Safe strip using standard library
+                w_clean = w.strip(string.punctuation)
+                if len(w_clean) > 2:
+                    doc_counts[w_clean] += 1
+                    
+        # Threshold: words appearing in > 20% of docs are noise
+        threshold = len(sample) * 0.2
+        new_stop_words = {w for w, count in doc_counts.items() if count > threshold}
+        
+        _search_globals["stop_words"].update(new_stop_words)
+        _search_globals["analyzed"] = True
+    except Exception:
+        # Fail-safe: ensure app never crashes due to stats analysis
+        pass
+
+def _search_docs(query, ctx):
+    import inspect
+    
+    # 1. Analyze if needed
+    _analyze_frequencies(ctx)
+    
+    query = query.strip()
+    if not query:
+        return {"symbols": [], "mentions": []}
+        
+    query_lower = query.lower()
+    
+    # 2. Check stop words
+    is_stop_word = query_lower in _search_globals["stop_words"]
+    skip_mentions = is_stop_word or len(query) < 3
+    
+    symbols = []
+    mentions = []
+    
+    # Gather search targets
+    targets = {}
+    
+    # Add context variables
+    for name, obj in ctx.items():
+        if not name.startswith('_'):
+            targets[name] = obj
+            
+    count_mentions = 0
+    limit_mentions = 30
+    
+    sorted_names = sorted(targets.keys())
+    
+    for name in sorted_names:
+        obj = targets[name]
+        name_lower = name.lower()
+        
+        # A. Symbol Match
+        if query_lower in name_lower:
+            try:
+                doc = inspect.getdoc(obj)
+                module = inspect.getmodule(obj)
+                symbols.append({
+                    "name": name,
+                    "signature": str(inspect.signature(obj)) if hasattr(obj, '__call__') else "",
+                    "docstring": doc or "",
+                    "module": module.__name__ if module else None
+                })
+            except:
+                pass
+                
+        # B. Mention Match
+        if not skip_mentions and count_mentions < limit_mentions:
+            try:
+                doc = inspect.getdoc(obj)
+                if doc:
+                    doc_lower = doc.lower()
+                    idx = doc_lower.find(query_lower)
+                    if idx != -1:
+                        if query_lower not in name_lower:
+                            # Create Snippet
+                            start = max(0, idx - 40)
+                            end = min(len(doc), idx + 40 + len(query))
+                            snippet = "..." + doc[start:end].replace('\\n', ' ') + "..."
+                            
+                            module = inspect.getmodule(obj)
+                            mentions.append({
+                                "name": name,
+                                "signature": str(inspect.signature(obj)) if hasattr(obj, '__call__') else "",
+                                "docstring": doc,
+                                "module": module.__name__ if module else None,
+                                "snippet": snippet
+                            })
+                            count_mentions += 1
+            except:
+                pass
+                
+    return {"symbols": symbols[:20], "mentions": mentions}
 `;
 
 
@@ -805,17 +939,17 @@ self.onmessage = async (event: MessageEvent<WorkerRequest | CompletionRequest>) 
             // Documentation interceptor: Check if code starts with '?'
             const trimmedCode = code.trim();
             if (trimmedCode.startsWith('?')) {
-                const symbolName = trimmedCode.substring(1).trim();
-                const _get_help = pyodide.globals.get("_get_help");
-                const docProxy = _get_help(symbolName, ctx);
-                const doc = docProxy ? docProxy.toJs({ dict_converter: Object.fromEntries }) : null;
-                if (docProxy) docProxy.destroy();
+                const query = trimmedCode.substring(1).trim();
+                const _search_docs = pyodide.globals.get("_search_docs");
+                const resultsProxy = _search_docs(query, ctx);
+                const results = resultsProxy.toJs({ dict_converter: Object.fromEntries });
+                resultsProxy.destroy();
 
                 self.postMessage({
                     id,
                     status: 'SUCCESS',
                     results: [],
-                    documentation: doc
+                    searchResults: results // Return specialized search structure
                 });
                 return;
             }

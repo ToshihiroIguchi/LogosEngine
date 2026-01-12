@@ -36,7 +36,13 @@ export interface Documentation {
   name: string;
   signature: string;
   docstring: string;
-  module?: string;
+  module: string | null;
+  snippet?: string; // For search results
+}
+
+export interface SearchResults {
+  symbols: Documentation[];
+  mentions: Documentation[];
 }
 
 export interface NotebookMeta {
