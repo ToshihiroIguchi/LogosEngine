@@ -12,6 +12,49 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     const { variables, activeDocumentation, setActiveDocumentation, activeTab, setActiveTab, fileList, deleteVariable, searchDocs, searchResults } = useNotebook();
     const [searchQuery, setSearchQuery] = React.useState('');
 
+    const [width, setWidth] = React.useState(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('logos-sidebar-width');
+            return saved ? parseInt(saved, 10) : 320;
+        }
+        return 320;
+    });
+    const [isResizing, setIsResizing] = React.useState(false);
+
+    const startResizing = React.useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        setIsResizing(true);
+        // Start dragging immediately
+        document.body.style.cursor = 'col-resize';
+    }, []);
+
+    const stopResizing = React.useCallback(() => {
+        setIsResizing(false);
+        localStorage.setItem('logos-sidebar-width', width.toString());
+        document.body.style.cursor = '';
+    }, [width]);
+
+    const resize = React.useCallback((e: MouseEvent) => {
+        if (isResizing) {
+            const newWidth = window.innerWidth - e.clientX;
+            // Min 250px, Max 80% of window
+            if (newWidth >= 250 && newWidth < window.innerWidth * 0.8) {
+                setWidth(newWidth);
+            }
+        }
+    }, [isResizing]);
+
+    React.useEffect(() => {
+        if (isResizing) {
+            window.addEventListener('mousemove', resize);
+            window.addEventListener('mouseup', stopResizing);
+        }
+        return () => {
+            window.removeEventListener('mousemove', resize);
+            window.removeEventListener('mouseup', stopResizing);
+        };
+    }, [isResizing, resize, stopResizing]);
+
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
         if (searchQuery.trim()) {
@@ -22,7 +65,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     if (!isOpen) return null;
 
     return (
-        <div className="w-80 bg-white border-l border-gray-200 flex flex-col shrink-0 h-full animate-in slide-in-from-right-10 duration-300">
+        <div
+            className="bg-white border-l border-gray-200 flex flex-col shrink-0 h-full animate-in slide-in-from-right-10 duration-300 relative group/sidebar"
+            style={{ width: `${width}px`, transition: isResizing ? 'none' : 'width 0.3s ease-in-out' }}
+        >
+            {/* Drag Handle */}
+            <div
+                className={`absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 z-50 transition-colors ${isResizing ? 'bg-blue-500' : 'bg-transparent'}`}
+                onMouseDown={startResizing}
+            />
+
             {/* Tab Header */}
             <div className="flex border-b border-gray-100 bg-gray-50/30">
                 <button
@@ -63,7 +115,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
+            <div className={`flex-1 overflow-y-auto ${isResizing ? 'select-none pointer-events-none' : ''}`}>
                 {activeTab === 'files' ? (
                     <FileExplorer />
                 ) : activeTab === 'variables' ? (
