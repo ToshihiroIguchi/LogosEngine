@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNotebook } from '../../context/AppNotebookContext';
+import { useNotebook } from '../../state/AppNotebookContext';
 import { Database, X, Hash, BookCopy, Info, FolderOpen, Trash2, Search } from 'lucide-react';
 import { FileExplorer } from './FileExplorer';
 

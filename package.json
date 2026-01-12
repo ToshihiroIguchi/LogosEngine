@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "prebuild": "node -e \"const fs=require('fs'); if(fs.existsSync('src/context/NotebookContext.tsx')) fs.unlinkSync('src/context/NotebookContext.tsx')\"",
+    "prebuild": "node -e \"const fs=require('fs'); if(fs.existsSync('src/context')) fs.rmSync('src/context', { recursive: true, force: true })\"",
     "build": "npm run prebuild && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"

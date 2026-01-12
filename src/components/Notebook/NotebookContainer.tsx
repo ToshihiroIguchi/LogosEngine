@@ -4,7 +4,7 @@ import {
     Square, Database, Printer, Eraser, FileText, Code, RefreshCw,
     Pencil, Check, CheckCircle2, CloudUpload, FolderOpen, MoreVertical
 } from 'lucide-react';
-import { useNotebook } from '../../context/AppNotebookContext';
+import { useNotebook } from '../../state/AppNotebookContext';
 import { CellItem } from './CellItem';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { DisclaimerModal } from './DisclaimerModal';
