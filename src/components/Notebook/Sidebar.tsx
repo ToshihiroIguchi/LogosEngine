@@ -3,7 +3,7 @@ import { useNotebook } from '../../state/AppNotebookContext';
 import { Database, X, Hash, BookCopy, Info, FolderOpen, Trash2, Search } from 'lucide-react';
 import { FileExplorer } from './FileExplorer';
 import DOMPurify from 'dompurify';
-import renderMathInElement from 'katex/dist/contrib/auto-render';
+import renderMathInElement from 'katex/contrib/auto-render';
 import 'katex/dist/katex.min.css';
 
 interface SidebarProps {
