@@ -2,6 +2,9 @@ import React from 'react';
 import { useNotebook } from '../../state/AppNotebookContext';
 import { Database, X, Hash, BookCopy, Info, FolderOpen, Trash2, Search } from 'lucide-react';
 import { FileExplorer } from './FileExplorer';
+import DOMPurify from 'dompurify';
+import renderMathInElement from 'katex/dist/contrib/auto-render';
+import 'katex/dist/katex.min.css';
 
 interface SidebarProps {
     isOpen: boolean;
@@ -44,6 +47,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         }
     }, [isResizing]);
 
+    const docRef = React.useRef<HTMLDivElement>(null);
+
+    // Resizing logic
     React.useEffect(() => {
         if (isResizing) {
             window.addEventListener('mousemove', resize);
@@ -54,6 +60,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             window.removeEventListener('mouseup', stopResizing);
         };
     }, [isResizing, resize, stopResizing]);
+
+    // KaTeX rendering logic
+    React.useEffect(() => {
+        if (activeDocumentation?.htmlContent && docRef.current) {
+            renderMathInElement(docRef.current, {
+                delimiters: [
+                    { left: '$$', right: '$$', display: true },
+                    { left: '$', right: '$', display: false },
+                    { left: '\\(', right: '\\)', display: false },
+                    { left: '\\[', right: '\\]', display: true }
+                ],
+                ignoredClasses: ['prose-code', 'prose-pre'],
+                throwOnError: false
+            });
+        }
+    }, [activeDocumentation]);
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
@@ -139,9 +161,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                                             </span>
                                             <button
                                                 onClick={() => {
-                                                    // Immediate deletion for better UX, or confirm? Plan said 'confirm' or 'immediate'.
-                                                    // Let's stick to user request imply 'button to delete'.
-                                                    // Providing a confirm is safer.
                                                     if (confirm(`Delete variable '${v.name}'?`)) {
                                                         deleteVariable(v.name);
                                                     }
@@ -202,9 +221,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                                             <Info size={14} />
                                             <span className="text-[10px] font-bold uppercase tracking-widest">Description</span>
                                         </div>
-                                        <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">
-                                            {activeDocumentation.docstring}
-                                        </pre>
+                                        <div
+                                            ref={docRef}
+                                            className="text-xs text-gray-700 font-sans leading-relaxed prose prose-sm prose-blue max-w-none 
+                                                       prose-headings:text-gray-900 prose-headings:font-bold prose-headings:mb-2 prose-headings:mt-4
+                                                       prose-p:mb-3 prose-p:mt-0
+                                                       prose-ul:my-2 prose-li:my-0.5
+                                                       prose-code:bg-gray-100 prose-code:px-1 prose-code:rounded prose-code:text-blue-600
+                                                       prose-pre:bg-gray-900 prose-pre:text-blue-100"
+                                            dangerouslySetInnerHTML={{
+                                                __html: DOMPurify.sanitize(activeDocumentation.htmlContent || activeDocumentation.docstring)
+                                            }}
+                                        />
                                     </div>
                                 </div>
                             ) : searchResults ? (

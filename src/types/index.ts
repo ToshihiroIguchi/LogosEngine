@@ -36,6 +36,7 @@ export interface Documentation {
   name: string;
   signature: string;
   docstring: string;
+  htmlContent?: string;
   module: string | null;
   snippet?: string; // For search results
 }

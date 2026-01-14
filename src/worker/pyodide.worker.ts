@@ -560,6 +560,40 @@ def get_tsv(val):
         pass
     return None
 
+
+# Docutils integration for RST to HTML conversion
+import docutils.core
+def convert_rst_to_html(rst_text):
+    import docutils.core
+    import re
+    if not rst_text:
+        return ""
+    try:
+        # Many docstrings (like SymPy's) use $...$ for inline math, 
+        # which isn't standard RST. Convert them to :math:\`...\` roles.
+        # We use a simple regex but try to avoid multi-line matches for now 
+        # as it can be ambiguous with other $ usage.
+        # Note: double backslashes are needed because this is inside a JS template literal.
+        processed_rst = re.sub(r'\\$([^\\n$]+)\\$', r':math:\`\\1\`', rst_text)
+        
+        # Settings to get a clean HTML snippet (body only)
+        settings = {
+            'output_encoding': 'unicode',
+            'initial_header_level': 3,
+            'doctitle_xform': False,
+            'report_level': 5, # Suppress warnings/errors in output
+            'math_output': 'MathJax', # This keeps math as raw LaTeX inside spans
+        }
+        # Use HTML5 writer
+        html = docutils.core.publish_string(
+            source=processed_rst,
+            writer_name='html5',
+            settings_overrides=settings
+        )
+        return html
+    except Exception as e:
+        return f"<div class='error'>Conversion Error: {str(e)}</div><pre>{rst_text}</pre>"
+
 def _get_help(name, ctx):
     import inspect
     if name not in ctx:
@@ -571,10 +605,14 @@ def _get_help(name, ctx):
         sig = ""
     doc = inspect.getdoc(obj)
     module = inspect.getmodule(obj)
+    
+    html_doc = convert_rst_to_html(doc) if doc else None
+    
     return {
         "name": name,
         "signature": sig,
         "docstring": doc or "No documentation found.",
+        "htmlContent": html_doc,
         "module": module.__name__ if module else None
     }
 
@@ -718,10 +756,12 @@ def _search_docs(query, ctx):
             try:
                 doc = inspect.getdoc(obj)
                 module = inspect.getmodule(obj)
+                html_doc = convert_rst_to_html(doc) if doc else None
                 symbols.append({
                     "name": name,
                     "signature": str(inspect.signature(obj)) if hasattr(obj, '__call__') else "",
                     "docstring": doc or "",
+                    "htmlContent": html_doc,
                     "module": module.__name__ if module else None
                 })
             except:
@@ -742,10 +782,12 @@ def _search_docs(query, ctx):
                             snippet = "..." + doc[start:end].replace('\\n', ' ') + "..."
                             
                             module = inspect.getmodule(obj)
+                            html_doc = convert_rst_to_html(doc) if doc else None
                             mentions.append({
                                 "name": name,
                                 "signature": str(inspect.signature(obj)) if hasattr(obj, '__call__') else "",
                                 "docstring": doc,
+                                "htmlContent": html_doc,
                                 "module": module.__name__ if module else None,
                                 "snippet": snippet
                             })
@@ -799,11 +841,11 @@ async function initPyodide() {
         });
         logTime('load_pyodide', performance.now() - t1);
 
-        console.log('Worker: Loading critical packages (sympy)...');
+        console.log('Worker: Loading critical packages (sympy, docutils)...');
         const t2 = performance.now();
         // STAGE 1: Load only critical packages
-        await pyodide.loadPackage(['sympy']);
-        logTime('load_sympy', performance.now() - t2);
+        await pyodide.loadPackage(['sympy', 'docutils']);
+        logTime('load_critical_packages', performance.now() - t2);
 
         console.log('Worker: Running initial Python code...');
         const t3 = performance.now();
