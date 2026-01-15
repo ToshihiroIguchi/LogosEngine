@@ -1,5 +1,6 @@
 import React from 'react';
-import { X, ShieldAlert } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
+import { useDarkMode } from '../../hooks/useDarkMode';
 
 interface DisclaimerModalProps {
     isOpen: boolean;
@@ -7,64 +8,56 @@ interface DisclaimerModalProps {
 }
 
 export const DisclaimerModal: React.FC<DisclaimerModalProps> = ({ isOpen, onClose }) => {
+    useDarkMode();
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-                <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-amber-100 rounded-lg text-amber-600">
-                            <ShieldAlert size={20} />
-                        </div>
-                        <h2 className="text-lg font-bold text-gray-800">Legal Information</h2>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                    >
-                        <X size={20} />
-                    </button>
-                </div>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <div
+                className="absolute inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm animate-in fade-in duration-300"
+                onClick={onClose}
+            />
 
-                <div className="p-6 overflow-y-auto text-sm text-gray-600 leading-relaxed space-y-6">
-                    <section>
-                        <h3 className="font-bold text-gray-800 mb-2">Disclaimer</h3>
-                        <p className="mb-2">
-                            This software is provided "AS IS" without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and non-infringement.
+            {/* Modal */}
+            <div className="relative bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl shadow-2xl max-w-xl w-full animate-in zoom-in-95 fade-in duration-300 overflow-hidden">
+                <div className="p-8">
+                    <div className="flex items-center gap-4 mb-6">
+                        <div className="p-3 bg-amber-50 dark:bg-amber-900/30 rounded-2xl text-amber-500 border border-amber-100 dark:border-amber-800/50">
+                            <AlertTriangle size={24} />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-black text-gray-900 dark:text-gray-100 tracking-tight leading-none uppercase italic border-b-4 border-amber-400 pb-1">Legal Notice & Risk</h2>
+                            <p className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mt-2 px-1">Computational Safeguards</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4 text-sm text-gray-600 dark:text-gray-400 leading-relaxed max-h-[40vh] overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-slate-800">
+                        <p className="border-l-4 border-blue-500 pl-4 bg-blue-50/30 dark:bg-blue-900/10 py-2 rounded-r-lg">
+                            <strong className="text-gray-900 dark:text-gray-200">Local Execution:</strong> All calculations, including Python and SymPy, are performed locally in your browser using WebAssembly. Your data never leaves your device and is stored in browser cache (IndexedDB).
                         </p>
                         <p>
-                            In no event shall the authors or copyright holders be liable for any claim, damages, or other liability, whether in an action of contract, tort, or otherwise, arising from, out of, or in connection with the software or the use or other dealings in the software (including but not limited to results of calculations).
+                            <strong className="text-gray-900 dark:text-gray-200">Accuracy:</strong> While powered by established computer algebra systems, numerical and symbolic outputs should be verified, especially for mission-critical engineering or research applications.
                         </p>
-                    </section>
+                        <p>
+                            <strong className="text-gray-900 dark:text-gray-200">Experimental Software:</strong> This is a cutting-edge computational IDE. Features and stability may evolve. Ensure critical work is exported as JSON or PDF frequently.
+                        </p>
+                        <p className="bg-gray-50 dark:bg-slate-800/50 p-3 rounded-xl border border-gray-100 dark:border-slate-800 text-[11px] font-mono leading-tight text-gray-600 dark:text-gray-400">
+                            LIMITATION OF LIABILITY: THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED. THE DEVELOPERS SHALL NOT BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY.
+                        </p>
+                    </div>
 
-                    <section>
-                        <h3 className="font-bold text-gray-800 mb-2">Terms of Use</h3>
-                        <ul className="list-disc pl-5 space-y-1">
-                            <li>
-                                <strong>Legal Use:</strong> It is prohibited to use this software for any purpose that violates laws or public order (including malware creation, cyberattacks, or calculations for illegal transactions).
-                            </li>
-                            <li>
-                                <strong>Platform Protection:</strong> It is prohibited to use this software for cryptocurrency mining or running scripts that place an excessive load on hosting servers.
-                            </li>
-                        </ul>
-                    </section>
-
-                    <section>
-                        <h3 className="font-bold text-gray-800 mb-2">Critical Usage Warning</h3>
-                        <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-red-800 text-xs font-medium">
-                            Users use this software at their own risk. For critical applications such as structural calculations, chemical reaction predictions, or financial transactions, please ensure verification by experts before use.
+                    <div className="mt-8 flex items-center justify-between gap-4">
+                        <div className="text-[10px] text-gray-400 dark:text-gray-500 font-mono uppercase tracking-tighter">
+                            v0.1.0 • SECURE LOCAL ENVIRONMENT
                         </div>
-                    </section>
-                </div>
-
-                <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end">
-                    <button
-                        onClick={onClose}
-                        className="px-6 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-lg font-medium text-sm transition-colors shadow-lg shadow-gray-200"
-                    >
-                        I Understand
-                    </button>
+                        <button
+                            onClick={onClose}
+                            className="px-6 py-2.5 bg-gray-900 dark:bg-slate-800 text-white text-xs font-bold rounded-xl hover:bg-gray-800 dark:hover:bg-slate-700 transition-all transform active:scale-95 shadow-lg shadow-gray-200 dark:shadow-none"
+                        >
+                            Understand & Continue
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

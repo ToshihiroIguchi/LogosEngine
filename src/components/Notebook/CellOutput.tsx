@@ -3,6 +3,8 @@ import { Copy, Check, ChevronDown, Code, Table, FileText } from 'lucide-react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import type { Output } from '../../types';
+import { useDarkMode } from '../../hooks/useDarkMode'; // Added this import
+import { cn } from '../../lib/utils'; // Added this import
 
 interface CellOutputProps {
     outputs: Output[];
@@ -11,17 +13,18 @@ interface CellOutputProps {
 }
 
 export const CellOutput: React.FC<CellOutputProps> = ({ outputs, executionCount, onFixError }) => {
+    const { isDark } = useDarkMode(); // Added useDarkMode hook
     const validOutputs = outputs.filter(o => o.value && o.value.trim().length > 0);
 
     if (validOutputs.length === 0) return null;
 
     return (
-        <div className="mt-1 space-y-4 border-l-2 border-gray-100 pl-4 py-2 bg-gray-50/30 rounded-r-lg">
+        <div className="mt-1 space-y-4 border-l-2 border-gray-100 dark:border-slate-700 pl-4 py-2 bg-gray-50/30 dark:bg-slate-800/30 rounded-r-lg">
             {validOutputs.map((output, idx) => (
                 <div key={`${output.timestamp}-${idx}`} className="group relative flex gap-4 animate-in fade-in slide-in-from-top-1 duration-300">
                     {/* Output Label */}
                     <div className="flex-shrink-0 w-12 pt-1 text-right">
-                        <span className="text-[10px] font-bold text-gray-400 font-mono tracking-tighter opacity-70">
+                        <span className="text-[10px] font-bold text-gray-400 dark:text-slate-400 font-mono tracking-tighter opacity-80">
                             {executionCount ? `Out [${executionCount}]:` : 'Out:'}
                         </span>
                     </div>
@@ -32,50 +35,50 @@ export const CellOutput: React.FC<CellOutputProps> = ({ outputs, executionCount,
                             <LatexRenderer value={output.value} />
                         ) : output.type === 'image' ? (
                             <div className="py-2">
-                                <img src={output.value} alt="Plot" className="max-w-full h-auto rounded shadow-sm bg-white border border-gray-100" />
+                                <img src={output.value} alt="Plot" className="max-w-full h-auto rounded shadow-sm bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-700" />
                             </div>
                         ) : output.type === 'error' ? (
-                            <div className="bg-[#FFF5F5] rounded-lg border border-[#FFE3E3] overflow-hidden shadow-sm">
+                            <div className="bg-[#FFF5F5] dark:bg-red-950/30 rounded-lg border border-[#FFE3E3] dark:border-red-900/50 overflow-hidden shadow-sm">
                                 <div className="p-3 flex gap-3 items-start">
-                                    <div className="bg-[#FF9B9B] p-1.5 rounded-full shadow-inner mt-0.5">
+                                    <div className="bg-[#FF9B9B] dark:bg-red-700 p-1.5 rounded-full shadow-inner mt-0.5">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <span className="text-[11px] font-bold text-[#E53E3E] uppercase tracking-wider font-mono bg-white px-2 py-0.5 rounded border border-[#FED7D7]">
+                                            <span className="text-[11px] font-bold text-[#E53E3E] dark:text-red-300 uppercase tracking-wider font-mono bg-white dark:bg-slate-900 px-2 py-0.5 rounded border border-[#FED7D7] dark:border-red-900/50">
                                                 {output.errorName || 'Error'}
                                             </span>
                                             {output.lineNo && (
-                                                <span className="text-[10px] text-[#A0AEC0] font-mono">
+                                                <span className="text-[10px] text-[#A0AEC0] dark:text-slate-400 font-mono">
                                                     at line {output.lineNo}
                                                 </span>
                                             )}
                                         </div>
-                                        <div className="font-mono text-sm font-medium text-[#2D3748] leading-snug select-text">
+                                        <div className="font-mono text-sm font-medium text-[#2D3748] dark:text-slate-200 leading-snug select-text">
                                             {output.value}
                                         </div>
                                         {(output.missingVariables && output.missingVariables.length > 0) && onFixError && (
-                                            <div className="mt-3 pt-2 border-t border-[#FFE3E3]/50">
+                                            <div className="mt-3 pt-2 border-t border-[#FFE3E3]/50 dark:border-red-900/30">
                                                 <button
                                                     onClick={() => onFixError!(output.missingVariables!)}
-                                                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-xs font-medium transition-colors border border-blue-200"
+                                                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-xs font-medium transition-colors border border-blue-200 dark:bg-blue-950/50 dark:hover:bg-blue-900/50 dark:text-blue-300 dark:border-blue-900"
                                                 >
                                                     <span className="text-lg">💡</span>
-                                                    Define <span className="font-mono bg-blue-100 px-1 rounded mx-0.5 font-bold">
+                                                    Define <span className="font-mono bg-blue-100 dark:bg-blue-900/50 px-1 rounded mx-0.5 font-bold">
                                                         {output.missingVariables.join(', ')}
                                                     </span> as Symbol(s) & Insert
                                                 </button>
                                             </div>
                                         )}
                                         {output.traceback && (
-                                            <div className="mt-3 pt-2 border-t border-[#FFE3E3]/50">
+                                            <div className="mt-3 pt-2 border-t border-[#FFE3E3]/50 dark:border-red-900/30">
                                                 <details className="group">
-                                                    <summary className="text-[11px] text-[#E53E3E] cursor-pointer hover:underline select-none flex items-center gap-1.5 font-bold transition-all w-fit opacity-80 hover:opacity-100">
+                                                    <summary className="text-[11px] text-[#E53E3E] dark:text-red-300 cursor-pointer hover:underline select-none flex items-center gap-1.5 font-bold transition-all w-fit opacity-80 hover:opacity-100">
                                                         <ChevronDown size={12} className="transition-transform group-open:rotate-180" />
                                                         Traceback
                                                     </summary>
                                                     <div className="mt-3 relative">
-                                                        <pre className="text-[11px] text-[#C53030] whitespace-pre-wrap font-mono bg-white/60 p-3 rounded-lg border border-[#FED7D7]/50 overflow-x-auto select-text leading-relaxed">
+                                                        <pre className="text-[11px] text-[#C53030] dark:text-red-400 whitespace-pre-wrap font-mono bg-white/60 dark:bg-slate-900/60 p-3 rounded-lg border border-[#FED7D7]/50 dark:border-red-900/30 overflow-x-auto select-text leading-relaxed">
                                                             {output.traceback}
                                                         </pre>
                                                     </div>
@@ -86,7 +89,7 @@ export const CellOutput: React.FC<CellOutputProps> = ({ outputs, executionCount,
                                 </div>
                             </div>
                         ) : (
-                            <pre className="text-gray-800 text-sm whitespace-pre-wrap font-mono leading-relaxed px-1">
+                            <pre className="text-gray-800 dark:text-gray-200 text-sm whitespace-pre-wrap font-mono leading-relaxed px-1">
                                 {output.value}
                             </pre>
                         )}
@@ -108,6 +111,7 @@ const CopyMenu: React.FC<{ output: Output }> = ({ output }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [copied, setCopied] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
+    const { isDark } = useDarkMode(); // Added useDarkMode hook
 
     const handleCopy = async (text: string) => {
         try {
@@ -132,12 +136,15 @@ const CopyMenu: React.FC<{ output: Output }> = ({ output }) => {
 
     return (
         <div
-            className={`relative ${isOpen ? 'opacity-100 z-50' : 'opacity-0 group-hover:opacity-100 transition-opacity'}`}
+            className={cn(
+                "relative",
+                isOpen ? 'opacity-100 z-50' : 'opacity-0 group-hover:opacity-100 transition-opacity'
+            )}
             ref={menuRef}
         >
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-white rounded border border-transparent hover:border-gray-200 transition-all shadow-sm bg-white/50 backdrop-blur-sm flex items-center gap-1"
+                className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-white dark:hover:bg-slate-800 rounded border border-transparent hover:border-gray-200 dark:hover:border-slate-700 transition-all shadow-sm bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm flex items-center gap-1"
                 title="Copy options"
             >
                 {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
@@ -145,10 +152,10 @@ const CopyMenu: React.FC<{ output: Output }> = ({ output }) => {
             </button>
 
             {isOpen && (
-                <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-50 py-1 min-w-[140px] animate-in fade-in zoom-in-95 duration-150">
+                <div className="absolute top-full right-0 mt-1 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg shadow-xl z-50 py-1 min-w-[140px] animate-in fade-in zoom-in-95 duration-150">
                     <button
                         onClick={() => handleCopy(output.value)}
-                        className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-blue-50 flex items-center gap-2 transition-colors font-medium border-b border-gray-50 last:border-0"
+                        className="w-full text-left px-3 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 flex items-center gap-2 transition-colors font-medium border-b border-gray-50 dark:border-slate-700 last:border-0"
                     >
                         <FileText size={12} className="text-blue-400" />
                         Copy as LaTeX
@@ -156,7 +163,7 @@ const CopyMenu: React.FC<{ output: Output }> = ({ output }) => {
                     {output.rawText && (
                         <button
                             onClick={() => handleCopy(output.rawText!)}
-                            className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-blue-50 flex items-center gap-2 transition-colors font-medium border-b border-gray-50 last:border-0"
+                            className="w-full text-left px-3 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 flex items-center gap-2 transition-colors font-medium border-b border-gray-50 dark:border-slate-700 last:border-0"
                         >
                             <Code size={12} className="text-purple-400" />
                             Copy as Code
@@ -195,7 +202,7 @@ const LatexRenderer: React.FC<{ value: string }> = ({ value }) => {
     }, [value]);
 
     return (
-        <div className="overflow-x-auto py-1 text-blue-900 text-left">
+        <div className="overflow-x-auto py-1 text-blue-900 dark:text-blue-200 text-left">
             <div ref={containerRef} />
         </div>
     );

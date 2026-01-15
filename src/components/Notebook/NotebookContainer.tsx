@@ -9,7 +9,10 @@ import { CellItem } from './CellItem';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { DisclaimerModal } from './DisclaimerModal';
 import { Sidebar } from './Sidebar';
-import { EXAMPLES } from '../../constants/examples';
+import { EXAMPLES } from '../../constants/examples'; // Changed path
+import { ThemeToggle } from '../ThemeToggle'; // Added import
+import { useDarkMode } from '../../hooks/useDarkMode'; // Added import
+import { usePyodide } from '../../hooks/usePyodide'; // Added import
 
 export const NotebookContainer: React.FC = () => {
     const {
@@ -23,6 +26,7 @@ export const NotebookContainer: React.FC = () => {
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [editTitleValue, setEditTitleValue] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
+    useDarkMode();
 
     const currentNotebook = fileList.find(m => m.id === currentNotebookId);
 
@@ -96,7 +100,7 @@ export const NotebookContainer: React.FC = () => {
     };
 
     return (
-        <div id="app-root" className="h-screen bg-[#FDFDFD] flex flex-col overflow-hidden">
+        <div id="app-root" className="h-screen bg-[#FDFDFD] dark:bg-slate-950 flex flex-col overflow-hidden">
             <input
                 ref={fileInputRef}
                 type="file"
@@ -106,12 +110,12 @@ export const NotebookContainer: React.FC = () => {
             />
 
             {/* Header - Fixed at top */}
-            <header className="flex-none bg-white/80 backdrop-blur-md border-b border-gray-200/60 px-6 py-3 flex items-center justify-between shadow-sm z-30">
+            <header className="flex-none bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-gray-200/60 dark:border-slate-800/60 px-6 py-3 flex items-center justify-between shadow-sm z-30">
                 <div className="flex items-center gap-6">
                     <div className="flex items-center gap-3">
-                        <div className="bg-white p-1.5 rounded-xl border border-gray-100 shadow-sm"><img src="/logo.png" alt="LogosCalc" className="w-8 h-8 object-contain" /></div>
+                        <div className="bg-white dark:bg-slate-800 p-1.5 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm"><img src="/logo.png" alt="LogosCalc" className="w-8 h-8 object-contain" /></div>
                         <div className="flex items-center">
-                            <h1 className="text-xl font-black text-gray-900 tracking-tighter">Logos<span className="text-purple-600">Calc</span></h1>
+                            <h1 className="text-xl font-black text-gray-900 dark:text-gray-100 tracking-tighter">Logos<span className="text-purple-600 dark:text-purple-400">Calc</span></h1>
                         </div>
                     </div>
 
@@ -127,19 +131,19 @@ export const NotebookContainer: React.FC = () => {
                                     onKeyDown={(e) => e.key === 'Enter' && handleSaveTitle()}
                                     onBlur={handleSaveTitle}
                                     autoFocus
-                                    className="bg-gray-50 border border-purple-200 rounded-lg px-3 py-1 text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-100 min-w-[200px]"
+                                    className="bg-gray-50 dark:bg-slate-800 border border-purple-200 dark:border-purple-800 rounded-lg px-3 py-1 text-sm font-bold text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-100 dark:focus:ring-purple-900 min-w-[200px]"
                                 />
                                 <button onClick={handleSaveTitle} className="text-green-600 hover:bg-green-50 p-1.5 rounded-lg transition-colors"><Check size={16} /></button>
                             </div>
                         ) : (
                             <div
-                                className="group flex items-center gap-2 cursor-pointer hover:bg-gray-50 px-3 py-1.5 rounded-xl transition-all"
+                                className="group flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-800 px-3 py-1.5 rounded-xl transition-all"
                                 onClick={() => setIsEditingTitle(true)}
                             >
-                                <span className="text-lg font-bold text-gray-900 tracking-tight">
+                                <span className="text-lg font-bold text-gray-900 dark:text-gray-100 tracking-tight">
                                     {currentNotebook?.title || 'Loading...'}
                                 </span>
-                                <Pencil size={14} className="text-gray-300 group-hover:text-purple-400 opacity-0 group-hover:opacity-100 transition-all" />
+                                <Pencil size={14} className="text-gray-300 dark:text-gray-600 group-hover:text-purple-400 opacity-0 group-hover:opacity-100 transition-all" />
                             </div>
                         )}
 
@@ -176,18 +180,20 @@ export const NotebookContainer: React.FC = () => {
                             <span className="text-xs font-semibold text-green-600">Ready</span>
                         </div>
                     )}
-                    <div className="h-6 w-px bg-gray-200 mx-2" />
-                    <div className="flex items-center bg-gray-100/50 p-1 rounded-xl border border-gray-200/50 gap-1">
+                    <div className="h-6 w-px bg-gray-200 dark:bg-slate-800 mx-2" />
+                    <ThemeToggle />
+                    <div className="h-6 w-px bg-gray-200 dark:bg-slate-800 mx-2" />
+                    <div className="flex items-center bg-gray-100/50 dark:bg-slate-800/50 p-1 rounded-xl border border-gray-200/50 dark:border-slate-700/50 gap-1">
                         <button
                             onClick={() => toggleSidebarTab('files')}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-white text-gray-600 rounded-lg shadow-sm border border-gray-200 hover:bg-gray-50 transition-all font-medium text-xs whitespace-nowrap"
+                            className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-300 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 transition-all font-medium text-xs whitespace-nowrap"
                             title="Open Notebook Explorer"
                         >
                             <FolderOpen size={14} />Notebooks
                         </button>
                         <button
                             onClick={() => toggleSidebarTab('variables')}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-white text-purple-600 rounded-lg shadow-sm border border-gray-200 hover:bg-purple-50 transition-all font-medium text-xs whitespace-nowrap"
+                            className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-400 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all font-medium text-xs whitespace-nowrap"
                         >
                             <Database size={14} />Variables
                         </button>
@@ -195,20 +201,20 @@ export const NotebookContainer: React.FC = () => {
                         <div className="relative">
                             <button
                                 onClick={() => { setShowExamples(!showExamples); setShowMenu(false); }}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-white text-purple-600 rounded-lg shadow-sm border border-gray-200 hover:bg-purple-50 transition-all font-medium text-xs whitespace-nowrap"
+                                className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-400 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all font-medium text-xs whitespace-nowrap"
                             >
                                 <BookOpen size={14} />Examples<ChevronDown size={12} className={`transition-transform ${showExamples ? 'rotate-180' : ''}`} />
                             </button>
                             {showExamples && (
-                                <div className="absolute top-full mt-2 right-0 bg-white border border-gray-200 rounded-xl shadow-lg w-64 max-h-96 overflow-y-auto z-50">
-                                    {EXAMPLES.map((example, idx) => (
+                                <div className="absolute top-full mt-2 right-0 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-lg w-64 max-h-96 overflow-y-auto z-50">
+                                    {EXAMPLES.map((example: { title: string; code: string }, idx: number) => (
                                         <button
                                             key={idx}
                                             onClick={() => handleInsertExample(example.code)}
-                                            className="w-full text-left px-4 py-3 hover:bg-purple-50 transition-colors border-b border-gray-100 last:border-b-0"
+                                            className="w-full text-left px-4 py-3 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors border-b border-gray-100 dark:border-slate-700 last:border-b-0"
                                         >
-                                            <div className="text-sm font-semibold text-gray-900">{example.title}</div>
-                                            <div className="text-xs text-gray-500 mt-1 font-mono truncate">{example.code.split('\n')[1]}</div>
+                                            <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">{example.title}</div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-mono truncate">{example.code.split('\n')[1]}</div>
                                         </button>
                                     ))}
                                 </div>
@@ -235,7 +241,7 @@ export const NotebookContainer: React.FC = () => {
                         <div className="relative">
                             <button
                                 onClick={() => { setShowMenu(!showMenu); setShowExamples(false); }}
-                                className={`p-1.5 rounded-lg transition-all ${showMenu ? 'bg-gray-200 text-gray-900' : 'text-gray-500 hover:bg-gray-200/50'}`}
+                                className={`p-1.5 rounded-lg transition-all ${showMenu ? 'bg-gray-200 dark:bg-slate-700 text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-slate-700/50'}`}
                                 title="More Actions"
                             >
                                 <MoreVertical size={18} />
@@ -244,26 +250,26 @@ export const NotebookContainer: React.FC = () => {
                             {showMenu && (
                                 <>
                                     <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-                                    <div className="absolute top-full mt-2 right-0 bg-white border border-gray-200 rounded-xl shadow-xl w-56 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-                                        <button onClick={() => { handleImport(); setShowMenu(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                                    <div className="absolute top-full mt-2 right-0 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-xl w-56 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                                        <button onClick={() => { handleImport(); setShowMenu(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
                                             <Upload size={14} />Import Notebook
                                         </button>
-                                        <button onClick={() => { handleExport(); setShowMenu(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                                        <button onClick={() => { handleExport(); setShowMenu(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
                                             <Download size={14} />Export JSON
                                         </button>
-                                        <button onClick={() => { handlePrint(); setShowMenu(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                                        <button onClick={() => { handlePrint(); setShowMenu(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
                                             <Printer size={14} />Print / PDF
                                         </button>
 
-                                        <div className="h-px bg-gray-100 my-2" />
+                                        <div className="h-px bg-gray-100 dark:bg-slate-700 my-2" />
 
-                                        <button onClick={() => { clearAllOutputs(); setShowMenu(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-amber-600 hover:bg-amber-50 transition-colors">
+                                        <button onClick={() => { clearAllOutputs(); setShowMenu(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors">
                                             <Eraser size={14} />Clear All Outputs
                                         </button>
 
-                                        <div className="h-px bg-gray-100 my-2" />
+                                        <div className="h-px bg-gray-100 dark:bg-slate-700 my-2" />
 
-                                        <button onClick={() => { handleReset(); setShowMenu(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                                        <button onClick={() => { handleReset(); setShowMenu(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors">
                                             <RefreshCw size={14} />Reset Notebook
                                         </button>
                                     </div>
@@ -290,19 +296,19 @@ export const NotebookContainer: React.FC = () => {
                             <div className="flex items-center gap-4">
                                 <button
                                     onClick={() => addCell('code')}
-                                    className="group flex flex-col items-center gap-2 text-gray-300 hover:text-blue-500 transition-all"
+                                    className="group flex flex-col items-center gap-2 text-gray-300 dark:text-slate-500 hover:text-blue-500 dark:hover:text-blue-400 transition-all"
                                 >
-                                    <div className="p-3 border-2 border-dashed border-gray-200 rounded-2xl group-hover:border-blue-200 group-hover:bg-blue-50/50 transition-all">
+                                    <div className="p-3 border-2 border-dashed border-gray-200 dark:border-slate-800 rounded-2xl group-hover:border-blue-200 dark:group-hover:border-blue-900 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/20 transition-all">
                                         <Code size={20} />
                                     </div>
                                     <span className="text-[9px] font-bold uppercase tracking-widest">Code Cell</span>
                                 </button>
-                                <div className="h-10 w-px bg-gray-100" />
+                                <div className="h-10 w-px bg-gray-100 dark:bg-slate-800" />
                                 <button
                                     onClick={() => addCell('markdown')}
-                                    className="group flex flex-col items-center gap-2 text-gray-300 hover:text-purple-500 transition-all"
+                                    className="group flex flex-col items-center gap-2 text-gray-300 dark:text-slate-500 hover:text-purple-500 dark:hover:text-purple-400 transition-all"
                                 >
-                                    <div className="p-3 border-2 border-dashed border-gray-200 rounded-2xl group-hover:border-purple-200 group-hover:bg-purple-50/50 transition-all">
+                                    <div className="p-3 border-2 border-dashed border-gray-200 dark:border-slate-800 rounded-2xl group-hover:border-purple-200 dark:group-hover:border-purple-900 group-hover:bg-purple-50/50 dark:group-hover:bg-purple-900/20 transition-all">
                                         <FileText size={20} />
                                     </div>
                                     <span className="text-[9px] font-bold uppercase tracking-widest">Markdown Cell</span>
@@ -310,19 +316,19 @@ export const NotebookContainer: React.FC = () => {
                             </div>
                         </div>
                     </main>
-                    <footer className="py-6 px-8 border-t border-gray-100 flex items-center justify-between bg-gray-50/50 mt-auto">
+                    <footer className="py-6 px-8 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between bg-gray-50/50 dark:bg-slate-900/50 mt-auto">
                         <div className="flex items-center gap-3 text-xs text-gray-400 font-mono">
                             <span>PYTHON 3.11</span><span className="opacity-30">•</span><span>SYMPY CORE</span><span className="opacity-30">•</span><span>BROWSER-WASM</span>
                         </div>
                         <div className="flex items-center gap-3">
                             <button
                                 onClick={() => setShowDisclaimer(true)}
-                                className="text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-tighter hover:underline transition-all"
+                                className="text-[10px] font-bold text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 uppercase tracking-tighter hover:underline transition-all"
                             >
                                 Legal & Risk
                             </button>
-                            <div className="flex items-center gap-1.5 px-3 py-1 bg-white border border-gray-200 rounded-full shadow-sm cursor-help hover:border-blue-300 transition-colors">
-                                <Info size={12} className="text-blue-500" /><span className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">Computational Notebook Environment</span>
+                            <div className="flex items-center gap-1.5 px-3 py-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-full shadow-sm cursor-help hover:border-blue-300 dark:hover:border-blue-900 transition-colors">
+                                <Info size={12} className="text-blue-500" /><span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-tighter">Computational Notebook Environment</span>
                             </div>
                         </div>
                     </footer>

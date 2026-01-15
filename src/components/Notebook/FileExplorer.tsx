@@ -1,135 +1,102 @@
 import React, { useState } from 'react';
-import { Plus, FileText, MoreVertical, Pencil, Trash2, Check, X } from 'lucide-react';
+import { Plus, FileText, Trash2, Search } from 'lucide-react';
 import { useNotebook } from '../../state/AppNotebookContext';
-import { clsx } from 'clsx';
+import { useDarkMode } from '../../hooks/useDarkMode';
+import { cn } from '../../lib/utils';
 
 export const FileExplorer: React.FC = () => {
-    const { fileList, currentNotebookId, createNotebook, openNotebook, deleteNotebook, renameNotebook } = useNotebook();
-    const [editingId, setEditingId] = useState<string | null>(null);
-    const [editValue, setEditValue] = useState('');
-    const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+    const { fileList, currentNotebookId, setCurrentNotebookId, createNotebook, deleteNotebook } = useNotebook();
+    const [searchTerm, setSearchTerm] = useState('');
+    useDarkMode();
 
-    const handleCreate = () => {
-        createNotebook();
-    };
+    const filteredFiles = fileList.filter(f =>
+        f.title.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
-    const handleStartRename = (id: string, currentTitle: string) => {
-        setEditingId(id);
-        setEditValue(currentTitle);
-        setMenuOpenId(null);
-    };
-
-    const handleSaveRename = async (id: string) => {
-        if (editValue.trim()) {
-            await renameNotebook(id, editValue.trim());
-        }
-        setEditingId(null);
-    };
-
-    const handleDelete = async (id: string, title: string) => {
-        if (confirm(`Are you sure you want to delete "${title}"?`)) {
-            await deleteNotebook(id);
-        }
-        setMenuOpenId(null);
-    };
+    const storageUsage = Math.min(100, (fileList.length / 50) * 100);
 
     return (
-        <div className="flex flex-col h-full bg-white">
-            <div className="p-4 border-b border-gray-100">
-                <button
-                    onClick={handleCreate}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl shadow-sm shadow-purple-100 transition-all font-semibold text-sm"
-                >
-                    <Plus size={16} strokeWidth={3} />
-                    New Notebook
-                </button>
+        <div className="flex flex-col h-full bg-[#F8FAF8] dark:bg-slate-900 animate-in fade-in duration-500">
+            <div className="p-4 space-y-4">
+                <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm transition-all hover:shadow-md">
+                    <div className="flex items-center justify-between mb-3 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+                        <span>Notebook Storage</span>
+                        <span className={storageUsage > 80 ? 'text-red-500' : 'text-purple-500 dark:text-purple-400'}>{fileList.length} / 50</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden mb-2">
+                        <div
+                            className={`h-full rounded-full transition-all duration-1000 ${storageUsage > 80 ? 'bg-red-400' : 'bg-gradient-to-r from-purple-400 to-blue-400'}`}
+                            style={{ width: `${storageUsage}%` }}
+                        />
+                    </div>
+                    <p className="text-[9px] text-gray-400 dark:text-gray-500 font-medium italic">Notebooks are saved locally in your browser.</p>
+                </div>
+
+                <div className="relative">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                    <input
+                        type="text"
+                        placeholder="Filter notebooks..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-9 pr-3 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-purple-100 dark:focus:ring-purple-900 transition-all font-medium text-gray-700 dark:text-gray-200"
+                    />
+                </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-2">
-                <div className="space-y-1">
-                    {fileList.map((file) => (
+            <div className="flex-1 overflow-y-auto px-4 pb-4">
+                <div className="grid grid-cols-1 gap-2">
+                    {filteredFiles.map((file) => (
                         <div
                             key={file.id}
-                            className={clsx(
-                                "group relative flex items-center gap-3 p-3 rounded-xl transition-all cursor-pointer",
+                            className={cn(
+                                "group relative p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between",
                                 currentNotebookId === file.id
-                                    ? "bg-purple-50 text-purple-700 font-medium"
-                                    : "hover:bg-gray-50 text-gray-600"
+                                    ? "bg-purple-50 dark:bg-purple-900/30 border-purple-200 dark:border-purple-800 shadow-sm"
+                                    : "bg-white dark:bg-slate-800 border-gray-100 dark:border-slate-800 hover:border-purple-200 dark:hover:border-purple-800 hover:shadow-sm"
                             )}
-                            onClick={() => editingId !== file.id && openNotebook(file.id)}
+                            onClick={() => setCurrentNotebookId(file.id)}
                         >
-                            <div className={clsx(
-                                "p-2 rounded-lg transition-colors",
-                                currentNotebookId === file.id ? "bg-purple-100" : "bg-gray-100 group-hover:bg-gray-200"
-                            )}>
-                                <FileText size={16} className={currentNotebookId === file.id ? "text-purple-600" : "text-gray-500"} />
-                            </div>
-
-                            <div className="flex-1 min-w-0">
-                                {editingId === file.id ? (
-                                    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                                        <input
-                                            type="text"
-                                            value={editValue}
-                                            onChange={(e) => setEditValue(e.target.value)}
-                                            onKeyDown={(e) => e.key === 'Enter' && handleSaveRename(file.id)}
-                                            autoFocus
-                                            className="w-full bg-white border border-purple-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200"
-                                        />
-                                        <button onClick={() => handleSaveRename(file.id)} className="text-green-600 p-1 hover:bg-green-50 rounded"><Check size={14} /></button>
-                                        <button onClick={() => setEditingId(null)} className="text-red-600 p-1 hover:bg-red-50 rounded"><X size={14} /></button>
+                            <div className="flex items-center gap-3 truncate">
+                                <FileText size={16} className={currentNotebookId === file.id ? "text-purple-600 dark:text-purple-400" : "text-gray-400 dark:text-gray-500 group-hover:text-purple-400"} />
+                                <div className="truncate">
+                                    <div className={`text-xs font-bold truncate ${currentNotebookId === file.id ? 'text-purple-900 dark:text-gray-100' : 'text-gray-700 dark:text-gray-300'}`}>
+                                        {file.title}
                                     </div>
-                                ) : (
-                                    <>
-                                        <div className="text-sm truncate pr-6">{file.title}</div>
-                                        <div className="text-[10px] text-gray-400 font-normal">
-                                            {new Date(file.updatedAt).toLocaleDateString()}
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-
-                            {editingId !== file.id && (
-                                <div className="absolute right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setMenuOpenId(menuOpenId === file.id ? null : file.id);
-                                        }}
-                                        className="p-1 hover:bg-gray-200 rounded-md text-gray-400"
-                                    >
-                                        <MoreVertical size={14} />
-                                    </button>
-
-                                    {menuOpenId === file.id && (
-                                        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-100 rounded-lg shadow-xl z-50 py-1 w-32 animate-in fade-in zoom-in-95 duration-100">
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); handleStartRename(file.id, file.title); }}
-                                                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50"
-                                            >
-                                                <Pencil size={12} /> Rename
-                                            </button>
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); handleDelete(file.id, file.title); }}
-                                                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50"
-                                            >
-                                                <Trash2 size={12} /> Delete
-                                            </button>
-                                        </div>
-                                    )}
+                                    <div className="text-[9px] text-gray-400 dark:text-gray-500 font-mono mt-0.5">
+                                        Last saved: {new Date(file.updatedAt).toLocaleTimeString()}
+                                    </div>
                                 </div>
-                            )}
+                            </div>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (confirm('Permanently delete this notebook?')) {
+                                        deleteNotebook(file.id);
+                                    }
+                                }}
+                                className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 rounded-lg transition-all"
+                            >
+                                <Trash2 size={12} />
+                            </button>
                         </div>
                     ))}
+                    {filteredFiles.length === 0 && (
+                        <div className="text-center py-12 px-4 border-2 border-dashed border-gray-200 dark:border-slate-800 rounded-2xl animate-in fade-in duration-500">
+                            <Plus size={24} className="mx-auto text-gray-100 dark:text-slate-600 mb-2" />
+                            <p className="text-xs text-gray-400 dark:text-slate-400 font-medium">No notebooks found.</p>
+                        </div>
+                    )}
                 </div>
             </div>
 
-            <div className="p-4 border-t border-gray-50 bg-gray-50/50">
-                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Storage</div>
-                <div className="mt-2 h-1 w-full bg-gray-200 rounded-full overflow-hidden">
-                    <div className="h-full bg-green-500 w-[5%]" />
-                </div>
-                <div className="mt-1 text-[9px] text-gray-400">IndexedDB Persistence</div>
+            <div className="p-4 mt-auto">
+                <button
+                    onClick={() => createNotebook()}
+                    className="w-full flex items-center justify-center gap-2 py-3 bg-purple-600 dark:bg-purple-700 text-white rounded-xl shadow-lg shadow-purple-200 dark:shadow-none hover:bg-purple-700 dark:hover:bg-purple-600 transition-all font-bold text-sm transform active:scale-95"
+                >
+                    <Plus size={18} /> New Notebook
+                </button>
             </div>
         </div>
     );
