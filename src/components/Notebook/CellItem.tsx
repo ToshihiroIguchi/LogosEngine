@@ -1,5 +1,6 @@
+
 import React, { useRef } from 'react';
-import { Play, Trash2, PlusCircle, Clock, Square, ChevronUp, ChevronDown, Copy, Eraser, Eye } from 'lucide-react';
+import { Play, Trash2, PlusCircle, Clock, Square, ChevronUp, ChevronDown, Copy, Eraser, Eye, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import MonacoEditor from '@monaco-editor/react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -152,7 +153,7 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
         const symbolsStr = variables.join(' ');
         // Insert at the beginning
         const definitionLine = `${varsStr} = symbols('${symbolsStr}')`;
-        const newContent = `${definitionLine}\n${cell.content}`;
+        const newContent = `${definitionLine} \n${cell.content} `;
 
         updateCell(cell.id, newContent);
         // Execute immediately with the new content
@@ -202,43 +203,70 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
         <div className="group relative mb-6">
             <style dangerouslySetInnerHTML={{
                 __html: `
-                .dark .monaco-editor,
-                .dark .monaco-editor .margin,
-                .dark .monaco-editor-background,
-                .dark .monaco-editor .inputarea.ime-input {
-                    background-color: #0f172a !important;
-                }
-                .dark .monaco-editor .view-line {
-                    color: #e2e8f0 !important;
-                }
+    .dark.monaco - editor,
+                .dark.monaco - editor.margin,
+                .dark.monaco - editor - background,
+                .dark.monaco - editor.inputarea.ime - input {
+    background - color: #0f172a!important;
+}
+                .dark.monaco - editor.view - line {
+    color: #e2e8f0!important;
+}
                 /* Syntax Highlighting Forcing for Dark Mode */
-                .dark .monaco-editor .mtk1 { color: #e2e8f0 !important; } /* Base text / Variables */
-                .dark .monaco-editor .mtk6 { color: #94a3b8 !important; } /* Brackets / Punctuation */
-                .dark .monaco-editor .mtk8 { color: #4ade80 !important; } /* Strings / Green */
-                .dark .monaco-editor .mtk7 { color: #60a5fa !important; } /* Numbers / Functions (common) */
-                .dark .monaco-editor .mtk10 { color: #f87171 !important; } /* Errors / Special */
-                .dark .monaco-editor .mtk12 { color: #c084fc !important; } /* Keywords */
+                .dark.monaco - editor.mtk1 { color: #e2e8f0!important; } /* Base text / Variables */
+                .dark.monaco - editor.mtk6 { color: #94a3b8!important; } /* Brackets / Punctuation */
+                .dark.monaco - editor.mtk8 { color: #4ade80!important; } /* Strings / Green */
+                .dark.monaco - editor.mtk7 { color: #60a5fa!important; } /* Numbers / Functions (common) */
+                .dark.monaco - editor.mtk10 { color: #f87171!important; } /* Errors / Special */
+                .dark.monaco - editor.mtk12 { color: #c084fc!important; } /* Keywords */
                 /* Force expand color specifically if it's mtk7 or common */
-                .dark .monaco-editor [class*="mtk"] { filter: brightness(1.2); }
-                
+                .dark.monaco - editor[class*= "mtk"] { filter: brightness(1.2); }
+
                 /* Better Current Line Highlight - Best Practice */
-                .dark .monaco-editor .current-line {
-                    background-color: #1e293b !important; /* Slate-800 */
-                    border: none !important;
-                }
-                .dark .monaco-editor .current-line-exact {
-                    border: none !important;
-                }
-            ` }} />
+                .dark.monaco - editor.current - line {
+    background - color: #1e293b!important; /* Slate-800 */
+    border: none!important;
+}
+                .dark.monaco - editor.current - line - exact {
+    border: none!important;
+}
+` }} />
             <div className={cn(
                 "flex flex-col border rounded-xl transition-colors duration-200 bg-white dark:bg-slate-900 relative overflow-visible print:border-none print:shadow-none",
                 cell.isExecuting ? (isQueued ? "ring-2 ring-amber-400 border-amber-400 shadow-md z-20" : "ring-2 ring-blue-400 border-blue-400 shadow-md z-20") : "border-gray-200 dark:border-slate-800 shadow-sm dark:shadow-none hover:border-gray-300 dark:hover:border-slate-700 hover:z-[50] focus-within:z-[50]"
             )}>
                 <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50/50 dark:bg-slate-800/30 border-b border-gray-100 dark:border-slate-800 opacity-60 group-hover:opacity-100 transition-opacity rounded-t-xl print:hidden">
                     <div className="flex items-center gap-3">
-                        <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 font-mono tracking-wider uppercase">
-                            {cell.isExecuting ? 'In [*]' : (cell.executionCount ? `In [${cell.executionCount}]` : 'In [ ]')}
-                        </span>
+                        {/* Status Icon & Time */}
+                        <div className="flex items-center gap-2 min-w-[60px]">
+                            {cell.isExecuting ? (
+                                <div className="flex items-center gap-1.5 text-blue-500">
+                                    <Loader2 size={14} className="animate-spin" />
+                                    <span className="text-[10px] font-bold uppercase tracking-wider">Running</span>
+                                </div>
+                            ) : cell.outputs.some(o => o.type === 'error') ? (
+                                <div className="flex items-center gap-1.5 text-red-500">
+                                    <AlertCircle size={14} />
+                                    <span className="text-[10px] font-bold uppercase tracking-wider">Error</span>
+                                </div>
+                            ) : (!cell.isExecuting && cell.executionCount) ? (
+                                <div className="flex items-center gap-1.5 text-green-500">
+                                    <CheckCircle2 size={14} />
+                                    {cell.lastExecutionTime !== undefined && (
+                                        <span className="text-[10px] font-mono font-medium opacity-80">
+                                            {(cell.lastExecutionTime / 1000).toFixed(2)}s
+                                        </span>
+                                    )}
+                                </div>
+                            ) : (
+                                <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 font-mono tracking-wider uppercase">
+                                    Ready
+                                </span>
+                            )}
+                        </div>
+
+                        <div className="h-3 w-px bg-gray-200 dark:bg-slate-700" />
+
                         <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-widest bg-gray-200/50 dark:bg-slate-700/50 px-1.5 py-0.5 rounded">
                             {cell.type}
                         </span>
@@ -327,7 +355,7 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                         </div>
                     ) : (
                         <MonacoEditor
-                            key={`editor-${index}`}
+                            key={`editor - ${index} `}
                             height={Math.max(100, (cell.content.split('\n').length + 1) * 19 + 32) + 'px'}
                             language={cell.type === 'markdown' ? 'markdown' : 'python'}
                             value={cell.content}

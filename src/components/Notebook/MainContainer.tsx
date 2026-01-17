@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useNotebook } from '../../state/AppNotebookContext';
 import { CellItem } from './CellItem';
+import { AddCellDivider } from './AddCellDivider';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { DisclaimerModal } from './DisclaimerModal';
 import { Sidebar } from './Sidebar';
@@ -283,12 +284,16 @@ export const MainContainer: React.FC = () => {
                 {/* Scrollable Notebook Area */}
                 <div id="notebook-scroll-area" className="flex-1 flex flex-col min-w-0 overflow-y-auto scroll-smooth">
                     <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-12">
-                        <div className="space-y-4">
+                        <div>
                             {cells.map((cell, index) => (
-                                <ErrorBoundary key={cell.id}>
-                                    <CellItem cell={cell} index={index} />
-                                </ErrorBoundary>
+                                <React.Fragment key={cell.id}>
+                                    <AddCellDivider index={index} />
+                                    <ErrorBoundary>
+                                        <CellItem cell={cell} index={index} />
+                                    </ErrorBoundary>
+                                </React.Fragment>
                             ))}
+                            <AddCellDivider index={cells.length} />
                         </div>
                         <div className="mt-12 flex flex-col items-center gap-6 pb-24 print:hidden">
                             <div className="flex items-center gap-4">

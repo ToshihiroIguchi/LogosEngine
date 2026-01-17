@@ -332,12 +332,22 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             const currentCount = executionCountRef.current;
             executionCountRef.current += 1;
 
+            const startTime = performance.now();
+
             // Execute code via Pyodide
             // Pass executionCount so the worker can index Out[] correctly
             const response = await execute(codeOverride || cell.content, currentNotebookId || 'default', currentCount);
 
+            const duration = performance.now() - startTime;
+
             setCells(prev => prev.map(c =>
-                c.id === id ? { ...c, outputs: response.results, isExecuting: false, executionCount: currentCount } : c
+                c.id === id ? {
+                    ...c,
+                    outputs: response.results,
+                    isExecuting: false,
+                    executionCount: currentCount,
+                    lastExecutionTime: duration
+                } : c
             ));
 
             if (response.variables) {

@@ -20,6 +20,7 @@ export interface Cell {
   executionCount?: number;
   isExecuting: boolean;
   isEditing?: boolean; // Used for Markdown cells
+  lastExecutionTime?: number; // Duration in ms
 }
 
 export interface NotebookState {
