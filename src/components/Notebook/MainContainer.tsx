@@ -10,9 +10,9 @@ import { ErrorBoundary } from '../ErrorBoundary';
 import { DisclaimerModal } from './DisclaimerModal';
 import { Sidebar } from './Sidebar';
 import { EXAMPLES } from '../../constants/examples'; // Changed path
-import { ThemeToggle } from '../ThemeToggle'; // Added import
+import { AppThemeToggle } from '../AppThemeToggle';
 
-export const NotebookContainer: React.FC = () => {
+export const MainContainer: React.FC = () => {
     const {
         cells, addCell, executeAll, interrupt, isReady, insertExample, importNotebook,
         isSidebarOpen, setIsSidebarOpen, clearAllOutputs, resetNotebook, isGraphicsReady,
@@ -178,7 +178,7 @@ export const NotebookContainer: React.FC = () => {
                         </div>
                     )}
                     <div className="h-6 w-px bg-gray-200 dark:bg-slate-800 mx-2" />
-                    <ThemeToggle />
+                    <AppThemeToggle />
                     <div className="h-6 w-px bg-gray-200 dark:bg-slate-800 mx-2" />
                     <div className="flex items-center bg-gray-100/50 dark:bg-slate-800/50 p-1 rounded-xl border border-gray-200/50 dark:border-slate-700/50 gap-1">
                         <button

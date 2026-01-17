@@ -1,11 +1,11 @@
 import React from 'react';
 import { NotebookProvider } from './state/AppNotebookContext';
-import { NotebookContainer } from './components/Notebook/NotebookContainer';
+import { MainContainer } from './components/Notebook/MainContainer';
 
 const App: React.FC = () => {
   return (
     <NotebookProvider>
-      <NotebookContainer />
+      <MainContainer />
     </NotebookProvider>
   );
 };

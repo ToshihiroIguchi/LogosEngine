@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Moon, Sun, Monitor } from 'lucide-react';
 import { useDarkMode, type Theme } from '../hooks/useDarkMode';
 
-export const ThemeToggle: React.FC = () => {
+export const AppThemeToggle: React.FC = () => {
     const { theme, setTheme } = useDarkMode();
     const [isOpen, setIsOpen] = useState(false);
 

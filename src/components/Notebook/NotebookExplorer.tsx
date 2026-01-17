@@ -4,7 +4,7 @@ import { useNotebook } from '../../state/AppNotebookContext';
 import { useDarkMode } from '../../hooks/useDarkMode';
 import { cn } from '../../lib/utils';
 
-export const FileExplorer: React.FC = () => {
+export const NotebookExplorer: React.FC = () => {
     const { fileList, currentNotebookId, openNotebook, createNotebook, deleteNotebook } = useNotebook();
     const [searchTerm, setSearchTerm] = useState('');
     useDarkMode();

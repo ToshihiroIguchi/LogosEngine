@@ -11,7 +11,7 @@ interface CellOutputProps {
     onFixError?: (variables: string[]) => void;
 }
 
-export const CellOutput: React.FC<CellOutputProps> = ({ outputs, executionCount, onFixError }) => {
+export const ResultView: React.FC<CellOutputProps> = ({ outputs, executionCount, onFixError }) => {
     const validOutputs = outputs.filter(o => o.value && o.value.trim().length > 0);
 
     if (validOutputs.length === 0) return null;

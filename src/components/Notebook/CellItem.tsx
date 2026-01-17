@@ -9,7 +9,7 @@ import 'katex/dist/katex.min.css';
 import type { editor } from 'monaco-editor';
 import type { Cell } from '../../types';
 import { useNotebook } from '../../state/AppNotebookContext';
-import { CellOutput } from './CellOutput';
+import { ResultView } from './ResultView';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { registerPythonCompletionProvider } from '../../utils/monacoCompletionProvider';
@@ -341,7 +341,7 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                 {cell.outputs.length > 0 && showOutputs && (
                     <div className="border-t border-gray-100 dark:border-slate-800/50 rounded-b-xl print:border-none">
                         <div className="mt-2">
-                            <CellOutput outputs={cell.outputs} executionCount={cell.executionCount} onFixError={handleFixError} />
+                            <ResultView outputs={cell.outputs} executionCount={cell.executionCount} onFixError={handleFixError} />
                         </div>
                     </div>
                 )}

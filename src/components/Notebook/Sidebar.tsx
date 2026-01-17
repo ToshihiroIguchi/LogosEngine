@@ -1,14 +1,14 @@
 import React from 'react';
 import { useNotebook } from '../../state/AppNotebookContext';
 import { Database, X, Hash, BookCopy, Info, FolderOpen, Trash2, Search, HelpCircle } from 'lucide-react';
-import { FileExplorer } from './FileExplorer';
+import { NotebookExplorer } from './NotebookExplorer';
 import DOMPurify from 'dompurify';
 import renderMathInElement from 'katex/contrib/auto-render';
 import 'katex/dist/katex.min.css';
 import { useDarkMode } from '../../hooks/useDarkMode'; // Assuming this hook exists
 import { cn } from '../../lib/utils'; // Assuming this utility exists
 import { FileExplorerIcon } from '../icons/FileExplorerIcon'; // Assuming this icon exists
-import { ThemeToggle } from '../ThemeToggle'; // Assuming this component exists
+import { AppThemeToggle } from '../AppThemeToggle'; // Assuming this component exists
 
 interface SidebarProps {
     isOpen: boolean;
@@ -115,7 +115,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <ThemeToggle />
+                        <AppThemeToggle />
                         <button
                             onClick={onClose}
                             className="p-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-xl transition-all"
@@ -164,7 +164,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
             <div className={`flex-1 overflow-y-auto ${isResizing ? 'select-none pointer-events-none' : ''}`}>
                 {activeTab === 'files' ? (
-                    <FileExplorer />
+                    <NotebookExplorer />
                 ) : activeTab === 'variables' ? (
                     variables.length === 0 ? (
                         <div className="h-full flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500">
