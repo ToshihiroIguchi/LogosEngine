@@ -1,6 +1,6 @@
 
 import React, { useRef } from 'react';
-import { Play, Trash2, PlusCircle, Clock, Square, ChevronUp, ChevronDown, Copy, Eraser, Eye, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Play, Trash2, PlusCircle, Square, ChevronUp, ChevronDown, Copy, Eraser, Eye, AlertCircle, Loader2 } from 'lucide-react';
 import MonacoEditor from '@monaco-editor/react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -200,34 +200,34 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
     }), [cell.isExecuting]);
 
     return (
-        <div className="group relative mb-6">
+        <div className="group relative mb-4">
             <style dangerouslySetInnerHTML={{
                 __html: `
-    .dark.monaco - editor,
-                .dark.monaco - editor.margin,
-                .dark.monaco - editor - background,
-                .dark.monaco - editor.inputarea.ime - input {
-    background - color: #0f172a!important;
+    .dark.monaco-editor,
+                .dark.monaco-editor .margin,
+                .dark.monaco-editor-background,
+                .dark.monaco-editor .inputarea.ime-input {
+    background-color: #0f172a!important;
 }
-                .dark.monaco - editor.view - line {
+                .dark.monaco-editor .view-line {
     color: #e2e8f0!important;
 }
                 /* Syntax Highlighting Forcing for Dark Mode */
-                .dark.monaco - editor.mtk1 { color: #e2e8f0!important; } /* Base text / Variables */
-                .dark.monaco - editor.mtk6 { color: #94a3b8!important; } /* Brackets / Punctuation */
-                .dark.monaco - editor.mtk8 { color: #4ade80!important; } /* Strings / Green */
-                .dark.monaco - editor.mtk7 { color: #60a5fa!important; } /* Numbers / Functions (common) */
-                .dark.monaco - editor.mtk10 { color: #f87171!important; } /* Errors / Special */
-                .dark.monaco - editor.mtk12 { color: #c084fc!important; } /* Keywords */
+                .dark.monaco-editor .mtk1 { color: #e2e8f0!important; } /* Base text / Variables */
+                .dark.monaco-editor .mtk6 { color: #94a3b8!important; } /* Brackets / Punctuation */
+                .dark.monaco-editor .mtk8 { color: #4ade80!important; } /* Strings / Green */
+                .dark.monaco-editor .mtk7 { color: #60a5fa!important; } /* Numbers / Functions (common) */
+                .dark.monaco-editor .mtk10 { color: #f87171!important; } /* Errors / Special */
+                .dark.monaco-editor .mtk12 { color: #c084fc!important; } /* Keywords */
                 /* Force expand color specifically if it's mtk7 or common */
-                .dark.monaco - editor[class*= "mtk"] { filter: brightness(1.2); }
+                .dark.monaco-editor[class*="mtk"] { filter: brightness(1.2); }
 
                 /* Better Current Line Highlight - Best Practice */
-                .dark.monaco - editor.current - line {
-    background - color: #1e293b!important; /* Slate-800 */
+                .dark.monaco-editor .current-line {
+    background-color: #1e293b!important; /* Slate-800 */
     border: none!important;
 }
-                .dark.monaco - editor.current - line - exact {
+                .dark.monaco-editor .current-line-exact {
     border: none!important;
 }
 ` }} />
@@ -235,119 +235,108 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                 "flex flex-col border rounded-xl transition-colors duration-200 bg-white dark:bg-slate-900 relative overflow-visible print:border-none print:shadow-none",
                 cell.isExecuting ? (isQueued ? "ring-2 ring-amber-400 border-amber-400 shadow-md z-20" : "ring-2 ring-blue-400 border-blue-400 shadow-md z-20") : "border-gray-200 dark:border-slate-800 shadow-sm dark:shadow-none hover:border-gray-300 dark:hover:border-slate-700 hover:z-[50] focus-within:z-[50]"
             )}>
-                <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50/50 dark:bg-slate-800/30 border-b border-gray-100 dark:border-slate-800 opacity-60 group-hover:opacity-100 transition-opacity rounded-t-xl print:hidden">
-                    <div className="flex items-center gap-3">
-                        {/* Status Icon & Time - NOW INTERACTIVE (Left Gutter Execution) */}
-                        <button
-                            onClick={async (e) => {
-                                e.stopPropagation();
-                                if (cell.isExecuting) {
-                                    interrupt();
+
+                {/* FLOATING CONTROLS CONTAINER */}
+
+                {/* 1. Left Gutter: Execution Button (VIVID) */}
+                <div className="absolute top-3 -left-3 md:left-2 z-30 flex flex-col items-center gap-1 opacity-100">
+                    <button
+                        onClick={async (e) => {
+                            e.stopPropagation();
+                            if (cell.isExecuting) {
+                                interrupt();
+                            } else {
+                                if (cell.type === 'markdown') {
+                                    setCellEditing(cell.id, false);
                                 } else {
-                                    if (cell.type === 'markdown') {
-                                        setCellEditing(cell.id, false);
-                                    } else {
-                                        await executeCell(cell.id);
-                                    }
-                                    selectNextCell(cell.id);
+                                    await executeCell(cell.id);
                                 }
-                            }}
-                            className="flex items-center gap-2 min-w-[60px] cursor-pointer group/status focus:outline-none"
-                            title={cell.isExecuting ? "Interrupt execution" : "Run cell"}
-                        >
-                            {cell.isExecuting ? (
-                                <div className="flex items-center gap-2">
-                                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-500 group-hover/status:bg-red-100 dark:group-hover/status:bg-red-900/30 group-hover/status:text-red-500 transition-colors">
-                                        <Loader2 size={14} className="animate-spin group-hover/status:hidden" />
-                                        <Square size={12} className="hidden group-hover/status:block fill-current" />
-                                    </div>
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-500 group-hover/status:text-red-500">
-                                        <span className="group-hover/status:hidden">Running</span>
-                                        <span className="hidden group-hover/status:inline">Stop</span>
-                                    </span>
-                                </div>
-                            ) : cell.outputs.some(o => o.type === 'error') ? (
-                                <div className="flex items-center gap-2">
-                                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/30 text-red-500 group-hover/status:bg-blue-600 group-hover/status:text-white transition-all shadow-sm">
-                                        <AlertCircle size={14} className="group-hover/status:hidden" />
-                                        <Play size={12} className="hidden group-hover/status:block fill-current ml-0.5" />
-                                    </div>
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-red-500 group-hover/status:hidden">Error</span>
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 hidden group-hover/status:inline">Run</span>
-                                </div>
-                            ) : (!cell.isExecuting && cell.executionCount) ? (
-                                <div className="flex items-center gap-2">
-                                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-500 group-hover/status:bg-blue-600 group-hover/status:text-white transition-all shadow-sm">
-                                        <CheckCircle2 size={14} className="group-hover/status:hidden" />
-                                        <Play size={12} className="hidden group-hover/status:block fill-current ml-0.5" />
-                                    </div>
-                                    {cell.lastExecutionTime !== undefined ? (
-                                        <>
-                                            <span className="text-[10px] font-mono font-medium opacity-80 text-green-600 dark:text-green-500 group-hover/status:hidden">
-                                                {(cell.lastExecutionTime / 1000).toFixed(2)}s
-                                            </span>
-                                            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 hidden group-hover/status:inline">Run</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <span className="text-[10px] font-bold uppercase tracking-wider text-green-600 dark:text-green-500 group-hover/status:hidden">Done</span>
-                                            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 hidden group-hover/status:inline">Run</span>
-                                        </>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="flex items-center gap-2">
-                                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 group-hover/status:bg-blue-600 group-hover/status:text-white transition-all shadow-sm group-hover/status:shadow-md group-hover/status:scale-105">
-                                        <Play size={12} className="fill-current ml-0.5" />
-                                    </div>
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 opacity-60 group-hover/status:opacity-100 hidden group-hover/status:inline transition-opacity">Run</span>
-                                </div>
-                            )}
-                        </button>
-
-                        <div className="h-3 w-px bg-gray-200 dark:bg-slate-700" />
-
-                        <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-widest bg-gray-200/50 dark:bg-slate-700/50 px-1.5 py-0.5 rounded">
-                            {cell.type}
-                        </span>
-                        {isQueued && (
-                            <span className="flex items-center gap-1 text-[10px] font-medium text-amber-600 dark:text-amber-400 uppercase tracking-widest bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800">
-                                <Clock size={10} />
-                                Queued
-                            </span>
+                                selectNextCell(cell.id);
+                            }
+                        }}
+                        className={cn(
+                            "flex items-center justify-center w-8 h-8 rounded-full shadow-md border transition-all focus:outline-none backdrop-blur-sm",
+                            cell.isExecuting
+                                ? "bg-white dark:bg-slate-800 border-2 border-blue-500 dark:border-blue-400 text-blue-500 shadow-lg scale-105"
+                                : cell.outputs.some(o => o.type === 'error')
+                                    ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-500 hover:bg-red-600 hover:text-white hover:border-red-600 hover:shadow-lg hover:scale-110"
+                                    : cell.executionCount
+                                        ? "bg-white dark:bg-slate-900 border-green-400 dark:border-green-600 text-green-600 dark:text-green-500 hover:bg-green-600 hover:text-white hover:border-green-600 hover:shadow-lg hover:scale-110" // Executed: Green Border
+                                        : "bg-blue-50 dark:bg-slate-800 border-blue-200 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-600 hover:text-white hover:border-blue-600 hover:shadow-lg hover:scale-110" // Default: Blue
                         )}
-                    </div>
-                    {/* Right Menu - Simplified (Removed Play Button) */}
-                    <div className="flex items-center gap-0.5">
-                        <button onClick={() => moveCell(cell.id, 'up')} className="p-1 px-1.5 text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors" title="Move Up">
+                        title={cell.isExecuting ? "Interrupt execution" : "Run cell"}
+                    >
+                        {cell.isExecuting ? (
+                            <div className="relative flex items-center justify-center">
+                                <Loader2 size={16} className="animate-spin" />
+                                <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100">
+                                    <Square size={10} className="fill-current text-red-500" />
+                                </div>
+                            </div>
+                        ) : (
+                            <Play size={14} className="fill-current ml-0.5" />
+                        )}
+                    </button>
+
+                    {/* Execution Info (Count & Time) - Outside the button */}
+                    {!cell.isExecuting && cell.executionCount && (
+                        <div className="flex flex-col items-center gap-0.5 pointer-events-none fade-in animate-in duration-300">
+                            <span className="text-[10px] font-mono font-bold text-green-600 dark:text-green-500 leading-none">
+                                [{cell.executionCount}]
+                            </span>
+                            {cell.lastExecutionTime !== undefined && (
+                                <span className="text-[9px] text-gray-400 dark:text-gray-500 font-medium leading-none">
+                                    {(cell.lastExecutionTime / 1000).toFixed(1)}s
+                                </span>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* 2. Top Right: Action Toolbar */}
+                <div className="absolute top-2 right-2 z-30 flex items-center gap-1 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm p-1 rounded-lg shadow-sm border border-gray-100 dark:border-slate-700 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-2 group-hover:translate-y-0">
+                    <div className="flex items-center gap-0.5 px-1">
+                        <button onClick={() => moveCell(cell.id, 'up')} className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors" title="Move Up">
                             <ChevronUp size={14} />
                         </button>
-                        <button onClick={() => moveCell(cell.id, 'down')} className="p-1 px-1.5 text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors" title="Move Down">
+                        <button onClick={() => moveCell(cell.id, 'down')} className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors" title="Move Down">
                             <ChevronDown size={14} />
                         </button>
-                        <div className="w-px h-4 bg-gray-200 dark:bg-slate-800 mx-1" />
-                        <button onClick={() => duplicateCell(cell.id)} className="p-1 px-1.5 text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors" title="Duplicate">
+                    </div>
+
+                    <div className="w-px h-4 bg-gray-200 dark:bg-slate-700" />
+
+                    <div className="flex items-center gap-0.5 px-1">
+                        <button onClick={() => duplicateCell(cell.id)} className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors" title="Duplicate">
                             <Copy size={14} />
                         </button>
-                        <button onClick={() => clearCellOutput(cell.id)} className="p-1 px-1.5 text-gray-400 dark:text-gray-500 hover:text-amber-500 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded transition-colors" title="Clear Output">
+                        <button onClick={() => clearCellOutput(cell.id)} className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-amber-500 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded transition-colors" title="Clear Output">
                             <Eraser size={14} />
                         </button>
                         {cell.type === 'markdown' && !isEditing && (
-                            <button onClick={() => setCellEditing(cell.id, true)} className="p-1 px-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors" title="Edit">
+                            <button onClick={() => setCellEditing(cell.id, true)} className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors" title="Edit">
                                 <Eye size={14} />
                             </button>
                         )}
-                        <div className="w-px h-4 bg-gray-200 dark:bg-slate-800 mx-1" />
-                        <button onClick={() => deleteCell(cell.id)} className="p-1 px-1.5 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors" title="Delete">
+                        <button onClick={() => deleteCell(cell.id)} className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors" title="Delete">
                             <Trash2 size={14} />
                         </button>
                     </div>
+
+                    <div className="w-px h-4 bg-gray-200 dark:bg-slate-700" />
+
+                    {/* Cell Type Indicator (Minimal) */}
+                    <span className="text-[9px] font-bold text-gray-300 dark:text-slate-600 uppercase tracking-widest px-2 select-none">
+                        {cell.type === 'markdown' ? 'MD' : 'PY'}
+                    </span>
                 </div>
-                <div className="relative">
+
+                {/* MAIN CONTENT AREA */}
+                <div className="relative pl-12 pr-2 pt-2 pb-2"> {/* Increased left padding for the gutter area */}
                     {cell.type === 'markdown' && !isEditing ? (
                         <div
                             onDoubleClick={() => setCellEditing(cell.id, true)}
-                            className="p-6 prose prose-slate dark:prose-invert max-w-none min-h-[50px] cursor-text hover:bg-gray-50/50 dark:hover:bg-slate-800/10 transition-colors rounded-b-xl overflow-x-auto"
+                            className="p-2 prose prose-slate dark:prose-invert max-w-none min-h-[50px] cursor-text hover:bg-gray-50/50 dark:hover:bg-slate-800/10 transition-colors rounded-lg overflow-x-auto"
                         >
                             <ReactMarkdown
                                 remarkPlugins={[remarkMath, remarkGfm]}
@@ -375,27 +364,35 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                         </div>
                     ) : (
                         <MonacoEditor
-                            key={`editor - ${index} `}
-                            height={Math.max(100, (cell.content.split('\n').length + 1) * 19 + 32) + 'px'}
+                            height={Math.max(80, (cell.content.split('\n').length + 1) * 19 + 20) + 'px'} // Slightly tweaked height calc
                             language={cell.type === 'markdown' ? 'markdown' : 'python'}
                             value={cell.content}
                             onChange={handleContentChange}
                             onMount={handleEditorDidMount}
                             options={editorOptions}
                             theme={isDark ? "vs-dark" : "vs"}
+                            loading={
+                                <div className="h-full w-full py-3 pl-10 pr-4 bg-white dark:bg-slate-900 overflow-hidden">
+                                    <pre className="m-0 p-0 font-mono text-[13px] leading-[19px] text-gray-800 dark:text-slate-200 whitespace-pre">
+                                        {cell.content}
+                                    </pre>
+                                </div>
+                            }
                         />
                     )}
                 </div>
                 {cell.outputs.length > 0 && showOutputs && (
-                    <div className="border-t border-gray-100 dark:border-slate-800/50 rounded-b-xl print:border-none">
-                        <div className="mt-2">
+                    <div className="border-t border-gray-100 dark:border-slate-800/50 rounded-b-xl print:border-none ml-12"> {/* Indent outputs too to match gutter */}
+                        <div className="mt-2 text-sm">
                             <ResultView outputs={cell.outputs} executionCount={cell.executionCount} onFixError={handleFixError} />
                         </div>
                     </div>
                 )}
             </div>
-            <div className="absolute -bottom-4 left-0 right-0 flex justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 z-10 pointer-events-none print:hidden">
-                <button onClick={() => addCell('code', index)} className="pointer-events-auto bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 text-gray-400 hover:text-blue-500 hover:border-blue-300 hover:shadow-lg rounded-full p-1.5 transition-all transform hover:scale-110">
+
+            {/* Add Cell Button (centered bottom) */}
+            <div className="absolute -bottom-5 left-0 right-0 flex justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 z-10 pointer-events-none print:hidden">
+                <button onClick={() => addCell('code', index)} className="pointer-events-auto bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 text-gray-400 hover:text-blue-500 hover:border-blue-300 hover:shadow-lg rounded-full p-1.5 transition-all transform hover:scale-110 shadow-sm">
                     <PlusCircle size={18} />
                 </button>
             </div>
