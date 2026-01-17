@@ -1,4 +1,4 @@
-import React from 'react';
+import { ThisShouldFailBuild } from './non-existent-file';
 import { NotebookProvider } from './state/AppNotebookContext';
 import { NotebookContainer } from './components/Notebook/NotebookContainer';
 
