@@ -237,33 +237,73 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
             )}>
                 <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50/50 dark:bg-slate-800/30 border-b border-gray-100 dark:border-slate-800 opacity-60 group-hover:opacity-100 transition-opacity rounded-t-xl print:hidden">
                     <div className="flex items-center gap-3">
-                        {/* Status Icon & Time */}
-                        <div className="flex items-center gap-2 min-w-[60px]">
+                        {/* Status Icon & Time - NOW INTERACTIVE (Left Gutter Execution) */}
+                        <button
+                            onClick={async (e) => {
+                                e.stopPropagation();
+                                if (cell.isExecuting) {
+                                    interrupt();
+                                } else {
+                                    if (cell.type === 'markdown') {
+                                        setCellEditing(cell.id, false);
+                                    } else {
+                                        await executeCell(cell.id);
+                                    }
+                                    selectNextCell(cell.id);
+                                }
+                            }}
+                            className="flex items-center gap-2 min-w-[60px] cursor-pointer group/status focus:outline-none"
+                            title={cell.isExecuting ? "Interrupt execution" : "Run cell"}
+                        >
                             {cell.isExecuting ? (
-                                <div className="flex items-center gap-1.5 text-blue-500">
-                                    <Loader2 size={14} className="animate-spin" />
-                                    <span className="text-[10px] font-bold uppercase tracking-wider">Running</span>
+                                <div className="flex items-center gap-2">
+                                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-500 group-hover/status:bg-red-100 dark:group-hover/status:bg-red-900/30 group-hover/status:text-red-500 transition-colors">
+                                        <Loader2 size={14} className="animate-spin group-hover/status:hidden" />
+                                        <Square size={12} className="hidden group-hover/status:block fill-current" />
+                                    </div>
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-500 group-hover/status:text-red-500">
+                                        <span className="group-hover/status:hidden">Running</span>
+                                        <span className="hidden group-hover/status:inline">Stop</span>
+                                    </span>
                                 </div>
                             ) : cell.outputs.some(o => o.type === 'error') ? (
-                                <div className="flex items-center gap-1.5 text-red-500">
-                                    <AlertCircle size={14} />
-                                    <span className="text-[10px] font-bold uppercase tracking-wider">Error</span>
+                                <div className="flex items-center gap-2">
+                                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/30 text-red-500 group-hover/status:bg-blue-600 group-hover/status:text-white transition-all shadow-sm">
+                                        <AlertCircle size={14} className="group-hover/status:hidden" />
+                                        <Play size={12} className="hidden group-hover/status:block fill-current ml-0.5" />
+                                    </div>
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-red-500 group-hover/status:hidden">Error</span>
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 hidden group-hover/status:inline">Run</span>
                                 </div>
                             ) : (!cell.isExecuting && cell.executionCount) ? (
-                                <div className="flex items-center gap-1.5 text-green-500">
-                                    <CheckCircle2 size={14} />
-                                    {cell.lastExecutionTime !== undefined && (
-                                        <span className="text-[10px] font-mono font-medium opacity-80">
-                                            {(cell.lastExecutionTime / 1000).toFixed(2)}s
-                                        </span>
+                                <div className="flex items-center gap-2">
+                                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-500 group-hover/status:bg-blue-600 group-hover/status:text-white transition-all shadow-sm">
+                                        <CheckCircle2 size={14} className="group-hover/status:hidden" />
+                                        <Play size={12} className="hidden group-hover/status:block fill-current ml-0.5" />
+                                    </div>
+                                    {cell.lastExecutionTime !== undefined ? (
+                                        <>
+                                            <span className="text-[10px] font-mono font-medium opacity-80 text-green-600 dark:text-green-500 group-hover/status:hidden">
+                                                {(cell.lastExecutionTime / 1000).toFixed(2)}s
+                                            </span>
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 hidden group-hover/status:inline">Run</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-green-600 dark:text-green-500 group-hover/status:hidden">Done</span>
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 hidden group-hover/status:inline">Run</span>
+                                        </>
                                     )}
                                 </div>
                             ) : (
-                                <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 font-mono tracking-wider uppercase">
-                                    Ready
-                                </span>
+                                <div className="flex items-center gap-2">
+                                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 group-hover/status:bg-blue-600 group-hover/status:text-white transition-all shadow-sm group-hover/status:shadow-md group-hover/status:scale-105">
+                                        <Play size={12} className="fill-current ml-0.5" />
+                                    </div>
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 opacity-60 group-hover/status:opacity-100 hidden group-hover/status:inline transition-opacity">Run</span>
+                                </div>
                             )}
-                        </div>
+                        </button>
 
                         <div className="h-3 w-px bg-gray-200 dark:bg-slate-700" />
 
@@ -277,6 +317,7 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                             </span>
                         )}
                     </div>
+                    {/* Right Menu - Simplified (Removed Play Button) */}
                     <div className="flex items-center gap-0.5">
                         <button onClick={() => moveCell(cell.id, 'up')} className="p-1 px-1.5 text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors" title="Move Up">
                             <ChevronUp size={14} />
@@ -291,33 +332,12 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                         <button onClick={() => clearCellOutput(cell.id)} className="p-1 px-1.5 text-gray-400 dark:text-gray-500 hover:text-amber-500 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded transition-colors" title="Clear Output">
                             <Eraser size={14} />
                         </button>
-                        <div className="w-px h-4 bg-gray-200 dark:bg-slate-800 mx-1" />
                         {cell.type === 'markdown' && !isEditing && (
                             <button onClick={() => setCellEditing(cell.id, true)} className="p-1 px-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors" title="Edit">
                                 <Eye size={14} />
                             </button>
                         )}
-                        {cell.isExecuting ? (
-                            <button onClick={interrupt} className="p-1 px-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors animate-pulse">
-                                <Square size={14} fill="currentColor" />
-                            </button>
-                        ) : (
-                            <button
-                                onClick={async () => {
-                                    if (cell.type === 'markdown') {
-                                        setCellEditing(cell.id, false);
-                                    } else {
-                                        await executeCell(cell.id);
-                                    }
-                                    selectNextCell(cell.id);
-                                }}
-                                disabled={cell.isExecuting}
-                                className="p-1 px-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors disabled:opacity-30"
-                                title={cell.type === 'markdown' ? 'Render' : 'Execute'}
-                            >
-                                <Play size={14} fill="currentColor" />
-                            </button>
-                        )}
+                        <div className="w-px h-4 bg-gray-200 dark:bg-slate-800 mx-1" />
                         <button onClick={() => deleteCell(cell.id)} className="p-1 px-1.5 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors" title="Delete">
                             <Trash2 size={14} />
                         </button>
