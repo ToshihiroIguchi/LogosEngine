@@ -1,17 +1,24 @@
 import type { languages } from 'monaco-editor';
 import type { CompletionResponse } from '../worker/workerTypes';
 
+const isRegistered = { value: false };
+
 export function registerPythonCompletionProvider(
     monaco: typeof import('monaco-editor'),
     getCompletions: (code: string, position: number) => Promise<CompletionResponse>
 ): void {
+    if (isRegistered.value) {
+        return;
+    }
+
     console.log('[Monaco] Registering Python completion provider');
     monaco.languages.registerCompletionItemProvider('python', {
         provideCompletionItems: async (model, position) => {
-            console.log('[Monaco] provideCompletionItems called');
+            // Log only on first activation or minimal logging if needed
+            // console.log('[Monaco] provideCompletionItems called');
             const code = model.getValue();
             const offset = model.getOffsetAt(position);
-            console.log('[Monaco] Code:', code, 'Offset:', offset);
+            // console.log('[Monaco] Code:', code, 'Offset:', offset);
 
             const response = await getCompletions(code, offset);
             console.log('[Monaco] Got completions:', response);
@@ -52,4 +59,6 @@ export function registerPythonCompletionProvider(
             return { suggestions };
         }
     });
+
+    isRegistered.value = true;
 }

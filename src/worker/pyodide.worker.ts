@@ -881,7 +881,17 @@ async function initPyodide() {
 
         console.log(`Worker: Engine Ready (SymPy only). Total init time: ${total.toFixed(0)}ms`);
         self.postMessage({ type: 'READY' });
-        self.postMessage({ type: 'PROFILE', timings });
+
+        // Send detailed profiling data
+        self.postMessage({
+            type: 'PROFILE',
+            timings: {
+                'Load Pyodide Library': timings['load_pyodide'] || 0,
+                'Load Critical Packages (SymPy)': timings['load_critical_packages'] || 0,
+                'Initialize Python Context': timings['init_context'] || 0,
+                'Total Initialization': total
+            }
+        });
 
         // STAGE 2: Load heavy packages in background
         console.log('Worker: Starting background load of matplotlib...');
