@@ -379,6 +379,16 @@ def setup_context(ctx):
     # Default symbols
     ctx['x'], ctx['y'], ctx['z'], ctx['t'] = ctx['symbols']('x y z t')
     
+    # Pre-import key plotting functions for seamless 3D/implicit support
+    try:
+        from sympy.plotting import plot3d, plot_implicit, plot_parametric, plot3d_parametric_surface
+        ctx['plot3d'] = plot3d
+        ctx['plot_implicit'] = plot_implicit
+        ctx['plot_parametric'] = plot_parametric
+        ctx['plot3d_parametric_surface'] = plot3d_parametric_surface
+    except:
+        pass
+
     # Initialize Out dictionary and _ variable
     # We use a dedicated dictionary for Out to prevent accidental overwrites
     ctx['Out'] = {}

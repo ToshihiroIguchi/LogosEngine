@@ -39,12 +39,10 @@ solve([x + y - 2, x - y], [x, y])`
     {
         title: "3D Surface Plot",
         code: `# 3D Surface Plot: Sombrero Function
-from sympy.plotting import plot3d
-
 # r is the distance from the origin
 r = sqrt(x**2 + y**2)
 
-# plot3d allows visualizing functions of two variables
+# plot3d is pre-imported for a seamless experience
 # We use points=80 for a smooth mesh
 plot3d(sin(r)/r, (x, -10, 10), (y, -10, 10), points=80)`
     },
