@@ -7,8 +7,6 @@ import renderMathInElement from 'katex/contrib/auto-render';
 import 'katex/dist/katex.min.css';
 import { useDarkMode } from '../../hooks/useDarkMode'; // Assuming this hook exists
 import { cn } from '../../lib/utils'; // Assuming this utility exists
-import { FileExplorerIcon } from '../icons/FileExplorerIcon'; // Assuming this icon exists
-import { AppThemeToggle } from '../AppThemeToggle'; // Assuming this component exists
 
 interface SidebarProps {
     isOpen: boolean;
@@ -102,64 +100,54 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 onMouseDown={startResizing}
             />
 
-            {/* Tab Header */}
-            <div className="flex-none p-6 border-b border-gray-100 dark:border-slate-800">
-                <div className="flex items-center justify-between mb-8">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-purple-50 dark:bg-purple-900/30 rounded-xl text-purple-600 dark:text-purple-400 border border-purple-100 dark:border-purple-800/50">
-                            <FileExplorerIcon size={20} />
-                        </div>
-                        <div>
-                            <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 tracking-tight">Workbench</h2>
-                            <p className="text-[10px] text-gray-400 dark:text-slate-400 font-bold uppercase tracking-widest mt-0.5">Control Center</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <AppThemeToggle />
-                        <button
-                            onClick={onClose}
-                            className="p-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-xl transition-all"
-                        >
-                            <X size={20} />
-                        </button>
-                    </div>
-                </div>
-
-                <div className="flex bg-gray-100/50 dark:bg-slate-800/50 p-1 rounded-xl border border-gray-200/50 dark:border-slate-700/50">
+            {/* Compact Header */}
+            <div className="flex-none p-3 border-b border-gray-100 dark:border-slate-800 flex items-center gap-2 bg-gray-50/50 dark:bg-slate-900/50">
+                <div className="flex-1 flex bg-gray-200/50 dark:bg-slate-800 p-1 rounded-lg border border-gray-200/50 dark:border-slate-700/50">
                     <button
                         onClick={() => setActiveTab('files')}
                         className={cn(
-                            "flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-bold rounded-lg transition-all",
+                            "flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-bold rounded-md transition-all uppercase tracking-wide",
                             activeTab === 'files'
                                 ? 'bg-white dark:bg-slate-700 text-purple-600 dark:text-purple-400 shadow-sm border border-gray-200/50 dark:border-slate-600/50'
                                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                         )}
+                        title="File Explorer"
                     >
-                        <FolderOpen size={14} /> Explorer
+                        <FolderOpen size={14} /> Files
                     </button>
                     <button
                         onClick={() => setActiveTab('variables')}
                         className={cn(
-                            "flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-bold rounded-lg transition-all",
+                            "flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-bold rounded-md transition-all uppercase tracking-wide",
                             activeTab === 'variables'
                                 ? 'bg-white dark:bg-slate-700 text-purple-600 dark:text-purple-400 shadow-sm border border-gray-200/50 dark:border-slate-600/50'
                                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                         )}
+                        title="Variable Inspector"
                     >
-                        <Database size={14} /> Variables
+                        <Database size={14} /> Vars
                     </button>
                     <button
                         onClick={() => setActiveTab('documentation')}
                         className={cn(
-                            "flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-bold rounded-lg transition-all",
+                            "flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-bold rounded-md transition-all uppercase tracking-wide",
                             activeTab === 'documentation'
                                 ? 'bg-white dark:bg-slate-700 text-purple-600 dark:text-purple-400 shadow-sm border border-gray-200/50 dark:border-slate-600/50'
                                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                         )}
+                        title="Documentation Search"
                     >
                         <HelpCircle size={14} /> Help
                     </button>
                 </div>
+
+                <button
+                    onClick={onClose}
+                    className="p-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200/50 dark:hover:bg-slate-800 rounded-lg transition-all"
+                    title="Close Sidebar"
+                >
+                    <X size={16} />
+                </button>
             </div>
 
             <div className={`flex-1 overflow-y-auto ${isResizing ? 'select-none pointer-events-none' : ''}`}>
