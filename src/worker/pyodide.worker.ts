@@ -846,15 +846,16 @@ async function initPyodide() {
     console.log('Worker: Initializing Pyodide (v0.29.0)...');
     try {
         const t1 = performance.now();
+        console.log(`Worker: Loading Pyodide from ${location.origin}/pyodide/`);
         pyodide = await loadPyodide({
-            indexURL: "https://cdn.jsdelivr.net/pyodide/v0.29.0/full/"
+            indexURL: "/pyodide/"
         });
         logTime('load_pyodide', performance.now() - t1);
 
         console.log('Worker: Loading critical packages (sympy, docutils)...');
         const t2 = performance.now();
         // STAGE 1: Load only critical packages
-        await pyodide.loadPackage(['sympy', 'docutils']);
+        await pyodide.loadPackage(['sympy', 'docutils'], { checkIntegrity: false });
         logTime('load_critical_packages', performance.now() - t2);
 
         console.log('Worker: Running initial Python code...');
@@ -898,7 +899,7 @@ async function initPyodide() {
         const tBackground = performance.now();
         matplotlibPromise = (async () => {
             try {
-                await pyodide.loadPackage(['matplotlib']);
+                await pyodide.loadPackage(['matplotlib'], { checkIntegrity: false });
 
                 // Post-load setup for matplotlib
                 await pyodide.runPythonAsync(`
