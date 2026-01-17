@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Moon, Sun, Monitor } from 'lucide-react';
 import { useDarkMode, type Theme } from '../hooks/useDarkMode';
 
@@ -36,8 +36,8 @@ export const ThemeToggle: React.FC = () => {
                                     setIsOpen(false);
                                 }}
                                 className={`w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors ${theme === t.id
-                                        ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 font-semibold'
-                                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700'
+                                    ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 font-semibold'
+                                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700'
                                     }`}
                             >
                                 <t.icon size={14} />

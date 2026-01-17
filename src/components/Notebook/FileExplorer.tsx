@@ -5,7 +5,7 @@ import { useDarkMode } from '../../hooks/useDarkMode';
 import { cn } from '../../lib/utils';
 
 export const FileExplorer: React.FC = () => {
-    const { fileList, currentNotebookId, setCurrentNotebookId, createNotebook, deleteNotebook } = useNotebook();
+    const { fileList, currentNotebookId, openNotebook, createNotebook, deleteNotebook } = useNotebook();
     const [searchTerm, setSearchTerm] = useState('');
     useDarkMode();
 
@@ -55,7 +55,7 @@ export const FileExplorer: React.FC = () => {
                                     ? "bg-purple-50 dark:bg-purple-900/30 border-purple-200 dark:border-purple-800 shadow-sm"
                                     : "bg-white dark:bg-slate-800 border-gray-100 dark:border-slate-800 hover:border-purple-200 dark:hover:border-purple-800 hover:shadow-sm"
                             )}
-                            onClick={() => setCurrentNotebookId(file.id)}
+                            onClick={() => openNotebook(file.id)}
                         >
                             <div className="flex items-center gap-3 truncate">
                                 <FileText size={16} className={currentNotebookId === file.id ? "text-purple-600 dark:text-purple-400" : "text-gray-400 dark:text-gray-500 group-hover:text-purple-400"} />

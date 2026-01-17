@@ -11,8 +11,6 @@ import { DisclaimerModal } from './DisclaimerModal';
 import { Sidebar } from './Sidebar';
 import { EXAMPLES } from '../../constants/examples'; // Changed path
 import { ThemeToggle } from '../ThemeToggle'; // Added import
-import { useDarkMode } from '../../hooks/useDarkMode'; // Added import
-import { usePyodide } from '../../hooks/usePyodide'; // Added import
 
 export const NotebookContainer: React.FC = () => {
     const {
@@ -26,7 +24,6 @@ export const NotebookContainer: React.FC = () => {
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [editTitleValue, setEditTitleValue] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
-    useDarkMode();
 
     const currentNotebook = fileList.find(m => m.id === currentNotebookId);
 

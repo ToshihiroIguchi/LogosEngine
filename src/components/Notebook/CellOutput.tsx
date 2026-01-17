@@ -3,7 +3,6 @@ import { Copy, Check, ChevronDown, Code, Table, FileText } from 'lucide-react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import type { Output } from '../../types';
-import { useDarkMode } from '../../hooks/useDarkMode'; // Added this import
 import { cn } from '../../lib/utils'; // Added this import
 
 interface CellOutputProps {
@@ -13,7 +12,6 @@ interface CellOutputProps {
 }
 
 export const CellOutput: React.FC<CellOutputProps> = ({ outputs, executionCount, onFixError }) => {
-    const { isDark } = useDarkMode(); // Added useDarkMode hook
     const validOutputs = outputs.filter(o => o.value && o.value.trim().length > 0);
 
     if (validOutputs.length === 0) return null;
@@ -111,7 +109,6 @@ const CopyMenu: React.FC<{ output: Output }> = ({ output }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [copied, setCopied] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
-    const { isDark } = useDarkMode(); // Added useDarkMode hook
 
     const handleCopy = async (text: string) => {
         try {
