@@ -113,7 +113,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                         )}
                         title="File Explorer"
                     >
-                        <FolderOpen size={14} /> Files
+                        <FolderOpen size={14} /> Notebooks
                     </button>
                     <button
                         onClick={() => setActiveTab('variables')}
@@ -125,7 +125,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                         )}
                         title="Variable Inspector"
                     >
-                        <Database size={14} /> Vars
+                        <Database size={14} /> Variables
                     </button>
                     <button
                         onClick={() => setActiveTab('documentation')}

@@ -183,16 +183,17 @@ export const MainContainer: React.FC = () => {
                     <div className="flex items-center bg-gray-100/50 dark:bg-slate-800/50 p-1 rounded-xl border border-gray-200/50 dark:border-slate-700/50 gap-1">
                         <button
                             onClick={() => toggleSidebarTab('files')}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-300 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 transition-all font-medium text-xs whitespace-nowrap"
-                            title="Open Notebook Explorer"
+                            className="flex items-center justify-center w-8 h-8 bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-300 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 transition-all"
+                            title="Notebook Explorer"
                         >
-                            <FolderOpen size={14} />Notebooks
+                            <FolderOpen size={16} />
                         </button>
                         <button
                             onClick={() => toggleSidebarTab('variables')}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-400 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all font-medium text-xs whitespace-nowrap"
+                            className="flex items-center justify-center w-8 h-8 bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-400 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all"
+                            title="Variable Inspector"
                         >
-                            <Database size={14} />Variables
+                            <Database size={16} />
                         </button>
 
                         <div className="relative">
