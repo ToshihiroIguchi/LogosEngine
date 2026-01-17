@@ -40,6 +40,13 @@ export function usePyodide() {
                 return;
             }
 
+            if (data.type === 'PROFILE') {
+                console.group('🚀 Logos Engine Startup Profile');
+                console.table((data as any).timings);
+                console.groupEnd();
+                return;
+            }
+
 
 
             const { id } = data as WorkerResponse;

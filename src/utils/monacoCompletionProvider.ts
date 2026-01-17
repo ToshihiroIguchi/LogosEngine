@@ -1,14 +1,20 @@
 import type { languages } from 'monaco-editor';
 import type { CompletionResponse } from '../worker/workerTypes';
 
+let isRegistered = false;
+
 export function registerPythonCompletionProvider(
     monaco: typeof import('monaco-editor'),
     getCompletions: (code: string, position: number) => Promise<CompletionResponse>
 ): void {
+    if (isRegistered) {
+        return;
+    }
+
     console.log('[Monaco] Registering Python completion provider');
     monaco.languages.registerCompletionItemProvider('python', {
         provideCompletionItems: async (model, position) => {
-            console.log('[Monaco] provideCompletionItems called');
+            // console.log('[Monaco] provideCompletionItems called');
             const code = model.getValue();
             const offset = model.getOffsetAt(position);
             console.log('[Monaco] Code:', code, 'Offset:', offset);
@@ -52,4 +58,5 @@ export function registerPythonCompletionProvider(
             return { suggestions };
         }
     });
+    isRegistered = true;
 }
