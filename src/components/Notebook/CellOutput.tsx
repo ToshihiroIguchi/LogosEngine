@@ -3,7 +3,7 @@ import { Copy, Check, ChevronDown, Code, Table, FileText } from 'lucide-react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import type { Output } from '../../types';
-import { cn } from '../../lib/utils'; // Added this import
+import { cn } from '../../lib/utils';
 
 interface CellOutputProps {
     outputs: Output[];
@@ -20,14 +20,12 @@ export const CellOutput: React.FC<CellOutputProps> = ({ outputs, executionCount,
         <div className="mt-1 space-y-4 border-l-2 border-gray-100 dark:border-slate-700 pl-4 py-2 bg-gray-50/30 dark:bg-slate-800/30 rounded-r-lg">
             {validOutputs.map((output, idx) => (
                 <div key={`${output.timestamp}-${idx}`} className="group relative flex gap-4 animate-in fade-in slide-in-from-top-1 duration-300">
-                    {/* Output Label */}
                     <div className="flex-shrink-0 w-12 pt-1 text-right">
                         <span className="text-[10px] font-bold text-gray-400 dark:text-slate-400 font-mono tracking-tighter opacity-80">
                             {executionCount ? `Out [${executionCount}]:` : 'Out:'}
                         </span>
                     </div>
 
-                    {/* Output Content Area */}
                     <div className="flex-1 min-w-0 flex flex-col gap-1 relative pr-10">
                         {output.type === 'latex' ? (
                             <LatexRenderer value={output.value} />
@@ -92,7 +90,6 @@ export const CellOutput: React.FC<CellOutputProps> = ({ outputs, executionCount,
                             </pre>
                         )}
 
-                        {/* Hover Copy Menu */}
                         {output.type !== 'image' && (
                             <div className="absolute top-0 right-0">
                                 <CopyMenu output={output} />
