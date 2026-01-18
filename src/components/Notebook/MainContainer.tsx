@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
     Download, PlayCircle, Loader2, Info, BookOpen, ChevronDown, Upload,
     Square, Database, Printer, Eraser, FileText, Code, RefreshCw,
-    Pencil, Check, CheckCircle2, CloudUpload, FolderOpen, MoreVertical
+    Pencil, Check, CheckCircle2, CloudUpload, FolderOpen, MoreVertical, ChevronRight
 } from 'lucide-react';
 import { useNotebook } from '../../state/AppNotebookContext';
 import { CellItem } from './CellItem';
@@ -23,6 +23,7 @@ export const MainContainer: React.FC = () => {
     const [showDisclaimer, setShowDisclaimer] = useState(false);
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [editTitleValue, setEditTitleValue] = useState('');
+    const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const currentNotebook = fileList.find(m => m.id === currentNotebookId);
@@ -91,9 +92,18 @@ export const MainContainer: React.FC = () => {
         setIsEditingTitle(false);
     };
 
+
     const toggleSidebarTab = (tab: 'files' | 'variables') => {
         setActiveTab(tab);
         setIsSidebarOpen(true);
+    };
+
+    const toggleCategory = (category: string) => {
+        setExpandedCategories(prev =>
+            prev.includes(category)
+                ? prev.filter(c => c !== category)
+                : [...prev, category]
+        );
     };
 
     return (
@@ -205,16 +215,39 @@ export const MainContainer: React.FC = () => {
                             </button>
                             {showExamples && (
                                 <div className="absolute top-full mt-2 right-0 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-lg w-64 max-h-96 overflow-y-auto z-50">
-                                    {EXAMPLES.map((example: { title: string; code: string }, idx: number) => (
-                                        <button
-                                            key={idx}
-                                            onClick={() => handleInsertExample(example.code)}
-                                            className="w-full text-left px-4 py-3 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors border-b border-gray-100 dark:border-slate-700 last:border-b-0"
-                                        >
-                                            <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">{example.title}</div>
-                                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-mono truncate">{example.code.split('\n')[1]}</div>
-                                        </button>
-                                    ))}
+                                    {EXAMPLES.map((category, catIdx) => {
+                                        const isExpanded = expandedCategories.includes(category.category);
+                                        return (
+                                            <div key={catIdx} className="border-b border-gray-100 dark:border-slate-700 last:border-b-0">
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); toggleCategory(category.category); }}
+                                                    className="w-full flex items-center justify-between px-4 py-2.5 bg-gray-50 dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+                                                >
+                                                    <span className="text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                                                        {category.category}
+                                                    </span>
+                                                    {isExpanded ? <ChevronDown size={14} className="text-gray-400" /> : <ChevronRight size={14} className="text-gray-400" />}
+                                                </button>
+
+                                                {isExpanded && (
+                                                    <div className="bg-white dark:bg-slate-800">
+                                                        {category.items.map((example, itemIdx) => (
+                                                            <button
+                                                                key={itemIdx}
+                                                                onClick={() => handleInsertExample(example.code)}
+                                                                className="w-full text-left px-4 py-2 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors border-l-2 border-transparent hover:border-purple-400 flex flex-col gap-0.5"
+                                                            >
+                                                                <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">{example.title}</div>
+                                                                <div className="text-[10px] text-gray-400 dark:text-gray-500 font-mono truncate max-w-full opacity-70">
+                                                                    {example.code.split('\n').find(line => !line.startsWith('#') && line.trim()) || 'Code...'}
+                                                                </div>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
