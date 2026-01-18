@@ -38,6 +38,10 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
     const selectNextCellRef = useRef(selectNextCell);
     const setCellEditingRef = useRef(setCellEditing);
 
+    // Auto-fix retry counter
+    const autoRetryCount = useRef(0);
+    const MAX_AUTO_RETRIES = 2;
+
     // Keep the refs updated with the latest functions to prevent stale closures
     React.useEffect(() => {
         executeCellRef.current = executeCell;
@@ -65,6 +69,9 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                 monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter
             ],
             run: async () => {
+                // Reset retry count on manual execution
+                autoRetryCount.current = 0;
+
                 if (cell.type === 'markdown') {
                     setCellEditingRef.current(cell.id, false);
                 } else {
@@ -144,6 +151,22 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
             }
         }
     };
+
+    // Auto-fix monitoring
+    React.useEffect(() => {
+        if (cell.isExecuting) return;
+
+        const errorOutput = cell.outputs.find(o => o.type === 'error' && o.missingVariables && o.missingVariables.length > 0);
+
+        if (errorOutput && errorOutput.missingVariables && errorOutput.missingVariables.length > 0) {
+            // Check if we can auto-retry
+            if (autoRetryCount.current < MAX_AUTO_RETRIES) {
+                console.log(`Auto-defining variables: ${errorOutput.missingVariables.join(', ')} (Attempt ${autoRetryCount.current + 1}/${MAX_AUTO_RETRIES})`);
+                autoRetryCount.current += 1;
+                handleFixError(errorOutput.missingVariables);
+            }
+        }
+    }, [cell.outputs, cell.isExecuting]);
 
     const handleFixError = (variables: string[]) => {
         if (!variables || variables.length === 0) return;
@@ -277,6 +300,9 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                         ) : (
                             <button
                                 onClick={async () => {
+                                    // Reset retry count on manual execution
+                                    autoRetryCount.current = 0;
+
                                     if (cell.type === 'markdown') {
                                         setCellEditing(cell.id, false);
                                     } else {
@@ -342,7 +368,19 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                 {cell.outputs.length > 0 && showOutputs && (
                     <div className="border-t border-gray-100 dark:border-slate-800/50 rounded-b-xl print:border-none">
                         <div className="mt-2">
-                            <ResultView outputs={cell.outputs} executionCount={cell.executionCount} onFixError={handleFixError} />
+                            <ResultView
+                                outputs={cell.outputs.filter(o => {
+                                    // Hide error if it's being auto-fixed (retry count < max)
+                                    if (o.type === 'error' && o.missingVariables && o.missingVariables.length > 0) {
+                                        if (autoRetryCount.current < MAX_AUTO_RETRIES) {
+                                            return false;
+                                        }
+                                    }
+                                    return true;
+                                })}
+                                executionCount={cell.executionCount}
+                                onFixError={handleFixError}
+                            />
                         </div>
                     </div>
                 )}
