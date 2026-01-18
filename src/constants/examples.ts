@@ -20,87 +20,94 @@ export const EXAMPLES = [
     {
         title: "Basic Calculus",
         code: `# Differentiation
-diff(sin(x), x)
+diff(sin(x)*exp(x), x)
 
 # Integration
-integrate(1/x, x)
+integrate(exp(-x**2), (x, -oo, oo))
 
-# Definite integral
-integrate(x**2, (x, 0, 1))`
+# Limit
+limit(sin(x)/x, x, 0)`
     },
     {
-        title: "Equation Solving",
-        code: `# Solve algebraic equation
-solve(x**2 - 4, x)
+        title: "Algebra & Equations",
+        code: `# Solve quadratic equation
+solve(x**2 - x - 1, x)
 
-# Solve system of equations
-solve([x + y - 2, x - y], [x, y])`
+# Solve system of linear equations
+solve([x + y - 2, 2*x - y - 1], [x, y])`
+    },
+    {
+        title: "Differential Equations",
+        code: `# Solve Ordinary Differential Equation (ODE)
+# y'' - y = e^x
+f = Function('f')
+dsolve(Derivative(f(x), x, x) - f(x) - exp(x), f(x))`
+    },
+    {
+        title: "Matrix Operations",
+        code: `M = Matrix([[1, 2], [2, 1]])
+
+# Eigenvalues
+M.eigenvals()
+
+# Eigenvectors
+M.eigenvects()
+
+# Determinant & Inverse
+(M.det(), M.inv())`
+    },
+    {
+        title: "Number Theory",
+        code: `# Prime factorization
+factorint(2026)
+
+# Check if prime
+isprime(2027)
+
+# Next prime after
+nextprime(100)`
+    },
+    {
+        title: "2D Plotting",
+        code: `# Standard Plot
+plot(sin(x), cos(x), (x, -2*pi, 2*pi))
+
+# Parametric Plot (Circle)
+# (x(u), y(u))
+plot((cos(x), sin(x)), (x, 0, 2*pi))`
     },
     {
         title: "3D Surface Plot",
-        code: `# 3D Surface Plot: Sombrero Function
-# r is the distance from the origin
+        code: `# 3D Surface Plot: Sombrero
 r = sqrt(x**2 + y**2)
-
-# plot3d is pre-imported for a seamless experience
-# We use points=80 for a smooth mesh
 plot3d(sin(r)/r, (x, -10, 10), (y, -10, 10), points=80)`
     },
     {
         title: "Series Expansion",
-        code: `# Taylor series
-series(exp(x), x, 0, 5)
+        code: `# Taylor Series
+series(tan(x), x, 0, 6)
 
-# Laurent series
-series(1/sin(x), x, 0, 3)`
+# Laurent Series
+series(1/sin(x), x, 0, 4)`
     },
     {
         title: "Simplification",
-        code: `# Simplify expression
-simplify((x**2 + 2*x + 1)/(x + 1))
+        code: `# Simplify
+simplify(sin(x)**2 + cos(x)**2)
 
 # Expand
-expand((x + 1)**3)
+expand((x + 1)**5)
 
 # Factor
-factor(x**2 - 4)`
+factor(x**3 - x**2 + x - 1)`
     },
     {
-        title: "Plotting (2D)",
-        code: `# Simple plot
-plot(sin(x))
+        title: "Complex Numbers",
+        code: `# Euler's Identity check
+N(exp(I*pi) + 1)
 
-# Multiple functions
-plot(sin(x), cos(x))
-
-# With range
-plot(x**2, (x, -5, 5))`
-    },
-    {
-        title: "Matrix Operations",
-        code: `# Create matrix
-M = Matrix([[1, 2], [3, 4]])
-
-# Determinant
-M.det()
-
-# Inverse
-M.inv()`
-    },
-    {
-        title: "Limits",
-        code: `# Limit
-limit(sin(x)/x, x, 0)
-
-# Limit at infinity
-limit(1/x, x, oo)`
-    },
-    {
-        title: "Symbolic Variables",
-        code: `# Define new symbols
-a, b, c = symbols('a b c')
-
-# Solve quadratic formula
-solve(a*x**2 + b*x + c, x)`
+# Complex operations
+z = 3 + 4*I
+(abs(z), arg(z))`
     }
 ];
