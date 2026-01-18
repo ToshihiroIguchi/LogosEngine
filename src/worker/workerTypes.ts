@@ -1,6 +1,6 @@
 import type { Output, Variable, Documentation, SearchResults } from '../types';
 
-export type WorkerAction = 'EXECUTE' | 'INTERRUPT' | 'COMPLETE' | 'RESET_CONTEXT' | 'DELETE_VARIABLE';
+export type WorkerAction = 'EXECUTE' | 'INTERRUPT' | 'COMPLETE' | 'RESET_CONTEXT' | 'DELETE_VARIABLE' | 'GET_COMPLETIONS' | 'GET_DOCS' | 'GET_HELP';
 
 export interface WorkerRequest {
     id: string;

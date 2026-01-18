@@ -1,6 +1,6 @@
 import { loadPyodide, type PyodideInterface } from 'pyodide';
-import type { WorkerRequest, CompletionRequest } from './workerTypes';
-import type { Output, Variable } from '../types';
+import type { WorkerRequest } from './workerTypes';
+import type { Output } from '../types';
 
 let pyodide: PyodideInterface;
 
@@ -44,7 +44,7 @@ function getContext(notebookId?: string) {
 }
 
 // Keys present in the context before user execution
-let ambient_keys: Set<string> = new Set();
+// Keys present in the context before user execution
 let matplotlibReady = false;
 let extensionsPromise: Promise<void> | null = null;
 
