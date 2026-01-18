@@ -209,36 +209,36 @@ export const MainContainer: React.FC = () => {
                         <div className="relative">
                             <button
                                 onClick={() => { setShowExamples(!showExamples); setShowMenu(false); }}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-400 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all font-medium text-xs whitespace-nowrap"
+                                className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-400 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all font-medium text-xs whitespace-nowrap outline-none focus:outline-none"
                             >
                                 <BookOpen size={14} />Examples<ChevronDown size={12} className={`transition-transform ${showExamples ? 'rotate-180' : ''}`} />
                             </button>
                             {showExamples && (
-                                <div className="absolute top-full mt-2 right-0 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-lg w-64 max-h-96 overflow-y-auto z-50">
+                                <div className="absolute top-full mt-2 right-0 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-lg w-64 max-h-96 overflow-y-auto z-50 outline-none">
                                     {EXAMPLES.map((category, catIdx) => {
                                         const isExpanded = expandedCategories.includes(category.category);
                                         return (
-                                            <div key={catIdx} className="border-b border-gray-100 dark:border-slate-700 last:border-b-0">
+                                            <div key={catIdx} className="border-b border-gray-200 dark:border-slate-700 last:border-b-0">
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); toggleCategory(category.category); }}
-                                                    className="w-full flex items-center justify-between px-4 py-2.5 bg-gray-50 dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+                                                    className="w-full flex items-center justify-between px-4 py-3 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors outline-none focus:outline-none"
                                                 >
-                                                    <span className="text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                                                    <span className="text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
                                                         {category.category}
                                                     </span>
-                                                    {isExpanded ? <ChevronDown size={14} className="text-gray-400" /> : <ChevronRight size={14} className="text-gray-400" />}
+                                                    {isExpanded ? <ChevronDown size={14} className="text-gray-500 dark:text-gray-400" /> : <ChevronRight size={14} className="text-gray-500 dark:text-gray-400" />}
                                                 </button>
 
                                                 {isExpanded && (
-                                                    <div className="bg-white dark:bg-slate-800">
+                                                    <div className="bg-white dark:bg-slate-950 shadow-inner">
                                                         {category.items.map((example, itemIdx) => (
                                                             <button
                                                                 key={itemIdx}
                                                                 onClick={() => handleInsertExample(example.code)}
-                                                                className="w-full text-left px-4 py-2 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors border-l-2 border-transparent hover:border-purple-400 flex flex-col gap-0.5"
+                                                                className="w-full text-left pl-10 pr-4 py-2 hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors flex flex-col gap-0.5 outline-none focus:outline-none"
                                                             >
-                                                                <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">{example.title}</div>
-                                                                <div className="text-[10px] text-gray-400 dark:text-gray-500 font-mono truncate max-w-full opacity-70">
+                                                                <div className="text-sm font-semibold text-gray-700 dark:text-gray-300 transition-colors">{example.title}</div>
+                                                                <div className="text-[10px] text-gray-400 dark:text-gray-600 font-mono truncate max-w-full opacity-80">
                                                                     {example.code.split('\n').find(line => !line.startsWith('#') && line.trim()) || 'Code...'}
                                                                 </div>
                                                             </button>
