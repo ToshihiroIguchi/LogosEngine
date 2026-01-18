@@ -26,7 +26,7 @@ interface CellItemProps {
 
 export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
     const {
-        updateCell, executeCell, deleteCell, addCell, interrupt, isReady, getCompletions,
+        updateCell, executeCell, deleteCell, addCell, interrupt, isReady, isGraphicsReady, getCompletions,
         focusedCellId, setFocusedCellId, selectNextCell,
         setCellEditing, moveCell, duplicateCell, clearCellOutput
     } = useNotebook();
@@ -159,7 +159,8 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
         executeCell(cell.id, newContent);
     };
 
-    const isQueued = cell.isExecuting && !isReady;
+    const needsGraphics = /\bplot\w*\s*\(/.test(cell.content);
+    const isQueued = cell.isExecuting && (!isReady || (needsGraphics && !isGraphicsReady));
     const isEditing = cell.isEditing !== false; // For Markdown: true=edit, false=preview. For Code: irrelevant for display but handles undefined safely.
     const showOutputs = cell.type === 'code' || !isEditing;
 

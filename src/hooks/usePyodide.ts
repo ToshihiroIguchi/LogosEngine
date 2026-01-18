@@ -65,18 +65,34 @@ export function usePyodide() {
         return () => workerRef.current?.terminate();
     }, [initWorker]);
 
-    // Flush queue when engine becomes ready
+    // Flush queue when engine becomes ready or graphics become ready
     useEffect(() => {
-        if (isReady && workerRef.current && queueRef.current.length > 0) {
-            const queue = queueRef.current;
-            queueRef.current = [];
-            queue.forEach(({ id, code, notebookId, executionCount, resolve }) => {
+        if (!workerRef.current || queueRef.current.length === 0) return;
+
+        // Check which items can be processed
+        const queue = queueRef.current;
+        const remainingQueue: typeof queue = [];
+
+        queue.forEach((item) => {
+            const { id, code, notebookId, executionCount, resolve } = item;
+
+            // Logic to determine if this item can be processed
+            const needsGraphics = /\bplot\w*\s*\(/.test(code);
+            const canRun = isReady && (!needsGraphics || isGraphicsReady);
+
+            if (canRun) {
                 resolversRef.current.set(id, resolve);
                 const request: WorkerRequest = { id, action: 'EXECUTE', code, notebookId, executionCount };
                 workerRef.current?.postMessage(request);
-            });
-        }
-    }, [isReady]);
+            } else {
+                remainingQueue.push(item);
+            }
+        });
+
+        // Update queue with remaining items
+        queueRef.current = remainingQueue;
+
+    }, [isReady, isGraphicsReady]);
 
     const interrupt = useCallback(() => {
         // Clear all pending state
@@ -107,14 +123,17 @@ export function usePyodide() {
                 workerRef.current?.postMessage(request);
             };
 
-            if (!workerRef.current || !isReady) {
+            const needsGraphics = /\bplot\w*\s*\(/.test(code);
+            const canRun = workerRef.current && isReady && (!needsGraphics || isGraphicsReady);
+
+            if (!canRun) {
                 // Queue the execution including executionCount
                 queueRef.current.push({ id, code, notebookId, executionCount, resolve: resolve as any });
             } else {
                 executeTask();
             }
         });
-    }, [isReady]);
+    }, [isReady, isGraphicsReady]);
 
     const getCompletions = useCallback((code: string, position: number, notebookId?: string): Promise<CompletionResponse> => {
         if (!workerRef.current || !isReady) return Promise.resolve({ id: '', completions: [] });
