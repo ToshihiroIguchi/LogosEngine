@@ -709,11 +709,12 @@ def load_extended_context(ctx):
     
     # Explicitly import available plotting functions
     try:
-        from sympy.plotting import plot, plot3d, plot_parametric, plot_implicit
+        from sympy.plotting import plot, plot3d, plot_parametric, plot_implicit, plot3d_parametric_surface
         ctx['plot'] = plot
         ctx['plot3d'] = plot3d
         ctx['plot_parametric'] = plot_parametric
         ctx['plot_implicit'] = plot_implicit
+        ctx['plot3d_parametric_surface'] = plot3d_parametric_surface
     except ImportError:
         pass
     
