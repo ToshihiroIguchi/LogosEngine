@@ -9,9 +9,10 @@ interface CellOutputProps {
     outputs: Output[];
     executionCount?: number;
     onFixError?: (variables: string[]) => void;
+    onMathAction?: (action: string) => void;
 }
 
-export const ResultView: React.FC<CellOutputProps> = ({ outputs, executionCount, onFixError }) => {
+export const ResultView: React.FC<CellOutputProps> = ({ outputs, executionCount, onFixError, onMathAction }) => {
     const validOutputs = outputs.filter(o => o.value && o.value.trim().length > 0);
 
     if (validOutputs.length === 0) return null;
@@ -90,7 +91,15 @@ export const ResultView: React.FC<CellOutputProps> = ({ outputs, executionCount,
                             </pre>
                         )}
 
-                        {output.type !== 'image' && (
+                        {output.type !== 'image' && output.type !== 'error' && (
+                            <div className="absolute top-0 right-0 flex items-center gap-1">
+                                {onMathAction && executionCount && (
+                                    <MathActionMenu onAction={onMathAction} />
+                                )}
+                                <CopyMenu output={output} />
+                            </div>
+                        )}
+                        {output.type !== 'image' && output.type === 'error' && (
                             <div className="absolute top-0 right-0">
                                 <CopyMenu output={output} />
                             </div>
@@ -177,6 +186,72 @@ const CopyMenu: React.FC<{ output: Output }> = ({ output }) => {
         </div>
     );
 };
+
+interface MathActionMenuProps {
+    onAction: (action: string) => void;
+}
+
+const MathActionMenu: React.FC<MathActionMenuProps> = ({ onAction }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const actions = [
+        { label: 'Expand', value: 'expand', icon: 'Expand' },
+        { label: 'Factor', value: 'factor', icon: 'Factor' },
+        { label: 'Simplify', value: 'simplify', icon: '✨' },
+    ];
+
+    return (
+        <div
+            className={cn(
+                "relative",
+                isOpen ? 'opacity-100 z-50' : 'opacity-0 group-hover:opacity-100 transition-opacity'
+            )}
+            ref={menuRef}
+        >
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="p-1.5 text-gray-400 hover:text-purple-500 hover:bg-white dark:hover:bg-slate-800 rounded border border-transparent hover:border-gray-200 dark:hover:border-slate-700 transition-all shadow-sm bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm flex items-center gap-1"
+                title="Math actions"
+            >
+                <div className="font-mono text-[10px] font-bold">fx</div>
+                <ChevronDown size={10} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isOpen && (
+                <div className="absolute top-full right-0 mt-1 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg shadow-xl z-50 py-1 min-w-[120px] animate-in fade-in zoom-in-95 duration-150">
+                    <div className="px-2 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-50 dark:border-slate-800 mb-1">
+                        Compute
+                    </div>
+                    {actions.map((action) => (
+                        <button
+                            key={action.value}
+                            onClick={() => {
+                                onAction(action.value);
+                                setIsOpen(false);
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:text-purple-700 dark:hover:text-purple-300 flex items-center gap-2 transition-colors font-medium"
+                        >
+                            <span className="w-4 text-center opacity-70">{action.icon === '✨' ? '✨' : '𝑓'}</span>
+                            {action.label}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
 
 const LatexRenderer: React.FC<{ value: string }> = ({ value }) => {
     const containerRef = useRef<HTMLDivElement>(null);

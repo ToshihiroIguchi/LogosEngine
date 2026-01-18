@@ -380,6 +380,15 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                                 })}
                                 executionCount={cell.executionCount}
                                 onFixError={handleFixError}
+                                onMathAction={(action) => {
+                                    if (typeof cell.executionCount !== 'number') return;
+                                    const newContent = `${action}(Out[${cell.executionCount}])`;
+                                    // addCell inserts after the current index if provided
+                                    const newId = addCell('code', index);
+                                    updateCell(newId, newContent);
+                                    // Focus the new cell
+                                    setFocusedCellId(newId);
+                                }}
                             />
                         </div>
                     </div>
