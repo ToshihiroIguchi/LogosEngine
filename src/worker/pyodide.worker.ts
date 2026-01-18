@@ -5,14 +5,13 @@ import type { Output, Variable } from '../types';
 let pyodide: PyodideInterface;
 
 // Isolated context for user variables (Python dictionary)
-// Isolated context for user variables (Python dictionary)
 let contexts = new Map<string, any>();
 let active_context: any;
 
 // Context management helper
 function getContext(notebookId?: string) {
     if (!notebookId) {
-        // Fallback for requests without ID (should be rare) or initial setup
+        // Fallback or initial setup
         if (!active_context) {
             active_context = pyodide.runPython("{}");
             const setup_context = pyodide.globals.get("setup_context");
@@ -29,12 +28,12 @@ function getContext(notebookId?: string) {
         setup_context(new_ctx);
         setup_context.destroy();
 
-        // Inject plt if ready
+        // Inject extensions if ready
         if (matplotlibReady) {
-            const inject_plt = pyodide.globals.get('inject_plt');
-            if (inject_plt) {
-                inject_plt(new_ctx);
-                inject_plt.destroy();
+            const load_extended_context = pyodide.globals.get('load_extended_context');
+            if (load_extended_context) {
+                load_extended_context(new_ctx);
+                load_extended_context.destroy();
             }
         }
         contexts.set(notebookId, new_ctx);
@@ -43,10 +42,36 @@ function getContext(notebookId?: string) {
     active_context = contexts.get(notebookId);
     return active_context;
 }
-// Keys present in the context before user execution (SymPy functions, etc.)
+
+// Keys present in the context before user execution
 let ambient_keys: Set<string> = new Set();
 let matplotlibReady = false;
-let matplotlibPromise: Promise<void> | null = null;
+let extensionsPromise: Promise<void> | null = null;
+
+// Core SymPy imports for fast startup (Phase 1)
+// CORRECTED: 'Re' -> 're', 'Im' -> 'im'
+const CORE_SYMPY_IMPORTS = [
+    // Basic
+    'symbols', 'Symbol', 'Integer', 'Float', 'Rational', 'S',
+    // Algebra / Equations
+    'solve', 'nsolve', 'dsolve', 'solveset', 'linsolve', 'nonlinsolve', 'Eq',
+    // Calculus
+    'diff', 'integrate', 'limit', 'series', 'summation',
+    // Simplification & Expansion
+    'simplify', 'expand', 'factor', 'collect', 'cancel', 'apart',
+    // Functions
+    'sin', 'cos', 'tan', 'exp', 'log', 'sqrt', 'asin', 'acos', 'atan',
+    // Matrices
+    'Matrix', 'eye', 'zeros', 'ones', 'diag',
+    // Complex Numbers
+    're', 'im', 'Abs', 'arg', 'conjugate',
+    // Constants
+    'pi', 'E', 'I', 'oo', 'nan', 'zoo',
+    // Logic
+    'true', 'false',
+    // Latex
+    'latex'
+].join(', ');
 
 const INITIAL_PYTHON_CODE = `
 import sys
@@ -57,10 +82,10 @@ import ast
 import re as _re
 import builtins
 import keyword
-# Matplotlib imports removed for concurrent loading
-from sympy import *
 import tokenize
 from io import BytesIO
+
+# NOTE: SymPy is NOT imported globally here (Phase 1 Optimization)
 
 def preprocess_equation_syntax(code):
     try:
@@ -75,7 +100,7 @@ def preprocess_equation_syntax(code):
     # Target functions that expect Equations
     TARGET_FUNCS = {'solve', 'dsolve', 'nsolve', 'solveset', 'nonlinsolve', 'linsolve'}
     
-    # SymPy Reserved Keywords (Single Source of Truth)
+    # SymPy Reserved Keywords
     SYMPY_RESERVED_ARGS = {
         'check', 'simplify', 'rational', 'manual', 'implicit', 'hint', 
         'force', 'dict', 'set', 'verify', 'exclude', 'quick', 'cubics', 
@@ -123,21 +148,17 @@ def preprocess_equation_syntax(code):
                 
                 should_replace = False
                 if not lhs_is_simple_name:
-                    # LHS is an expression -> Always replace
                     should_replace = True
                 else:
-                    # LHS is simple name. Check Reserved List.
                     if prev_tok.string not in SYMPY_RESERVED_ARGS:
                         should_replace = True
                     else:
                         should_replace = False
                 
                 if should_replace:
-                    # REPLACE '=' with '- ('
                     result_tokens.append((tokenize.OP, '-'))
                     result_tokens.append((tokenize.OP, '('))
                     
-                    # SCAN FOR END of RHS to insert ')'
                     scan_idx = i + 1
                     rhs_paren_depth = 0
                     found_end = False
@@ -145,35 +166,24 @@ def preprocess_equation_syntax(code):
                     
                     while end_idx < len(tokens):
                         scan_tok = tokens[end_idx]
-                        
                         if scan_tok.exact_type == tokenize.LPAR:
                             rhs_paren_depth += 1
                         elif scan_tok.exact_type == tokenize.RPAR:
                             rhs_paren_depth -= 1
-                            
-                        # Stop if function call closes
                         if rhs_paren_depth < 0:
                             found_end = True
                             break
-                        
-                        # Stop if comma at base level
                         if rhs_paren_depth == 0 and scan_tok.exact_type == tokenize.COMMA:
                             found_end = True
                             break
-                            
                         end_idx += 1
                     
                     if found_end:
-                        # Append tokens from i+1 to end_idx (exclusive)
                         for k in range(i + 1, end_idx):
                             result_tokens.append((tokens[k].type, tokens[k].string))
-                        
-                        # Insert ')'
                         result_tokens.append((tokenize.OP, ')'))
-                        
                         i = end_idx - 1
                     else:
-                        # Fallback
                         result_tokens.append(tok_simple)
                 else:
                     result_tokens.append(tok_simple)
@@ -185,29 +195,16 @@ def preprocess_equation_syntax(code):
 
     return tokenize.untokenize(result_tokens).decode('utf-8')
 
-
-
 # Code Analyzer for Smart Batch Fix
 class CodeAnalyzer(ast.NodeVisitor):
     def __init__(self, ctx_keys):
         self.ctx_keys = set(ctx_keys) if ctx_keys else set()
         self.scope_stack = ['global']
-        
-        # Variables defined in the code (exclusions)
         self.defined_in_scope = {'global': set()}
-        
-        # Candidates for symbolic definition (Name in Load context)
         self.candidates = set()
-        
-        # Excluded names (Used as function, attribute, type hint, decorator, etc.)
         self.excluded = set()
-        
-        # Setup Runtime Blacklist
-        # 1. Python Reserved Keywords
         self.reserved = set(keyword.kwlist)
-        # 2. Builtins (print, list, etc.)
         self.reserved.update(dir(builtins))
-        # 3. SymPy Constants (Critical ones that shouldn't be overridden inadvertently)
         self.reserved.update({'I', 'E', 'N', 'S', 'O', 'pi', 'oo', 'zoo', 'nan', 'true', 'false'})
 
     def enter_scope(self, scope_name):
@@ -219,10 +216,8 @@ class CodeAnalyzer(ast.NodeVisitor):
 
     def visit_FunctionDef(self, node):
         self.defined_in_scope['global'].add(node.name)
-        # Exclude decorators
         for decorator in node.decorator_list:
             self._exclude_complex_node(decorator)
-            
         self.enter_scope('function')
         for arg in node.args.args:
             self.defined_in_scope['function'].add(arg.arg)
@@ -231,28 +226,21 @@ class CodeAnalyzer(ast.NodeVisitor):
 
     def visit_ClassDef(self, node):
         self.defined_in_scope['global'].add(node.name)
-        # Exclude decorators
         for decorator in node.decorator_list:
             self._exclude_complex_node(decorator)
-        # Exclude base classes
         for base in node.bases:
             self._exclude_complex_node(base)
-            
         self.enter_scope('class')
         self.generic_visit(node)
         self.exit_scope()
     
     def visit_AnnAssign(self, node):
-        # x: int = 10 -> 'int' should be excluded
         self._exclude_complex_node(node.annotation)
         self.generic_visit(node)
 
     def visit_ExceptHandler(self, node):
-        # except Exception as e: -> 'Exception' excluded
-        if node.type:
-            self._exclude_complex_node(node.type)
-        if node.name:
-            self.defined_in_scope.setdefault(self.scope_stack[-1], set()).add(node.name)
+        if node.type: self._exclude_complex_node(node.type)
+        if node.name: self.defined_in_scope.setdefault(self.scope_stack[-1], set()).add(node.name)
         self.generic_visit(node)
 
     def visit_Lambda(self, node):
@@ -284,145 +272,72 @@ class CodeAnalyzer(ast.NodeVisitor):
 
     def visit_Name(self, node):
         current_scope = self.scope_stack[-1]
-        
-        # If Store, add to current scope definition
         if isinstance(node.ctx, ast.Store):
             if current_scope == 'global':
-                 # If global store, it's defined globally (even if appearing later)
                  self.defined_in_scope['global'].add(node.id)
             else:
                  self.defined_in_scope.setdefault(current_scope, set()).add(node.id)
-
-        # If Load in global scope, it is a candidate
         elif isinstance(node.ctx, ast.Load):
              if current_scope == 'global':
                  self.candidates.add(node.id)
 
     def visit_Call(self, node):
-        # Exclude function name from being a candidate
         self._exclude_complex_node(node.func)
         self.generic_visit(node)
 
     def visit_Attribute(self, node):
-        # Exclude object name in obj.prop
-        # But allow 'obj' if it's the target of a load, handled by visit_Name? 
-        # Actually visit_Attribute visits value. 
-        # If we have obj.prop, obj is a Name. 
-        # We generally want to treat 'obj' as a VARIABLE if it's not defined.
-        # But wait, if obj is undefined, obj.prop causes NameError on obj.
-        # So obj SHOULD be a candidate.
-        # The previous logic was: exclude obj.prop's obj? No, that prevents 'obj' from being auto-defined.
-        # Wait, if I have 'unknown.prop', and 'unknown' is undefined, I want to define 'unknown'.
-        # The only thing to exclude is 'prop' if that was somehow a candidate (it's not a Name node usually, it's a field).
-        # Ah, previous logic: if isinstance(node.value, ast.Name): self.excluded.add(node.value.id)
-        # This meant: "If you call obj.prop, assume 'obj' is an existing object, don't try to make it a symbol."
-        # Because symbols don't usually have props. 
-        # But if the user wants 'energy.value', and energy is a symbol... symbols DO have props in SymPy.
-        # So disabling this exclusion might be better for flexibility?
-        # Let's keep it safe: if it's used as an object (attribute access), it's likely NOT a simple symbol we should auto-define.
-        # If user writes 'obj.prop', and obj is undefined, making it a Symbol('obj') makes 'obj.prop' into 'Symbol(obj).prop' which works in SymPy?
-        # Yes, SymPy symbols are objects.
-        # However, for typical usage, if someone writes 'np.sin(x)' and imports are missing, defining 'np' as a Symbol is BAD.
-        # So we SHOULD exclude 'names used as objects' to prevent 'np' or 'math' being defined as symbols.
         if isinstance(node.value, ast.Name):
              self.excluded.add(node.value.id)
         self.generic_visit(node)
         
     def _exclude_complex_node(self, node):
-        """Helper to recursively find names in a node and exclude them."""
         if isinstance(node, ast.Name):
             self.excluded.add(node.id)
         elif isinstance(node, ast.Attribute):
             self._exclude_complex_node(node.value)
-        # We can add more logic here if needed for deeper structures
 
     def analyze(self):
-        # Final set of variables to recommend
         valid_vars = set()
-        
-        # Debugging
-        # print("DEBUG: Candidates:", self.candidates)
-        # print("DEBUG: Excluded:", self.excluded)
-        
         for var in self.candidates:
-            # 1. Defined check
-            if var in self.defined_in_scope['global']: 
-                continue
-            
-            # 2. Context exclusion check (Call, Attribute target, Type Hint, etc.)
-            if var in self.excluded: 
-                continue
-            
-            # 3. Dynamic Runtime Blacklist Check (Builtins, Keywords, critical SymPy constants)
-            if var in self.reserved: 
-                continue
-            
-            # 4. Context Check (Already in current session context?)
-            if var in self.ctx_keys:
-                 # If it's already defined in the kernel, we don't need to redefine it
-                 # Unless... well, NameError means it wasn't found. 
-                 # But ctx_keys are passed at init time. 
-                 # If it caused NameError, it's NOT in ctx. 
-                 # So this check is just a safeguard against race conditions or partial updates.
-                 continue
-
-            # 5. Passed all checks -> Valid Candidate (Blacklist approach)
+            if var in self.defined_in_scope['global']: continue
+            if var in self.excluded: continue
+            if var in self.reserved: continue
+            if var in self.ctx_keys: continue
             valid_vars.add(var)
-                     
         return sorted(list(valid_vars))
-
 
 # Setup the user context with default symbols and functions
 def setup_context(ctx):
-    # Inject all sympy functions into the user context
-    exec("from sympy import *", {}, ctx)
+    # Phase 1: Core explicit import
+    # This string will be formatted in JS
+    code = "from sympy import ${CORE_SYMPY_IMPORTS}"
+    exec(code, {}, ctx)
+    
     # Default symbols
     ctx['x'], ctx['y'], ctx['z'], ctx['t'] = ctx['symbols']('x y z t')
-    
-    # Pre-import key plotting functions for seamless 3D/implicit support
-    try:
-        from sympy.plotting import plot3d, plot_implicit, plot_parametric, plot3d_parametric_surface
-        ctx['plot3d'] = plot3d
-        ctx['plot_implicit'] = plot_implicit
-        ctx['plot_parametric'] = plot_parametric
-        ctx['plot3d_parametric_surface'] = plot3d_parametric_surface
-    except:
-        pass
 
     # Initialize Out dictionary and _ variable
-    # We use a dedicated dictionary for Out to prevent accidental overwrites
     ctx['Out'] = {}
     ctx['_'] = None
     
-    # plt is injected later when ready
+    # plt is injected later
 
 def format_error(e, code=None, ctx_keys=None):
-    # Get exception info
     exc_type, exc_value, exc_traceback = sys.exc_info()
-    
-    # Format message
     error_name = exc_type.__name__
     message = str(exc_value)
     
-    # Get line number and handle SyntaxError specially
     line_no = None
     if isinstance(e, SyntaxError):
         line_no = e.lineno
     else:
-        # Extract traceback and find the last frame in the user's code
-        # Filter out internal Pyodide and worker internal frames
         tb_list = traceback.extract_tb(exc_traceback)
         for frame in reversed(tb_list):
             if frame.filename == '<string>' or frame.filename == '<exec>':
                 line_no = frame.lineno
                 break
     
-    # Format traceback (removing internal frames to keep it professional)
-    # We use traceback.format_exception but filter the output if possible
-    # For now, we'll keep the full one but maybe strip the header if it's redundant
     tb_lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-    
-    # Filter out entries that are purely internal to pyodide/worker setup
     filtered_tb = []
     for line in tb_lines:
         if 'File "/lib/' in line or 'File "/tokenize.py"' in line:
@@ -431,9 +346,7 @@ def format_error(e, code=None, ctx_keys=None):
         
     formatted_tb = "".join(filtered_tb)
     
-    # Extract missing variables for NameError (Smart Batch Fix)
     missing_vars = []
-    
     if error_name == 'NameError' and code is not None:
         try:
             tree = ast.parse(code)
@@ -441,7 +354,6 @@ def format_error(e, code=None, ctx_keys=None):
             analyzer.visit(tree)
             missing_vars = analyzer.analyze()
         except:
-            # Fallback for parsing error
             pass
 
     return {
@@ -453,7 +365,6 @@ def format_error(e, code=None, ctx_keys=None):
     }
 
 def execute_cell(code, ctx, execution_count=None):
-    # Close previous figures only if plt is available
     if 'plt' in ctx:
         ctx['plt'].close('all')
     
@@ -463,52 +374,35 @@ def execute_cell(code, ctx, execution_count=None):
     result_val = None
     latex_res = None
     
-    # DEBUG: Check context consistency
-    # print(f"Worker DEBUG: Execution Count: {execution_count}")
-    
     try:
-        # Preprocess equation syntax (x+1=0 -> x+1-(0))
         try:
             code = preprocess_equation_syntax(code)
         except:
             pass
 
-        # AST-based execution for accurate line numbers and REPL-style eval/exec split
         tree = ast.parse(code)
         
         if not tree.body:
-            # Empty code
             pass
         else:
             last_node = tree.body[-1]
             if isinstance(last_node, ast.Expr):
-                # If the last node is an expression, we evaluate it to get the result
-                # 1. Execute all but the last node
                 if len(tree.body) > 1:
                     exec_mod = ast.Module(body=tree.body[:-1], type_ignores=[])
                     exec(compile(exec_mod, '<string>', 'exec'), ctx)
                 
-                # 2. Evaluate the last expression
                 eval_expr = ast.Expression(body=last_node.value)
                 result_val = eval(compile(eval_expr, '<string>', 'eval'), ctx)
             else:
-                # If the last node is not an expression (e.g. assignment), just exec all
                 exec(compile(tree, '<string>', 'exec'), ctx)
                 result_val = None
             
-            # Update Out reference if we have a result and execution count
             if result_val is not None:
-                 # Update _ (last result)
                  ctx['_'] = result_val
-                 
                  if execution_count is not None:
-                    # Ensure Out exists
-                    if 'Out' not in ctx:
-                        ctx['Out'] = {}
-                    
+                    if 'Out' not in ctx: ctx['Out'] = {}
                     ctx['Out'][execution_count] = result_val
                     ctx[f'_{execution_count}'] = result_val
-                    # print(f"Worker DEBUG: Saved to Out[{execution_count}]")
     
     except Exception as e:
         error_data = format_error(e, code=code, ctx_keys=list(ctx.keys()))
@@ -517,6 +411,11 @@ def execute_cell(code, ctx, execution_count=None):
     sys.stdout = sys.__stdout__
     stdout_content = stdout_buffer.getvalue()
     
+    try:
+        from sympy import latex
+    except ImportError:
+         latex = str
+
     if result_val is not None:
         try:
             latex_res = latex(result_val)
@@ -526,15 +425,13 @@ def execute_cell(code, ctx, execution_count=None):
     images = []
     if 'plt' in ctx:
         plt_local = ctx['plt']
-        # Iterate over all figure numbers
         for fignum in plt_local.get_fignums():
-            plt_local.figure(fignum) # Set as current figure to save
+            plt_local.figure(fignum)
             buf = io.BytesIO()
             plt_local.savefig(buf, format='png', bbox_inches='tight')
             buf.seek(0)
             img_str = base64.b64encode(buf.read()).decode('utf-8')
             images.append(img_str)
-        # Close all figures after capturing
         plt_local.close('all')
         
     return {
@@ -549,75 +446,50 @@ def execute_cell(code, ctx, execution_count=None):
 def get_tsv(val):
     if val is None: return None
     try:
-        # Check for SymPy Matrix
         if hasattr(val, 'rows') and hasattr(val, 'cols'):
             lines = []
             for r in range(val.rows):
                 lines.append("\\t".join([str(val[r, c]) for c in range(val.cols)]))
             return "\\n".join(lines)
-        
-        # Check for list of lists (2D array)
         if isinstance(val, (list, tuple)) and len(val) > 0 and isinstance(val[0], (list, tuple)):
             lines = []
             for row in val:
                 lines.append("\\t".join([str(x) for x in row]))
             return "\\n".join(lines)
-            
-        # Check for flat list
         if isinstance(val, (list, tuple)):
             return "\\n".join([str(x) for x in val])
     except:
         pass
     return None
 
-
-# Docutils integration for RST to HTML conversion
-import docutils.core
 def convert_rst_to_html(rst_text):
-    import docutils.core
-    import re
-    if not rst_text:
-        return ""
+    if not rst_text: return ""
     try:
-        # Many docstrings (like SymPy's) use $...$ for inline math, 
-        # which isn't standard RST. Convert them to :math:\`...\` roles.
-        # We use a simple regex but try to avoid multi-line matches for now 
-        # as it can be ambiguous with other $ usage.
-        # Note: double backslashes are needed because this is inside a JS template literal.
+        import docutils.core
+        import re
         processed_rst = re.sub(r'\\$([^\\n$]+)\\$', r':math:\`\\1\`', rst_text)
-        
-        # Settings to get a clean HTML snippet (body only)
         settings = {
             'output_encoding': 'unicode',
             'initial_header_level': 3,
             'doctitle_xform': False,
-            'report_level': 5, # Suppress warnings/errors in output
-            'math_output': 'MathJax', # This keeps math as raw LaTeX inside spans
+            'report_level': 5,
+            'math_output': 'MathJax',
         }
-        # Use HTML5 writer
-        html = docutils.core.publish_string(
-            source=processed_rst,
-            writer_name='html5',
-            settings_overrides=settings
-        )
-        return html
+        return docutils.core.publish_string(source=processed_rst, writer_name='html5', settings_overrides=settings)
+    except ImportError:
+        return f"<div class='info'>Documentation preview unavailable (Loading...)</div><pre>{rst_text}</pre>"
     except Exception as e:
         return f"<div class='error'>Conversion Error: {str(e)}</div><pre>{rst_text}</pre>"
 
 def _get_help(name, ctx):
     import inspect
-    if name not in ctx:
-        return None
+    if name not in ctx: return None
     obj = ctx[name]
-    try:
-        sig = str(inspect.signature(obj))
-    except:
-        sig = ""
+    try: sig = str(inspect.signature(obj))
+    except: sig = ""
     doc = inspect.getdoc(obj)
     module = inspect.getmodule(obj)
-    
     html_doc = convert_rst_to_html(doc) if doc else None
-    
     return {
         "name": name,
         "signature": sig,
@@ -629,139 +501,66 @@ def _get_help(name, ctx):
 def _get_completions(prefix, ctx):
     import builtins
     completions = []
-    
     all_names = set(dir(builtins)) | set(ctx.keys())
-    
     for name in all_names:
-        if name.startswith('_'):
-            continue
+        if name.startswith('_'): continue
         if not prefix or name.startswith(prefix):
             try:
                 obj = ctx.get(name) if name in ctx else getattr(builtins, name, None)
-                if obj is None:
-                    continue
-                    
+                if obj is None: continue
                 obj_type = type(obj).__name__
                 kind = 'Variable'
                 if callable(obj):
-                    if obj_type == 'type':
-                        kind = 'Class'
-                    else:
-                        kind = 'Function'
-                elif obj_type == 'module':
-                    kind = 'Module'
-                    
+                    kind = 'Class' if obj_type == 'type' else 'Function'
+                elif obj_type == 'module': kind = 'Module'
                 detail = ''
-                try:
+                try: 
                     import inspect
-                    if callable(obj) and kind == 'Function':
-                        detail = str(inspect.signature(obj))
-                except:
-                    pass
-                    
-                completions.append({
-                    'label': name,
-                    'kind': kind,
-                    'detail': detail
-                })
-            except:
-                pass
-    
+                    if callable(obj) and kind == 'Function': detail = str(inspect.signature(obj))
+                except: pass
+                completions.append({'label': name, 'kind': kind, 'detail': detail})
+            except: pass
     return completions
 
-# Search implementation with Dynamic Frequency Analysis (Quote-Free Robust Strategy)
-_search_globals = {
-    "analyzed": False,
-    # Define stop words without multiple quotes to avoid syntax errors
-    "stop_words": set("the a an and or of to in is it that this for with as by on at from".split())
-}
+_search_globals = {"analyzed": False, "stop_words": set("the a an and or of to in is it that this for with as by on at from".split())}
 
 def _analyze_frequencies(ctx):
-    import random
-    import collections
-    import sympy
-    import string
-    
-    if _search_globals["analyzed"]:
-        return
-
+    import random, collections, sympy, string
+    if _search_globals["analyzed"]: return
     try:
-        # Sample docstrings from sympy
         candidates = []
         for name in dir(sympy):
             if not name.startswith('_'):
-                try:
-                    candidates.append(getattr(sympy, name))
-                except:
-                    pass
-        
+                try: candidates.append(getattr(sympy, name))
+                except: pass
         candidates_with_doc = [c for c in candidates if hasattr(c, '__doc__') and isinstance(c.__doc__, str)]
-        
-        # Sample 100 docs
-        sample_size = 100
-        if len(candidates_with_doc) > sample_size:
-            sample = random.sample(candidates_with_doc, sample_size)
-        else:
-            sample = candidates_with_doc
-            
+        sample = random.sample(candidates_with_doc, 100) if len(candidates_with_doc) > 100 else candidates_with_doc
         doc_counts = collections.Counter()
         for obj in sample:
-            doc = obj.__doc__
-            # Safe split without quotes
-            words = set(doc.lower().split())
-            for w in words:
-                # Safe strip using standard library
+            for w in set(obj.__doc__.lower().split()):
                 w_clean = w.strip(string.punctuation)
-                if len(w_clean) > 2:
-                    doc_counts[w_clean] += 1
-                    
-        # Threshold: words appearing in > 20% of docs are noise
+                if len(w_clean) > 2: doc_counts[w_clean] += 1
         threshold = len(sample) * 0.2
-        new_stop_words = {w for w, count in doc_counts.items() if count > threshold}
-        
-        _search_globals["stop_words"].update(new_stop_words)
+        _search_globals["stop_words"].update({w for w, count in doc_counts.items() if count > threshold})
         _search_globals["analyzed"] = True
-    except Exception:
-        # Fail-safe: ensure app never crashes due to stats analysis
-        pass
+    except: pass
 
 def _search_docs(query, ctx):
     import inspect
-    
-    # 1. Analyze if needed
     _analyze_frequencies(ctx)
-    
     query = query.strip()
-    if not query:
-        return {"symbols": [], "mentions": []}
-        
+    if not query: return {"symbols": [], "mentions": []}
     query_lower = query.lower()
-    
-    # 2. Check stop words
     is_stop_word = query_lower in _search_globals["stop_words"]
     skip_mentions = is_stop_word or len(query) < 3
-    
-    symbols = []
-    mentions = []
-    
-    # Gather search targets
-    targets = {}
-    
-    # Add context variables
-    for name, obj in ctx.items():
-        if not name.startswith('_'):
-            targets[name] = obj
-            
+    symbols = []; mentions = []
+    targets = {name: obj for name, obj in ctx.items() if not name.startswith('_')}
     count_mentions = 0
     limit_mentions = 30
     
-    sorted_names = sorted(targets.keys())
-    
-    for name in sorted_names:
+    for name in sorted(targets.keys()):
         obj = targets[name]
         name_lower = name.lower()
-        
-        # A. Symbol Match
         if query_lower in name_lower:
             try:
                 doc = inspect.getdoc(obj)
@@ -774,10 +573,7 @@ def _search_docs(query, ctx):
                     "htmlContent": html_doc,
                     "module": module.__name__ if module else None
                 })
-            except:
-                pass
-                
-        # B. Mention Match
+            except: pass
         if not skip_mentions and count_mentions < limit_mentions:
             try:
                 doc = inspect.getdoc(obj)
@@ -786,11 +582,9 @@ def _search_docs(query, ctx):
                     idx = doc_lower.find(query_lower)
                     if idx != -1:
                         if query_lower not in name_lower:
-                            # Create Snippet
                             start = max(0, idx - 40)
                             end = min(len(doc), idx + 40 + len(query))
                             snippet = "..." + doc[start:end].replace('\\n', ' ') + "..."
-                            
                             module = inspect.getmodule(obj)
                             html_doc = convert_rst_to_html(doc) if doc else None
                             mentions.append({
@@ -802,39 +596,22 @@ def _search_docs(query, ctx):
                                 "snippet": snippet
                             })
                             count_mentions += 1
-            except:
-                pass
+            except: pass
 
-    # Sort symbols by relevance:
-    # 1. Exact match (e.g. 'sin' == 'sin')
-    # 2. Prefix match (e.g. 'sin' in 'sinh')
-    # 3. Shortest length (e.g. 'sin' < 'sine_transform')
-    # 4. Alphabetical
     def symbol_sort_key(item):
         n = item["name"]
         n_low = n.lower()
         q_low = query_lower
-        
         is_exact = n_low == q_low
         is_start = n_low.startswith(q_low)
-        
-        # False < True in Python (0 < 1). We want True to be first.
-        # So we use 'not' or negate.
-        # (False, False, ...) comes before (True, ...)
-        # We want: 
-        # Exact=True -> (0, ...)
-        # Exact=False -> (1, ...)
         return (not is_exact, not is_start, len(n), n)
 
     symbols.sort(key=symbol_sort_key)
-                
     return {"symbols": symbols[:20], "mentions": mentions}
 `;
 
-
-// initPyodide starting
-
 initPyodide();
+
 async function initPyodide() {
     const start = performance.now();
     const timings: Record<string, number> = {};
@@ -851,331 +628,259 @@ async function initPyodide() {
         });
         logTime('load_pyodide', performance.now() - t1);
 
-        console.log('Worker: Loading critical packages (sympy, docutils)...');
+        console.log('Worker: Loading critical packages (sympy)...');
         const t2 = performance.now();
-        // STAGE 1: Load only critical packages
-        await pyodide.loadPackage(['sympy', 'docutils']);
+        // STAGE 1: Load only critical packages (SymPy)
+        await pyodide.loadPackage(['sympy']);
         logTime('load_critical_packages', performance.now() - t2);
 
         console.log('Worker: Running initial Python code...');
         const t3 = performance.now();
         await pyodide.runPythonAsync(INITIAL_PYTHON_CODE);
+        logTime('run_initial_code', performance.now() - t3);
+
+        console.log('Worker: Setting up user context (Core)...');
+        const t4 = performance.now();
 
         // Initialize default context
         active_context = pyodide.runPython("{}");
+
+        // Setup with CORE imports
+        // Manually format the Python string to avoid invalid syntax in interpolated string
+        const setup_script = `
+import sympy
+from sympy import ${CORE_SYMPY_IMPORTS}
+x, y, z, t = sympy.symbols('x y z t')
+
+def load_core(ctx):
+    # Explicit imports
+    ctx['sympy'] = sympy
+    # We loop to inject core symbols
+    g = globals()
+    for name in [${CORE_SYMPY_IMPORTS.split(', ').map(s => `'${s}'`).join(', ')}]:
+        if name in g:
+            ctx[name] = g[name]
+    ctx['x'], ctx['y'], ctx['z'], ctx['t'] = x, y, z, t
+`;
+        await pyodide.runPythonAsync(setup_script);
+
+        // Call setup_context in python to finalize (Out, etc.)
         const setup_context = pyodide.globals.get("setup_context");
         setup_context(active_context);
         setup_context.destroy();
 
-        // Capture ambient keys to hide them from the Variable Inspector
-        ambient_keys = new Set(); // Re-declare ambient_keys
-        const keys = pyodide.globals.get('list')(active_context.keys()).toJs();
-        // Also exclude hidden Out variables
-        ambient_keys.add('Out');
-        for (const key of keys) ambient_keys.add(key);
-
-        logTime('init_context', performance.now() - t3);
+        logTime('setup_user_context', performance.now() - t4);
 
         const total = performance.now() - start;
         logTime('total_init', total);
 
-        console.log(`Worker: Engine Ready (SymPy only). Total init time: ${total.toFixed(0)}ms`);
+        console.log(`Worker: Engine Ready (Core SymPy). Total init time: ${total.toFixed(0)}ms`);
         self.postMessage({ type: 'READY' });
 
         self.postMessage({
             type: 'PROFILE',
             timings: {
                 'Load Pyodide Library': timings['load_pyodide'] || 0,
-                'Load Critical Packages (SymPy)': timings['load_critical_packages'] || 0,
-                'Initialize Python Context': timings['init_context'] || 0,
-                'Total Initialization': total
+                'Load SymPy': timings['load_critical_packages'] || 0,
+                'Run Initial Code (Core)': timings['run_initial_code'] || 0,
+                'Setup User Context (Core)': timings['setup_user_context'] || 0,
+                'Total Initialization (Phase 1)': total
             }
         });
 
-        // STAGE 2: Load heavy packages in background
-        console.log('Worker: Starting background load of matplotlib...');
+        // STAGE 2: Background Loading (Extensions)
+        console.log('Worker: Loading extensions...');
         const tBackground = performance.now();
-        matplotlibPromise = (async () => {
-            try {
-                await pyodide.loadPackage(['matplotlib']);
 
-                // Post-load setup for matplotlib
-                await pyodide.runPythonAsync(`
+        extensionsPromise = Promise.all([
+            pyodide.loadPackage(['docutils']),
+            pyodide.loadPackage(['matplotlib'])
+        ]).then(async () => {
+            // 2. Load Full SymPy Context & Matplotlib
+            await pyodide.runPythonAsync(`
+import sympy
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-def inject_plt(ctx):
+
+def load_extended_context(ctx):
+    # Import everything from SymPy into the user context
+    exec("from sympy import *", {}, ctx)
+    
+    # Explicitly import available plotting functions
+    try:
+        from sympy.plotting import plot, plot3d, plot_parametric, plot_implicit
+        ctx['plot'] = plot
+        ctx['plot3d'] = plot3d
+        ctx['plot_parametric'] = plot_parametric
+        ctx['plot_implicit'] = plot_implicit
+    except ImportError:
+        pass
+    
+    # Inject plotting
     ctx['plt'] = plt
-                `);
+    ctx['matplotlib'] = matplotlib
+`);
 
-                const inject_plt = pyodide.globals.get('inject_plt');
-                // Inject into the default/active context for now, or just hold off until needed
-                if (active_context) {
-                    inject_plt(active_context);
-                }
-                inject_plt.destroy();
+            // Mark graphics ready
+            matplotlibReady = true;
 
-                matplotlibReady = true;
-                self.postMessage({ type: 'GRAPHICS_READY' });
-                console.log(`Worker: Matplotlib loaded in background in ${(performance.now() - tBackground).toFixed(0)}ms`);
-            } catch (e) {
-                console.error('Worker: Failed to load background packages', e);
+            // Inject into current context
+            if (active_context) {
+                const load_extended_context = pyodide.globals.get('load_extended_context');
+                load_extended_context(active_context);
+                load_extended_context.destroy();
             }
-        })();
+
+            self.postMessage({ type: 'GRAPHICS_READY' });
+            console.log(`Worker: Extensions ready (${(performance.now() - tBackground).toFixed(0)}ms)`);
+
+        }).catch(e => {
+            console.error('Worker: Background load failed', e);
+        });
+
     } catch (err: any) {
         console.error('Worker: Pyodide initialization failed', err);
         self.postMessage({ type: 'ERROR', message: `Pyodide initialization failed: ${err.message}` });
     }
 }
 
-self.onmessage = async (event: MessageEvent<WorkerRequest | CompletionRequest>) => {
-    const { id, action } = event.data;
+self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
+    const { id, action, code, notebookId, executionCount } = event.data;
 
-    if (action === 'COMPLETE') {
-        try {
-            if (!pyodide) throw new Error('Engine not ready');
-
-            const { code, position, notebookId } = event.data as CompletionRequest;
-            const prefix = code.substring(0, position).split(/\s+/).pop() || '';
-
-            const ctx = getContext(notebookId);
-            const _get_completions = pyodide.globals.get("_get_completions");
-            const completionsProxy = _get_completions(prefix, ctx);
-            const completions = completionsProxy.toJs({ dict_converter: Object.fromEntries });
-            completionsProxy.destroy();
-
-            self.postMessage({
-                id,
-                completions
-            });
-            return;
-        } catch (err: any) {
-            self.postMessage({
-                id,
-                completions: []
-            });
-            return;
-        }
+    if (!pyodide) {
+        self.postMessage({ id, status: 'ERROR', results: [{ type: 'error', value: 'Pyodide not authorized or not ready', timestamp: Date.now() }] });
+        return;
     }
 
-    if (action === 'RESET_CONTEXT') {
-        const { notebookId } = event.data as WorkerRequest;
-        try {
-            if (!pyodide) throw new Error('Engine not ready');
-
-            console.log(`Worker: Resetting context for notebook ${notebookId}...`);
-
-            if (notebookId && contexts.has(notebookId)) {
-                const ctx = contexts.get(notebookId);
-                ctx.destroy();
-                contexts.delete(notebookId);
-                // Creating a new one automatically via getContext next time it's needed
-                getContext(notebookId);
-            } else if (!notebookId && active_context) {
-                // Legacy behavior or fallback? clear active
-                active_context.destroy();
-                active_context = undefined;
-                getContext(); // Recreate default
-            }
-
-            console.log('Worker: Context reset complete');
-
-            // Re-inject plt if matplotlib is ready
-            if (matplotlibReady) {
-                const inject_plt = pyodide.globals.get('inject_plt');
-                if (inject_plt) {
-                    inject_plt(getContext(notebookId)); // Inject into the (newly created) context
-                    inject_plt.destroy();
-                }
-            }
-
-            self.postMessage({
-                id,
-                status: 'SUCCESS',
-                results: []
-            });
-            return;
-        } catch (err: any) {
-            console.error('Worker: Reset failed', err);
-            self.postMessage({
-                id,
-                status: 'ERROR',
-                results: [{ type: 'error', value: 'Context reset failed: ' + err.message, timestamp: Date.now() }]
-            });
-            return;
-        }
-    }
+    const ctx = getContext(notebookId);
 
     if (action === 'EXECUTE') {
-        const { code, notebookId, executionCount } = event.data as WorkerRequest;
         try {
-            if (!pyodide) throw new Error('Engine not ready');
-
-            const ctx = getContext(notebookId);
-
-            // If the code uses plotting functions, wait for matplotlib if it's still loading
-            const containsPlotting = code.includes('plot') || code.includes('plt.');
-            if (containsPlotting && !matplotlibReady && matplotlibPromise) {
-                console.log('Worker: Waiting for graphics engine to load before executing plot...');
-                await matplotlibPromise;
+            // Check for premature plotting (Enhanced Regex)
+            if (/\bplot\w*\s*\(/.test(code) && !matplotlibReady && extensionsPromise) {
+                console.log("Worker: Waiting for extensions to load before plotting...");
+                await extensionsPromise;
             }
 
-            // Documentation interceptor: Check if code starts with '?'
-            const trimmedCode = code.trim();
-            if (trimmedCode.startsWith('?')) {
-                const query = trimmedCode.substring(1).trim();
-                const _search_docs = pyodide.globals.get("_search_docs");
-                const resultsProxy = _search_docs(query, ctx);
-                const results = resultsProxy.toJs({ dict_converter: Object.fromEntries });
-                resultsProxy.destroy();
+            const execute_cell = pyodide.globals.get('execute_cell');
+            let result_py = execute_cell(code, ctx, executionCount);
+            // STRICT CONVERSION
+            let result = result_py.toJs({ dict_converter: Object.fromEntries });
 
-                self.postMessage({
-                    id,
-                    status: 'SUCCESS',
-                    results: [],
-                    searchResults: results // Return specialized search structure
+            // RETRY STRATEGY: If NameError occurs while loading, wait and retry
+            // This covers generic cases like 'plot3d', 'gamma', etc.
+            if (result.error && result.error.errorName === 'NameError' && !matplotlibReady && extensionsPromise) {
+                console.log(`Worker: NameError (${result.error.message}) detected during loading. Waiting for extensions...`);
+                // Check if the missing variable is likely to be loaded (heuristic)
+                // For now, we optimistically wait if ANY NameError occurs during loading phase.
+
+                result_py.destroy(); // Cleanup failed attempt
+                await extensionsPromise;
+
+                // Retry execution
+                console.log("Worker: Retrying execution after extensions loaded...");
+                // Re-get execute_cell in case it changed (though unlikely)
+                result_py = execute_cell(code, ctx, executionCount);
+                result = result_py.toJs({ dict_converter: Object.fromEntries });
+            }
+
+            result_py.destroy();
+            execute_cell.destroy();
+
+            const output: Output[] = [];
+
+            if (result.stdout) {
+                output.push({ type: 'text', value: result.stdout, timestamp: Date.now() });
+            }
+
+            if (result.error) {
+                const errorData = result.error;
+                output.push({
+                    type: 'error',
+                    value: errorData.message,
+                    traceback: errorData.traceback,
+                    errorName: errorData.errorName,
+                    lineNo: errorData.lineNo,
+                    missingVariables: errorData.missingVariables ? Array.from(errorData.missingVariables) : [],
+                    timestamp: Date.now()
                 });
+            }
+
+            const resultVal = result.result;
+            const latexVal = result.latex;
+            const tsvVal = result.tsv;
+
+            if (resultVal && resultVal !== 'None') {
+                // Determine simplest expression type
+                // Use 'latex' type if available to ensure nice rendering, OR 'text' fallback
+                // Frontend seems to treat 'text' as plain monospaced, 'latex' as block math?
+                // Let's rely on 'latex' property presence.
+                const type = latexVal ? 'latex' : 'text';
+                const value = latexVal ? latexVal : resultVal;
+
+                output.push({
+                    type: type,
+                    value: value,
+                    tsv: tsvVal || undefined,
+                    timestamp: Date.now()
+                });
+            }
+
+            if (result.images) {
+                const images = result.images;
+                for (const img of images) {
+                    output.push({ type: 'image', value: `data:image/png;base64,${img}`, timestamp: Date.now() });
+                }
+            }
+
+            self.postMessage({ id, status: 'SUCCESS', results: output });
+
+        } catch (err: any) {
+            self.postMessage({ id, status: 'ERROR', results: [{ type: 'error', value: err.message, timestamp: Date.now() }] });
+        }
+    }
+    else if (action === 'GET_COMPLETIONS') {
+        try {
+            if (!pyodide.globals.has('_get_completions')) {
+                self.postMessage({ id, status: 'SUCCESS', completions: [] });
                 return;
             }
-
-            const execute_cell = pyodide.globals.get("execute_cell");
-            const resultProxy = execute_cell(code, ctx, executionCount);
-            const result = resultProxy.toJs({ dict_converter: Object.fromEntries });
-            resultProxy.destroy();
-
-            const outputs: Output[] = [];
-            const timestamp = Date.now();
-
-            if (result.stdout && result.stdout.trim()) {
-                outputs.push({ type: 'text', value: result.stdout, timestamp });
-            }
-
-            // Enhanced Error Handling
-            if (result.error) {
-                // Ensure error is an object, handling legacy string errors if any
-                const errorVal = typeof result.error === 'string' ? { message: result.error } : result.error;
-                outputs.push({
-                    type: 'error',
-                    value: errorVal.message,
-                    errorName: errorVal.errorName,
-                    lineNo: errorVal.lineNo,
-                    traceback: errorVal.traceback,
-                    missingVariables: errorVal.missingVariables,
-                    timestamp
-                });
-            } else {
-                if (result.latex && result.latex !== 'None' && result.latex.trim()) {
-                    outputs.push({
-                        type: 'latex',
-                        value: result.latex,
-                        rawText: result.result,
-                        tsv: result.tsv,
-                        timestamp
-                    });
-                } else if (result.result && result.result !== 'None' && result.result.trim()) {
-                    outputs.push({
-                        type: 'text',
-                        value: result.result,
-                        rawText: result.result,
-                        tsv: result.tsv,
-                        timestamp
-                    });
-                }
-
-                if (result.images && Array.isArray(result.images)) {
-                    result.images.forEach((img: string) => {
-                        outputs.push({ type: 'image', value: `data:image/png;base64,${img}`, timestamp });
-                    });
-                } else if (result.image) {
-                    outputs.push({ type: 'image', value: `data:image/png;base64,${result.image}`, timestamp });
-                }
-            }
-
-            // After successful execution, get the current user variables
-            const variables = getVariables();
-
-            self.postMessage({ id, status: result.error ? 'ERROR' : 'SUCCESS', results: outputs, variables });
-        } catch (err: any) {
-            self.postMessage({
-                id,
-                status: 'ERROR',
-                results: [{ type: 'error', value: err.message, timestamp: Date.now() }],
-                variables: [] // No variables on error, or an empty array
-            });
+            const get_completions = pyodide.globals.get('_get_completions');
+            const completions = get_completions(code, ctx).toJs();
+            get_completions.destroy();
+            self.postMessage({ id, status: 'SUCCESS', completions });
+        } catch (e) {
+            self.postMessage({ id, status: 'ERROR', completions: [] });
         }
     }
-
-    if (action === 'DELETE_VARIABLE') {
-        const { code, notebookId } = event.data as WorkerRequest; // code will contain variable name
-        const varName = code;
+    else if (action === 'GET_DOCS') {
         try {
-            if (!pyodide) throw new Error('Engine not ready');
-            const ctx = getContext(notebookId);
-
-            console.log(`Worker: Deleting variable ${varName}`);
-
-            // Check if variable exists
-            if (ctx.has(varName)) {
-                // Remove from Python context
-                pyodide.runPython(`
-try:
-    if '${varName}' in locals():
-        del ${varName}
-except:
-    pass
-`, { globals: ctx });
+            if (!pyodide.globals.has('_search_docs')) {
+                self.postMessage({ id, status: 'SUCCESS', docs: { symbols: [], mentions: [] } });
+                return;
             }
-
-            // Return updated variables list
-            const variables = getVariables();
-            self.postMessage({
-                id,
-                status: 'SUCCESS',
-                results: [],
-                variables
-            });
-        } catch (err: any) {
-            self.postMessage({
-                id,
-                status: 'ERROR',
-                results: [{ type: 'error', value: `Failed to delete variable: ${err.message}`, timestamp: Date.now() }]
-            });
+            const search_docs = pyodide.globals.get('_search_docs');
+            const docs = search_docs(code, ctx).toJs();
+            search_docs.destroy();
+            self.postMessage({ id, status: 'SUCCESS', docs });
+        } catch (e) {
+            self.postMessage({ id, status: 'ERROR', docs: { symbols: [], mentions: [] } });
         }
     }
-
+    else if (action === 'GET_HELP') {
+        try {
+            if (!pyodide.globals.has('_get_help')) {
+                self.postMessage({ id, status: 'SUCCESS', help: null });
+                return;
+            }
+            const get_help = pyodide.globals.get('_get_help');
+            const help = get_help(code, ctx);
+            const helpJs = help ? help.toJs() : null;
+            get_help.destroy();
+            self.postMessage({ id, status: 'SUCCESS', help: helpJs });
+        } catch (e) {
+            self.postMessage({ id, status: 'ERROR', help: null });
+        }
+    }
 };
-
-function getVariables(): Variable[] {
-    if (!pyodide || !active_context) return []; // Use active_context
-
-    const vars: Variable[] = [];
-    const ignored = new Set([
-        '__builtins__', 'symbols', 'Matrix', 'Rational', 'Integer', 'Float',
-        'Symbol', 'Function', 'plt', 'x', 'y', 'z', 't', 'setup_context', 'execute_cell', 'format_error', 'Out'
-    ]);
-
-    try {
-        const keys = pyodide.globals.get('list')(active_context.keys()).toJs();
-
-        for (const key of keys) {
-            // Skip ambient keys (SymPy functions, etc.), internal symbols, or non-string keys
-            if (typeof key !== 'string' || ambient_keys.has(key) || ignored.has(key) || key.startsWith('_')) continue;
-
-            try {
-                const val = active_context.get(key);
-                if (typeof val === 'function') continue;
-
-                const typeName = pyodide.globals.get('type')(val).__name__;
-                let strVal = String(val);
-                if (strVal.length > 100) strVal = strVal.substring(0, 97) + "...";
-
-                vars.push({ name: key, type: typeName, value: strVal });
-            } catch (e) {
-                // Skip if error
-            }
-        }
-    } catch (e) {
-        console.error('Error fetching variables:', e);
-    }
-    return vars;
-}
