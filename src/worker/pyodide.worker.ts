@@ -706,6 +706,12 @@ import matplotlib.pyplot as plt
 def load_extended_context(ctx):
     # Import everything from SymPy into the user context
     exec("from sympy import *", {}, ctx)
+
+    # Import vector module (Stage 2)
+    try:
+        exec("from sympy.vector import *", {}, ctx)
+    except ImportError:
+        pass
     
     # Explicitly import available plotting functions
     try:
@@ -758,9 +764,12 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 
     if (action === 'EXECUTE') {
         try {
-            // Check for premature plotting (Enhanced Regex)
-            if (/\bplot\w*\s*\(/.test(code) && !matplotlibReady && extensionsPromise) {
-                console.log("Worker: Waiting for extensions to load before plotting...");
+            // Check for premature plotting/vector usage (Enhanced Regex)
+            // Keywords that require full extensions loaded
+            const extendedKeywords = /\b(plot\w*|CoordSys3D|divergence|curl|gradient)\s*\(/;
+
+            if (extendedKeywords.test(code) && !matplotlibReady && extensionsPromise) {
+                console.log("Worker: Waiting for extensions to load before execution...");
                 await extensionsPromise;
             }
 
