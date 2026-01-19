@@ -298,22 +298,20 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                             )}
                         </button>
 
-                        <div className="flex flex-col">
-                            <div className="flex items-baseline gap-2">
-                                <span className="text-xs font-mono text-gray-400 dark:text-slate-500 font-bold tracking-tighter w-14">
-                                    {cell.isExecuting ? 'In [*]' :
-                                        (cell.executionCount === undefined || cell.executionCount === null) ? 'In [ ]' :
-                                            `In [${cell.executionCount}]`}
-                                </span>
-                                {isQueued && (
-                                    <span className="flex items-center gap-1 text-[8px] font-medium text-amber-600 dark:text-amber-400 uppercase tracking-widest bg-amber-50 dark:bg-amber-900/20 px-1 py-0.5 rounded border border-amber-200 dark:border-amber-800">
-                                        <Clock size={8} /> QUEUED
-                                    </span>
-                                )}
-                            </div>
+                        <div className="flex items-baseline gap-3">
+                            <span className="text-xs font-mono text-gray-400 dark:text-slate-500 font-bold tracking-tighter">
+                                {cell.isExecuting ? 'In [*]' :
+                                    (cell.executionCount === undefined || cell.executionCount === null) ? 'In [ ]' :
+                                        `In [${cell.executionCount}]`}
+                            </span>
                             {(cell.type === 'code' || cell.type === 'markdown') && (
                                 <span className="text-[9px] font-bold text-gray-300 dark:text-slate-600 select-none uppercase tracking-widest">
                                     {cell.type}
+                                </span>
+                            )}
+                            {isQueued && (
+                                <span className="flex items-center gap-1 text-[8px] font-medium text-amber-600 dark:text-amber-400 uppercase tracking-widest bg-amber-50 dark:bg-amber-900/20 px-1 py-0.5 rounded border border-amber-200 dark:border-amber-800 self-center">
+                                    <Clock size={8} /> QUEUED
                                 </span>
                             )}
                         </div>
