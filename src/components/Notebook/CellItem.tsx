@@ -28,7 +28,7 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
     const {
         updateCell, executeCell, deleteCell, addCell, interrupt, isReady, isGraphicsReady, getCompletions,
         focusedCellId, setFocusedCellId, selectNextCell,
-        setCellEditing, moveCell, duplicateCell, clearCellOutput
+        setCellEditing, moveCell, duplicateCell, clearCellOutput, toggleCellType
     } = useNotebook();
     const { isDark } = useDarkMode();
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
@@ -305,9 +305,13 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                                         `In [${cell.executionCount}]`}
                             </span>
                             {(cell.type === 'code' || cell.type === 'markdown') && (
-                                <span className="text-[9px] font-bold text-gray-300 dark:text-slate-600 select-none uppercase tracking-widest">
+                                <button
+                                    onClick={() => toggleCellType(cell.id)}
+                                    className="text-[9px] font-bold text-gray-300 dark:text-slate-600 select-none uppercase tracking-widest hover:text-blue-500 dark:hover:text-blue-400 cursor-pointer transition-colors"
+                                    title="Switch cell type"
+                                >
                                     {cell.type}
-                                </span>
+                                </button>
                             )}
                             {isQueued && (
                                 <span className="flex items-center gap-1 text-[8px] font-medium text-amber-600 dark:text-amber-400 uppercase tracking-widest bg-amber-50 dark:bg-amber-900/20 px-1 py-0.5 rounded border border-amber-200 dark:border-amber-800 self-center">

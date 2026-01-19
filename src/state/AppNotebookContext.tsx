@@ -28,6 +28,7 @@ interface NotebookContextType {
     setFocusedCellId: (id: string | null) => void;
     addCell: (type: 'code' | 'markdown', index?: number) => string;
     updateCell: (id: string, content: string) => void;
+    toggleCellType: (id: string) => void;
     deleteCell: (id: string) => void;
     executeCell: (id: string, codeOverride?: string) => Promise<void>;
     executeAll: () => Promise<void>;
@@ -297,6 +298,28 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         setCells(prev => prev.map(c => c.id === id ? { ...c, content } : c));
     }, []);
 
+    const toggleCellType = useCallback((id: string) => {
+        setCells(prev => prev.map(c => {
+            if (c.id !== id) return c;
+
+            if (c.type === 'code') {
+                return {
+                    ...c,
+                    type: 'markdown',
+                    outputs: [],
+                    executionCount: undefined,
+                    isEditing: true
+                };
+            } else {
+                return {
+                    ...c,
+                    type: 'code',
+                    isEditing: undefined
+                };
+            }
+        }));
+    }, []);
+
     const resetNotebook = useCallback(() => {
         const initialCells: Cell[] = WELCOME_NOTEBOOK_DATA.map((data) => ({
             id: crypto.randomUUID(),
@@ -460,7 +483,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             cells, variables, activeDocumentation, activeTab, setActiveTab,
             isSidebarOpen, setIsSidebarOpen,
             isReady, focusedCellId, setFocusedCellId,
-            addCell, updateCell, deleteCell, executeCell, executeAll, interrupt, insertExample, importNotebook,
+            addCell, updateCell, toggleCellType, deleteCell, executeCell, executeAll, interrupt, insertExample, importNotebook,
             selectNextCell,
             setCellEditing, moveCell, duplicateCell, clearCellOutput, clearAllOutputs, resetNotebook,
             isGraphicsReady,
