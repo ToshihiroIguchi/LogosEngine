@@ -91,7 +91,7 @@ export const ResultView: React.FC<CellOutputProps> = ({ outputs, executionCount,
                             </pre>
                         )}
 
-                        {output.type !== 'image' && output.type !== 'error' && (
+                        {output.isResult && (
                             <div className="absolute top-0 right-0 flex items-center gap-1">
                                 {onMathAction && executionCount && (
                                     <MathActionMenu onAction={onMathAction} />
@@ -99,7 +99,12 @@ export const ResultView: React.FC<CellOutputProps> = ({ outputs, executionCount,
                                 <CopyMenu output={output} />
                             </div>
                         )}
-                        {output.type !== 'image' && output.type === 'error' && (
+                        {(!output.isResult && output.type !== 'image' && output.type !== 'error') && (
+                            <div className="absolute top-0 right-0">
+                                <CopyMenu output={output} />
+                            </div>
+                        )}
+                        {(!output.isResult && output.type === 'error') && (
                             <div className="absolute top-0 right-0">
                                 <CopyMenu output={output} />
                             </div>

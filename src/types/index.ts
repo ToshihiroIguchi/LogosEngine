@@ -10,6 +10,7 @@ export interface Output {
   errorName?: string;
   missingVariables?: string[];
   timestamp: number;
+  isResult?: boolean;
 }
 
 export interface Cell {
