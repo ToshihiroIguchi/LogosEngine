@@ -313,6 +313,9 @@ def setup_context(ctx):
     code = "from sympy import ${CORE_SYMPY_IMPORTS}"
     exec(code, {}, ctx)
     
+    # Snapshot system state (BEFORE user variables x,y,z,t)
+    ctx['_system_objects'] = {k: id(v) for k, v in ctx.items()}
+    
     # Default symbols
     ctx['x'], ctx['y'], ctx['z'], ctx['t'] = ctx['symbols']('x y z t')
 
@@ -608,6 +611,50 @@ def _search_docs(query, ctx):
 
     symbols.sort(key=symbol_sort_key)
     return {"symbols": symbols[:20], "mentions": mentions}
+
+def _get_variables(ctx):
+    import sys
+    import builtins
+    import inspect
+    
+    variables = []
+    
+    # Helper to check if a variable is a system internal
+    system_objects = ctx.get('_system_objects', {})
+    
+    for name, val in list(ctx.items()):
+        if name.startswith('_'): continue
+        if name in {'In', 'Out', 'exit', 'quit', 'get_ipython', 'open', 'help', 'license', 'copyright', 'credits'}: continue
+        
+        # Snapshot check: Hidden if name matches AND object identity matches
+        # This allows users to overwrite 'pi' or 'x' and see it, but hides default 'pi'
+        if name in system_objects:
+             if id(val) == system_objects[name]:
+                 continue
+        
+        if hasattr(builtins, name): continue
+        if inspect.ismodule(val): continue
+        if inspect.isclass(val): continue
+        if inspect.isfunction(val): continue
+        
+        # Get type name
+        type_name = type(val).__name__
+        
+        # String repr with truncation
+        try:
+             s_val = str(val)
+             if len(s_val) > 200:
+                 s_val = s_val[:200] + '...'
+        except:
+             s_val = "<unprintable>"
+             
+        variables.append({
+            "name": name,
+            "type": type_name,
+            "value": s_val
+        })
+        
+    return variables
 `;
 
 initPyodide();
@@ -704,29 +751,44 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 def load_extended_context(ctx):
-    # Import everything from SymPy into the user context
-    exec("from sympy import *", {}, ctx)
+    # Helper to import and track system objects to preventing UI clutter
+    def tracked_import(exec_code):
+        scope = {}
+        try:
+            exec(exec_code, {}, scope)
+            ctx.update(scope)
+            if '_system_objects' in ctx:
+                for k, v in scope.items():
+                    ctx['_system_objects'][k] = id(v)
+        except ImportError:
+            pass
 
-    # Import vector module (Stage 2)
-    try:
-        exec("from sympy.vector import *", {}, ctx)
-    except ImportError:
-        pass
+    # Import everything from SymPy
+    tracked_import("from sympy import *")
+
+    # Import vector module
+    tracked_import("from sympy.vector import *")
     
     # Explicitly import available plotting functions
     try:
         from sympy.plotting import plot, plot3d, plot_parametric, plot_implicit, plot3d_parametric_surface
-        ctx['plot'] = plot
-        ctx['plot3d'] = plot3d
-        ctx['plot_parametric'] = plot_parametric
-        ctx['plot_implicit'] = plot_implicit
-        ctx['plot3d_parametric_surface'] = plot3d_parametric_surface
+        pkgs = {
+            'plot': plot, 'plot3d': plot3d, 'plot_parametric': plot_parametric,
+            'plot_implicit': plot_implicit, 'plot3d_parametric_surface': plot3d_parametric_surface
+        }
+        ctx.update(pkgs)
+        if '_system_objects' in ctx:
+            for k, v in pkgs.items(): ctx['_system_objects'][k] = id(v)
+            
     except ImportError:
         pass
     
     # Inject plotting
     ctx['plt'] = plt
     ctx['matplotlib'] = matplotlib
+    if '_system_objects' in ctx:
+        ctx['_system_objects']['plt'] = id(plt)
+        ctx['_system_objects']['matplotlib'] = id(matplotlib)
 `);
 
             // Mark graphics ready
@@ -846,7 +908,19 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
                 }
             }
 
-            self.postMessage({ id, status: 'SUCCESS', results: output });
+            // Get variables
+            let variables: any[] = [];
+            try {
+                if (pyodide.globals.has('_get_variables')) {
+                    const get_vars = pyodide.globals.get('_get_variables');
+                    variables = get_vars(ctx).toJs();
+                    get_vars.destroy();
+                }
+            } catch (e) {
+                console.warn('Worker: Failed to retrieve variables', e);
+            }
+
+            self.postMessage({ id, status: 'SUCCESS', results: output, variables });
 
         } catch (err: any) {
             self.postMessage({ id, status: 'ERROR', results: [{ type: 'error', value: err.message, timestamp: Date.now() }] });
