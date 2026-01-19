@@ -832,6 +832,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
                 output.push({
                     type: type,
                     value: value,
+                    rawText: resultVal,
                     tsv: tsvVal || undefined,
                     timestamp: Date.now(),
                     isResult: true
