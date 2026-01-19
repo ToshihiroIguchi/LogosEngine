@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Copy, Check, ChevronDown, Code, Table, FileText } from 'lucide-react';
+import { Copy, Check, ChevronDown, Code, Table, FileText, Eraser } from 'lucide-react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import type { Output } from '../../types';
@@ -10,9 +10,10 @@ interface CellOutputProps {
     executionCount?: number;
     onFixError?: (variables: string[]) => void;
     onMathAction?: (action: string) => void;
+    onClear?: () => void;
 }
 
-export const ResultView: React.FC<CellOutputProps> = ({ outputs, executionCount, onFixError, onMathAction }) => {
+export const ResultView: React.FC<CellOutputProps> = ({ outputs, executionCount, onFixError, onMathAction, onClear }) => {
     const validOutputs = outputs.filter(o => o.value && o.value.trim().length > 0);
 
     if (validOutputs.length === 0) return null;
@@ -97,16 +98,19 @@ export const ResultView: React.FC<CellOutputProps> = ({ outputs, executionCount,
                                     <MathActionMenu onAction={onMathAction} />
                                 )}
                                 <CopyMenu output={output} />
+                                {onClear && <ClearButton onClear={onClear} />}
                             </div>
                         )}
                         {(!output.isResult && output.type !== 'image' && output.type !== 'error') && (
-                            <div className="absolute top-0 right-0">
+                            <div className="absolute top-0 right-0 flex items-center gap-1">
                                 <CopyMenu output={output} />
+                                {onClear && <ClearButton onClear={onClear} />}
                             </div>
                         )}
                         {(!output.isResult && output.type === 'error') && (
-                            <div className="absolute top-0 right-0">
+                            <div className="absolute top-0 right-0 flex items-center gap-1">
                                 <CopyMenu output={output} />
+                                {onClear && <ClearButton onClear={onClear} />}
                             </div>
                         )}
                     </div>
@@ -115,6 +119,16 @@ export const ResultView: React.FC<CellOutputProps> = ({ outputs, executionCount,
         </div>
     );
 };
+
+const ClearButton: React.FC<{ onClear: () => void }> = ({ onClear }) => (
+    <button
+        onClick={onClear}
+        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-white dark:hover:bg-slate-800 rounded border border-transparent hover:border-gray-200 dark:hover:border-slate-700 transition-all shadow-sm bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm opacity-0 group-hover:opacity-100"
+        title="Clear Output"
+    >
+        <Eraser size={14} />
+    </button>
+);
 
 const CopyMenu: React.FC<{ output: Output }> = ({ output }) => {
     const [isOpen, setIsOpen] = useState(false);

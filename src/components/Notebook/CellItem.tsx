@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Play, Trash2, PlusCircle, Clock, Square, ChevronUp, ChevronDown, Copy, Eraser, Eye } from 'lucide-react';
+import { Play, Trash2, PlusCircle, Clock, Square, ChevronUp, ChevronDown, Copy, Eye } from 'lucide-react';
 import MonacoEditor from '@monaco-editor/react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -284,9 +284,6 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                         <button onClick={() => duplicateCell(cell.id)} className="p-1 px-1.5 text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors" title="Duplicate">
                             <Copy size={14} />
                         </button>
-                        <button onClick={() => clearCellOutput(cell.id)} className="p-1 px-1.5 text-gray-400 dark:text-gray-500 hover:text-amber-500 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded transition-colors" title="Clear Output">
-                            <Eraser size={14} />
-                        </button>
                         <div className="w-px h-4 bg-gray-200 dark:bg-slate-800 mx-1" />
                         {cell.type === 'markdown' && !isEditing && (
                             <button onClick={() => setCellEditing(cell.id, true)} className="p-1 px-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors" title="Edit">
@@ -380,6 +377,7 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                                 })}
                                 executionCount={cell.executionCount}
                                 onFixError={handleFixError}
+                                onClear={() => clearCellOutput(cell.id)}
                                 onMathAction={(action) => {
                                     if (typeof cell.executionCount !== 'number') return;
                                     const newContent = `${action}(Out[${cell.executionCount}])`;
