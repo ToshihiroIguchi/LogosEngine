@@ -289,7 +289,7 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                                     ? "bg-red-50 text-red-500 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30"
                                     : "bg-blue-50 text-blue-500 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 hover:scale-105 active:scale-95"
                             )}
-                            title={cell.isExecuting ? "Interrupt (Not supported in this version)" : "Run Cell (Shift+Enter)"}
+                            title={cell.isExecuting ? "Interrupt (Warning: This will reset all variables)" : "Run Cell (Shift+Enter)"}
                         >
                             {cell.isExecuting ? (
                                 <Square size={14} fill="currentColor" />
