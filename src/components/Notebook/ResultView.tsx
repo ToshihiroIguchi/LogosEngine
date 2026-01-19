@@ -92,25 +92,24 @@ export const ResultView: React.FC<CellOutputProps> = ({ outputs, executionCount,
                             </pre>
                         )}
 
-                        {output.isResult && (
-                            <div className="absolute top-0 right-0 flex items-center gap-1">
-                                {onMathAction && executionCount && (
-                                    <MathActionMenu onAction={onMathAction} />
-                                )}
-                                <CopyMenu output={output} />
-                                {onClear && <ClearButton onClear={onClear} />}
-                            </div>
-                        )}
-                        {(!output.isResult && output.type !== 'image' && output.type !== 'error') && (
-                            <div className="absolute top-0 right-0 flex items-center gap-1">
-                                <CopyMenu output={output} />
-                                {onClear && <ClearButton onClear={onClear} />}
-                            </div>
-                        )}
-                        {(!output.isResult && output.type === 'error') && (
-                            <div className="absolute top-0 right-0 flex items-center gap-1">
-                                <CopyMenu output={output} />
-                                {onClear && <ClearButton onClear={onClear} />}
+                        {/* Unified Toolbar */}
+                        {(output.isResult || output.type !== 'image') && (
+                            <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                <div className="flex items-center gap-0.5 p-1 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm border border-gray-200 dark:border-slate-700 rounded-lg shadow-sm">
+                                    {output.isResult && onMathAction && executionCount && (
+                                        <>
+                                            <MathActionMenu onAction={onMathAction} />
+                                            <div className="w-px h-3 bg-gray-200 dark:bg-slate-700 mx-1" />
+                                        </>
+                                    )}
+                                    <CopyMenu output={output} />
+                                    {onClear && (
+                                        <>
+                                            <div className="w-px h-3 bg-gray-200 dark:bg-slate-700 mx-1" />
+                                            <ClearButton onClear={onClear} />
+                                        </>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>
@@ -123,7 +122,7 @@ export const ResultView: React.FC<CellOutputProps> = ({ outputs, executionCount,
 const ClearButton: React.FC<{ onClear: () => void }> = ({ onClear }) => (
     <button
         onClick={onClear}
-        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-white dark:hover:bg-slate-800 rounded border border-transparent hover:border-gray-200 dark:hover:border-slate-700 transition-all shadow-sm bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm opacity-0 group-hover:opacity-100"
+        className="p-1 px-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
         title="Clear Output"
     >
         <Eraser size={14} />
@@ -160,13 +159,13 @@ const CopyMenu: React.FC<{ output: Output }> = ({ output }) => {
         <div
             className={cn(
                 "relative",
-                isOpen ? 'opacity-100 z-50' : 'opacity-0 group-hover:opacity-100 transition-opacity'
+                isOpen ? 'z-50' : ''
             )}
             ref={menuRef}
         >
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-white dark:hover:bg-slate-800 rounded border border-transparent hover:border-gray-200 dark:hover:border-slate-700 transition-all shadow-sm bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm flex items-center gap-1"
+                className="p-1 px-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors flex items-center gap-1"
                 title="Copy options"
             >
                 {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
@@ -234,13 +233,13 @@ const MathActionMenu: React.FC<MathActionMenuProps> = ({ onAction }) => {
         <div
             className={cn(
                 "relative",
-                isOpen ? 'opacity-100 z-50' : 'opacity-0 group-hover:opacity-100 transition-opacity'
+                isOpen ? 'z-50' : ''
             )}
             ref={menuRef}
         >
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="p-1.5 text-gray-400 hover:text-purple-500 hover:bg-white dark:hover:bg-slate-800 rounded border border-transparent hover:border-gray-200 dark:hover:border-slate-700 transition-all shadow-sm bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm flex items-center gap-1"
+                className="p-1 px-1.5 text-gray-400 hover:text-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded transition-colors flex items-center gap-1"
                 title="Math actions"
             >
                 <div className="font-mono text-[10px] font-bold">fx</div>

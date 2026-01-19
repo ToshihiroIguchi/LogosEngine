@@ -222,6 +222,25 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
         readOnly: cell.isExecuting
     }), [cell.isExecuting]);
 
+    const handleExecute = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+
+        if (cell.isExecuting) {
+            interrupt();
+            return;
+        }
+
+        // Reset retry count on manual execution
+        autoRetryCount.current = 0;
+
+        if (cell.type === 'markdown') {
+            setCellEditing(cell.id, false);
+        } else {
+            await executeCell(cell.id);
+        }
+        selectNextCell(cell.id);
+    };
+
     return (
         <div className="group relative mb-6">
             <style dangerouslySetInnerHTML={{
@@ -259,25 +278,53 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                 cell.isExecuting ? (isQueued ? "ring-2 ring-amber-400 border-amber-400 shadow-md z-20" : "ring-2 ring-blue-400 border-blue-400 shadow-md z-20") : "border-gray-200 dark:border-slate-800 shadow-sm dark:shadow-none hover:border-gray-300 dark:hover:border-slate-700 hover:z-[50] focus-within:z-[50]"
             )}>
                 <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50/50 dark:bg-slate-800/30 border-b border-gray-100 dark:border-slate-800 opacity-60 group-hover:opacity-100 transition-opacity rounded-t-xl print:hidden">
+                    {/* Left Group: Execute Button & Label */}
                     <div className="flex items-center gap-3">
-                        <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 font-mono tracking-wider uppercase">
-                            {cell.isExecuting ? 'In [*]' : (cell.executionCount ? `In [${cell.executionCount}]` : 'In [ ]')}
-                        </span>
-                        <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-widest bg-gray-200/50 dark:bg-slate-700/50 px-1.5 py-0.5 rounded">
-                            {cell.type}
-                        </span>
-                        {isQueued && (
-                            <span className="flex items-center gap-1 text-[10px] font-medium text-amber-600 dark:text-amber-400 uppercase tracking-widest bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800">
-                                <Clock size={10} />
-                                Queued
-                            </span>
-                        )}
+                        <button
+                            onClick={handleExecute}
+                            disabled={!isReady && !cell.isExecuting}
+                            className={cn(
+                                "p-1.5 rounded-full transition-all shadow-sm flex-shrink-0 z-10",
+                                cell.isExecuting
+                                    ? "bg-red-50 text-red-500 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30"
+                                    : "bg-blue-50 text-blue-500 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 hover:scale-105 active:scale-95"
+                            )}
+                            title={cell.isExecuting ? "Interrupt (Not supported in this version)" : "Run Cell (Shift+Enter)"}
+                        >
+                            {cell.isExecuting ? (
+                                <Square size={14} fill="currentColor" />
+                            ) : (
+                                <Play size={14} fill="currentColor" />
+                            )}
+                        </button>
+
+                        <div className="flex flex-col">
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-xs font-mono text-gray-400 dark:text-slate-500 font-bold tracking-tighter w-14">
+                                    {cell.isExecuting ? 'In [*]' :
+                                        (cell.executionCount === undefined || cell.executionCount === null) ? 'In [ ]' :
+                                            `In [${cell.executionCount}]`}
+                                </span>
+                                {isQueued && (
+                                    <span className="flex items-center gap-1 text-[8px] font-medium text-amber-600 dark:text-amber-400 uppercase tracking-widest bg-amber-50 dark:bg-amber-900/20 px-1 py-0.5 rounded border border-amber-200 dark:border-amber-800">
+                                        <Clock size={8} /> QUEUED
+                                    </span>
+                                )}
+                            </div>
+                            {(cell.type === 'code' || cell.type === 'markdown') && (
+                                <span className="text-[9px] font-bold text-gray-300 dark:text-slate-600 select-none uppercase tracking-widest">
+                                    {cell.type}
+                                </span>
+                            )}
+                        </div>
                     </div>
-                    <div className="flex items-center gap-0.5">
-                        <button onClick={() => moveCell(cell.id, 'up')} className="p-1 px-1.5 text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors" title="Move Up">
+
+                    {/* Right Group: Management Buttons */}
+                    <div className="flex items-center gap-1">
+                        <button onClick={() => moveCell(cell.id, 'up')} className="p-1 px-1.5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded transition-colors" title="Move Up">
                             <ChevronUp size={14} />
                         </button>
-                        <button onClick={() => moveCell(cell.id, 'down')} className="p-1 px-1.5 text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors" title="Move Down">
+                        <button onClick={() => moveCell(cell.id, 'down')} className="p-1 px-1.5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded transition-colors" title="Move Down">
                             <ChevronDown size={14} />
                         </button>
                         <div className="w-px h-4 bg-gray-200 dark:bg-slate-800 mx-1" />
@@ -288,30 +335,6 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                         {cell.type === 'markdown' && !isEditing && (
                             <button onClick={() => setCellEditing(cell.id, true)} className="p-1 px-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors" title="Edit">
                                 <Eye size={14} />
-                            </button>
-                        )}
-                        {cell.isExecuting ? (
-                            <button onClick={interrupt} className="p-1 px-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors animate-pulse">
-                                <Square size={14} fill="currentColor" />
-                            </button>
-                        ) : (
-                            <button
-                                onClick={async () => {
-                                    // Reset retry count on manual execution
-                                    autoRetryCount.current = 0;
-
-                                    if (cell.type === 'markdown') {
-                                        setCellEditing(cell.id, false);
-                                    } else {
-                                        await executeCell(cell.id);
-                                    }
-                                    selectNextCell(cell.id);
-                                }}
-                                disabled={cell.isExecuting}
-                                className="p-1 px-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors disabled:opacity-30"
-                                title={cell.type === 'markdown' ? 'Render' : 'Execute'}
-                            >
-                                <Play size={14} fill="currentColor" />
                             </button>
                         )}
                         <button onClick={() => deleteCell(cell.id)} className="p-1 px-1.5 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors" title="Delete">
