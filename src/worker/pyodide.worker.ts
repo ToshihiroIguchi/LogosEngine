@@ -943,15 +943,15 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
     else if (action === 'GET_DOCS') {
         try {
             if (!pyodide.globals.has('_search_docs')) {
-                self.postMessage({ id, status: 'SUCCESS', docs: { symbols: [], mentions: [] } });
+                self.postMessage({ id, status: 'SUCCESS', searchResults: { symbols: [], mentions: [] } });
                 return;
             }
             const search_docs = pyodide.globals.get('_search_docs');
             const docs = search_docs(code, ctx).toJs();
             search_docs.destroy();
-            self.postMessage({ id, status: 'SUCCESS', docs });
+            self.postMessage({ id, status: 'SUCCESS', searchResults: docs });
         } catch (e) {
-            self.postMessage({ id, status: 'ERROR', docs: { symbols: [], mentions: [] } });
+            self.postMessage({ id, status: 'ERROR', searchResults: { symbols: [], mentions: [] } });
         }
     }
     else if (action === 'GET_HELP') {

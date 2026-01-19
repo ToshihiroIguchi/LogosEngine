@@ -174,9 +174,20 @@ export function usePyodide() {
     }, [isReady]);
 
     const searchDocs = useCallback((query: string, notebookId?: string): Promise<WorkerResponse> => {
-        // Reuse execute logic with '?' prefix which the worker interprets as a doc request
-        return execute(`?${query}`, notebookId);
-    }, [execute]);
+        if (!workerRef.current || !isReady) return Promise.resolve({ id: '', status: 'ERROR', results: [] });
+
+        const id = crypto.randomUUID();
+        return new Promise((resolve) => {
+            resolversRef.current.set(id, (response) => resolve(response as WorkerResponse));
+            const request: WorkerRequest = {
+                id,
+                action: 'GET_DOCS',
+                code: query,
+                notebookId
+            };
+            workerRef.current?.postMessage(request);
+        });
+    }, [isReady]);
 
     return { isReady, isGraphicsReady, execute, interrupt, getCompletions, resetContext, deleteVariable, searchDocs };
 }
