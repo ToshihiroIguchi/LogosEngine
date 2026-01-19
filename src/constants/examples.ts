@@ -158,9 +158,9 @@ plot3d(sin(r)/r, (x, -10, 10), (y, -10, 10), points=80)`
                 title: "Parametric Plot",
                 code: `# Butterfly Curve (Parametric 2D)
 u = symbols('u')
-plot(
-    (sin(u)*(exp(cos(u)) - 2*cos(4*u) - sin(u/12)**5),
-     cos(u)*(exp(cos(u)) - 2*cos(4*u) - sin(u/12)**5)),
+plot_parametric(
+    sin(u)*(exp(cos(u)) - 2*cos(4*u) - sin(u/12)**5),
+    cos(u)*(exp(cos(u)) - 2*cos(4*u) - sin(u/12)**5),
     (u, 0, 12*pi)
 )`
             }
