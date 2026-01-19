@@ -163,6 +163,17 @@ plot_parametric(
     cos(u)*(exp(cos(u)) - 2*cos(4*u) - sin(u/12)**5),
     (u, 0, 12*pi)
 )`
+            },
+            {
+                title: "Klein Bottle",
+                code: `# Klein Bottle (Figure-8 Immersion)
+u, v = symbols('u v')
+plot3d_parametric_surface(
+    (2 + cos(u/2)*sin(v) - sin(u/2)*sin(2*v)) * cos(u),
+    (2 + cos(u/2)*sin(v) - sin(u/2)*sin(2*v)) * sin(u),
+    sin(u/2)*sin(v) + cos(u/2)*sin(2*v),
+    (u, 0, 2*pi), (v, 0, 2*pi)
+)`
             }
         ]
     }

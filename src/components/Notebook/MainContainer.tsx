@@ -223,7 +223,7 @@ export const MainContainer: React.FC = () => {
                                                     onClick={(e) => { e.stopPropagation(); toggleCategory(category.category); }}
                                                     className="w-full flex items-center justify-between px-4 py-3 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors outline-none focus:outline-none"
                                                 >
-                                                    <span className="text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
+                                                    <span className="text-xs font-bold text-gray-700 dark:text-gray-200">
                                                         {category.category}
                                                     </span>
                                                     {isExpanded ? <ChevronDown size={14} className="text-gray-500 dark:text-gray-400" /> : <ChevronRight size={14} className="text-gray-500 dark:text-gray-400" />}
@@ -332,7 +332,7 @@ export const MainContainer: React.FC = () => {
                                     <div className="p-3 border-2 border-dashed border-gray-200 dark:border-slate-800 rounded-2xl group-hover:border-blue-200 dark:group-hover:border-blue-900 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/20 transition-all">
                                         <Code size={20} />
                                     </div>
-                                    <span className="text-[9px] font-bold uppercase tracking-widest">Code Cell</span>
+                                    <span className="text-[9px] font-bold">Code Cell</span>
                                 </button>
                                 <div className="h-10 w-px bg-gray-100 dark:bg-slate-800" />
                                 <button
@@ -342,7 +342,7 @@ export const MainContainer: React.FC = () => {
                                     <div className="p-3 border-2 border-dashed border-gray-200 dark:border-slate-800 rounded-2xl group-hover:border-purple-200 dark:group-hover:border-purple-900 group-hover:bg-purple-50/50 dark:group-hover:bg-purple-900/20 transition-all">
                                         <FileText size={20} />
                                     </div>
-                                    <span className="text-[9px] font-bold uppercase tracking-widest">Markdown Cell</span>
+                                    <span className="text-[9px] font-bold">Markdown Cell</span>
                                 </button>
                             </div>
                         </div>
