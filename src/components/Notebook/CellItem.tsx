@@ -304,6 +304,15 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                                     (cell.executionCount === undefined || cell.executionCount === null) ? 'In [ ]' :
                                         `In [${cell.executionCount}]`}
                             </span>
+
+                            {cell.executionTime !== undefined && (
+                                <span className="text-[10px] text-gray-400 dark:text-slate-500 font-mono">
+                                    {cell.executionTime < 1000
+                                        ? `${cell.executionTime}ms`
+                                        : `${(cell.executionTime / 1000).toFixed(2)}s`}
+                                </span>
+                            )}
+
                             {(cell.type === 'code' || cell.type === 'markdown') && (
                                 <button
                                     onClick={() => toggleCellType(cell.id)}

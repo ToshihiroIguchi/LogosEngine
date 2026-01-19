@@ -19,6 +19,7 @@ export interface Cell {
   content: string;
   outputs: Output[];
   executionCount?: number;
+  executionTime?: number;
   isExecuting: boolean;
   isEditing?: boolean; // Used for Markdown cells
 }
