@@ -1,7 +1,8 @@
 import React from 'react';
 import { useNotebook } from '../../state/AppNotebookContext';
-import { Database, X, Hash, BookCopy, Info, FolderOpen, Trash2, Search, HelpCircle } from 'lucide-react';
+import { Database, X, Hash, BookCopy, Info, FolderOpen, Trash2, Search, HelpCircle, Sigma } from 'lucide-react';
 import { NotebookExplorer } from './NotebookExplorer';
+import { SYMBOL_CATEGORIES } from '../../constants/symbols';
 import DOMPurify from 'dompurify';
 import renderMathInElement from 'katex/contrib/auto-render';
 import 'katex/dist/katex.min.css';
@@ -14,7 +15,7 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
-    const { variables, activeDocumentation, setActiveDocumentation, activeTab, setActiveTab, fileList, deleteVariable, searchDocs, searchResults } = useNotebook();
+    const { variables, activeDocumentation, setActiveDocumentation, activeTab, setActiveTab, fileList, deleteVariable, searchDocs, searchResults, focusedCellId, cells, updateCell, addCell } = useNotebook();
     const [searchQuery, setSearchQuery] = React.useState('');
     useDarkMode(); // Use the dark mode hook to trigger re-renders for dark mode classes
 
@@ -50,7 +51,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         }
     }, [isResizing]);
 
-    const docRef = React.useRef<HTMLDivElement>(null);
+    const containerRef = React.useRef<HTMLDivElement>(null);
 
     // Resizing logic
     React.useEffect(() => {
@@ -66,24 +67,42 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
     // KaTeX rendering logic
     React.useEffect(() => {
-        if (activeDocumentation?.htmlContent && docRef.current) {
-            renderMathInElement(docRef.current, {
-                delimiters: [
-                    { left: '$$', right: '$$', display: true },
-                    { left: '$', right: '$', display: false },
-                    { left: '\\(', right: '\\)', display: false },
-                    { left: '\\[', right: '\\]', display: true }
-                ],
-                ignoredClasses: ['prose-code', 'prose-pre'],
-                throwOnError: false
+        if (containerRef.current) {
+            // Small delay to ensure DOM is ready after tab switch
+            requestAnimationFrame(() => {
+                if (containerRef.current) {
+                    renderMathInElement(containerRef.current, {
+                        delimiters: [
+                            { left: '$$', right: '$$', display: true },
+                            { left: '$', right: '$', display: false },
+                            { left: '\\(', right: '\\)', display: false },
+                            { left: '\\[', right: '\\]', display: true }
+                        ],
+                        ignoredClasses: ['prose-code', 'prose-pre'],
+                        throwOnError: false
+                    });
+                }
             });
         }
-    }, [activeDocumentation]);
+    }, [activeDocumentation, activeTab, searchResults, variables]);
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
         if (searchQuery.trim()) {
             searchDocs(searchQuery.trim());
+        }
+    };
+
+    const handleInsertSymbol = (code: string) => {
+        if (focusedCellId) {
+            const cell = cells.find(c => c.id === focusedCellId);
+            if (cell) {
+                const separator = cell.content.length > 0 && !cell.content.match(/\s$/) ? ' ' : '';
+                updateCell(focusedCellId, cell.content + separator + code);
+            }
+        } else {
+            const newId = addCell('code');
+            updateCell(newId, code);
         }
     };
 
@@ -139,6 +158,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                     >
                         <HelpCircle size={14} /> Help
                     </button>
+                    <button
+                        onClick={() => setActiveTab('symbols')}
+                        className={cn(
+                            "flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-bold rounded-md transition-all uppercase tracking-wide",
+                            activeTab === 'symbols'
+                                ? 'bg-white dark:bg-slate-700 text-purple-600 dark:text-purple-400 shadow-sm border border-gray-200/50 dark:border-slate-600/50'
+                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                        )}
+                        title="Common Symbols"
+                    >
+                        <Sigma size={14} /> Symbols
+                    </button>
                 </div>
 
                 <button
@@ -150,7 +181,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 </button>
             </div>
 
-            <div className={`flex-1 overflow-y-auto ${isResizing ? 'select-none pointer-events-none' : ''}`}>
+            <div
+                ref={containerRef}
+                className={`flex-1 overflow-y-auto ${isResizing ? 'select-none pointer-events-none' : ''}`}
+            >
                 {activeTab === 'files' ? (
                     <NotebookExplorer />
                 ) : activeTab === 'variables' ? (
@@ -234,7 +268,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                                         <span className="text-[10px] font-bold uppercase tracking-widest">Description</span>
                                     </div>
                                     <div
-                                        ref={docRef}
                                         className="text-xs text-gray-700 dark:text-gray-300 font-sans leading-relaxed prose prose-sm prose-blue dark:prose-invert max-w-none 
                                                        prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-headings:font-bold prose-headings:mb-2 prose-headings:mt-4
                                                        prose-p:mb-3 prose-p:mt-0
@@ -320,6 +353,39 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                             </div>
                         )}
                     </div>
+                ) : activeTab === 'symbols' ? (
+                    <div className="flex flex-col h-full overflow-y-auto divide-y divide-gray-50 dark:divide-slate-800 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        {SYMBOL_CATEGORIES.map((category) => (
+                            <div key={category.category} className="p-4">
+                                <h3 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    {category.category}
+                                </h3>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {category.items.map((item) => (
+                                        <button
+                                            key={item.name}
+                                            onClick={() => handleInsertSymbol(item.code)}
+                                            className="flex flex-col items-center justify-center p-3 rounded-lg border border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200 dark:hover:border-blue-800 transition-all group relative"
+                                            title={item.description || item.name}
+                                        >
+                                            <span className="text-lg font-serif mb-1 text-gray-800 dark:text-gray-200 group-hover:scale-110 transition-transform">
+                                                {/* Render latex-like symbol using span for now or KaTeX if needed. 
+                                                    For simplicity, we use text. Most symbols like pi, e, i can be rendered as text or we can use the latex string if we had a mini-renderer.
+                                                    Let's just use the Name + Latex (as text) for now, or trust the user knows \pi.
+                                                    Actually, let's use a KaTeX renderer if possible or just display the LaTeX string.
+                                                    Since we have auto-render, we can put standard latex delimiters.
+                                                */}
+                                                <span dangerouslySetInnerHTML={{ __html: isNaN(Number(item.latex)) ? `$${item.latex}$` : item.latex }} />
+                                            </span>
+                                            <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-tight group-hover:text-blue-500 dark:group-hover:text-blue-400">{item.name}</span>
+                                            <span className="text-[9px] font-mono text-gray-300 dark:text-gray-600 mt-1">{item.code}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+
+                    </div>
                 ) : null}
             </div>
 
@@ -329,7 +395,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                         ? `${fileList.length} Notebooks`
                         : activeTab === 'variables'
                             ? `${variables.length} Active ${variables.length === 1 ? 'Symbol' : 'Symbols'}`
-                            : activeDocumentation ? 'Viewing Documentation' : 'Ready for help (?)'}
+                            : activeTab === 'symbols' ? 'Click to insert'
+                                : activeDocumentation ? 'Viewing Documentation' : 'Ready for help (?)'}
                 </div>
                 <div className="text-[9px] text-gray-300 dark:text-gray-600 font-mono ml-2" title={`Commit: ${__COMMIT_HASH__}`}>
                     v{__APP_VERSION__}-{__COMMIT_HASH__}
