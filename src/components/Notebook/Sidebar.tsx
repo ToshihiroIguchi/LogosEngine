@@ -4,8 +4,7 @@ import { Database, X, Hash, BookCopy, Info, FolderOpen, Trash2, Search, HelpCirc
 import { NotebookExplorer } from './NotebookExplorer';
 import { SYMBOL_CATEGORIES } from '../../constants/symbols';
 import DOMPurify from 'dompurify';
-import renderMathInElement from 'katex/contrib/auto-render';
-import 'katex/dist/katex.min.css';
+import { KatexRenderer } from '../UI/KatexRenderer';
 import { useDarkMode } from '../../hooks/useDarkMode'; // Assuming this hook exists
 import { cn } from '../../lib/utils'; // Assuming this utility exists
 
@@ -65,26 +64,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         };
     }, [isResizing, resize, stopResizing]);
 
-    // KaTeX rendering logic
-    React.useEffect(() => {
-        if (containerRef.current) {
-            // Small delay to ensure DOM is ready after tab switch
-            requestAnimationFrame(() => {
-                if (containerRef.current) {
-                    renderMathInElement(containerRef.current, {
-                        delimiters: [
-                            { left: '$$', right: '$$', display: true },
-                            { left: '$', right: '$', display: false },
-                            { left: '\\(', right: '\\)', display: false },
-                            { left: '\\[', right: '\\]', display: true }
-                        ],
-                        ignoredClasses: ['prose-code', 'prose-pre'],
-                        throwOnError: false
-                    });
-                }
-            });
-        }
-    }, [activeDocumentation, activeTab, searchResults, variables]);
+    // OLD KaTeX Effect removed in favor of KatexRenderer component
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
@@ -360,47 +340,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                                 <h3 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                                     {category.category}
                                 </h3>
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="grid grid-cols-4 gap-2">
                                     {category.items.map((item) => (
                                         <button
                                             key={item.name}
                                             onClick={() => handleInsertSymbol(item.code)}
-                                            className="flex flex-col items-center justify-center p-3 rounded-lg border border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200 dark:hover:border-blue-800 transition-all group relative"
-                                            title={item.description || item.name}
+                                            className="aspect-square flex flex-col items-center justify-center p-1 rounded-lg border border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200 dark:hover:border-blue-800 transition-all group relative"
+                                            title={`${item.name} (${item.code})`}
                                         >
-                                            <span className="text-lg font-serif mb-1 text-gray-800 dark:text-gray-200 group-hover:scale-110 transition-transform">
-                                                {/* Render latex-like symbol using span for now or KaTeX if needed. 
-                                                    For simplicity, we use text. Most symbols like pi, e, i can be rendered as text or we can use the latex string if we had a mini-renderer.
-                                                    Let's just use the Name + Latex (as text) for now, or trust the user knows \pi.
-                                                    Actually, let's use a KaTeX renderer if possible or just display the LaTeX string.
-                                                    Since we have auto-render, we can put standard latex delimiters.
-                                                */}
-                                                <span dangerouslySetInnerHTML={{ __html: isNaN(Number(item.latex)) ? `$${item.latex}$` : item.latex }} />
+                                            <span className="text-lg text-gray-800 dark:text-gray-200 group-hover:scale-110 transition-transform">
+                                                <KatexRenderer tex={item.latex} />
                                             </span>
-                                            <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-tight group-hover:text-blue-500 dark:group-hover:text-blue-400">{item.name}</span>
-                                            <span className="text-[9px] font-mono text-gray-300 dark:text-gray-600 mt-1">{item.code}</span>
                                         </button>
                                     ))}
                                 </div>
                             </div>
                         ))}
-
                     </div>
                 ) : null}
-            </div>
-
-            <div className="p-4 bg-gray-50 dark:bg-slate-900/50 border-t border-gray-100 dark:border-slate-800 flex justify-between items-center">
-                <div className="text-[10px] text-gray-400 dark:text-gray-500 font-mono uppercase tracking-widest text-center flex-1">
-                    {activeTab === 'files'
-                        ? `${fileList.length} Notebooks`
-                        : activeTab === 'variables'
-                            ? `${variables.length} Active ${variables.length === 1 ? 'Symbol' : 'Symbols'}`
-                            : activeTab === 'symbols' ? 'Click to insert'
-                                : activeDocumentation ? 'Viewing Documentation' : 'Ready for help (?)'}
-                </div>
-                <div className="text-[9px] text-gray-300 dark:text-gray-600 font-mono ml-2" title={`Commit: ${__COMMIT_HASH__}`}>
-                    v{__APP_VERSION__}-{__COMMIT_HASH__}
-                </div>
             </div>
         </div>
     );
