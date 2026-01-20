@@ -336,19 +336,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 ) : activeTab === 'symbols' ? (
                     <div className="flex flex-col h-full overflow-y-auto divide-y divide-gray-50 dark:divide-slate-800 animate-in fade-in slide-in-from-bottom-2 duration-300">
                         {SYMBOL_CATEGORIES.map((category) => (
-                            <div key={category.category} className="p-4">
-                                <h3 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                            <div key={category.category} className="p-2">
+                                <h3 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-2">
                                     {category.category}
                                 </h3>
-                                <div className="grid grid-cols-4 gap-2">
+                                <div className="grid grid-cols-6 gap-1">
                                     {category.items.map((item) => (
                                         <button
                                             key={item.name}
                                             onClick={() => handleInsertSymbol(item.code)}
-                                            className="aspect-square flex flex-col items-center justify-center p-1 rounded-lg border border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200 dark:hover:border-blue-800 transition-all group relative"
+                                            className="h-9 w-9 flex flex-col items-center justify-center p-0.5 rounded border border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200 dark:hover:border-blue-800 transition-all group relative"
                                             title={`${item.name} (${item.code})`}
                                         >
-                                            <span className="text-lg text-gray-800 dark:text-gray-200 group-hover:scale-110 transition-transform">
+                                            <span className="text-sm text-gray-800 dark:text-gray-200 group-hover:scale-110 transition-transform">
                                                 <KatexRenderer tex={item.latex} />
                                             </span>
                                         </button>
