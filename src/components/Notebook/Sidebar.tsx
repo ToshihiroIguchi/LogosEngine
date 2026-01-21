@@ -98,50 +98,50 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                     <button
                         onClick={() => setActiveTab('files')}
                         className={cn(
-                            "flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-bold rounded-md transition-all",
+                            "flex-1 flex items-center justify-center p-2 rounded-md transition-all",
                             activeTab === 'files'
                                 ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm border border-gray-200/50 dark:border-slate-600/50'
                                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                         )}
-                        title="File Explorer"
+                        title="File Explorer (Notebooks)"
                     >
-                        <FolderOpen size={14} /> Notebooks
+                        <FolderOpen size={18} />
                     </button>
                     <button
                         onClick={() => setActiveTab('variables')}
                         className={cn(
-                            "flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-bold rounded-md transition-all",
+                            "flex-1 flex items-center justify-center p-2 rounded-md transition-all",
                             activeTab === 'variables'
                                 ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm border border-gray-200/50 dark:border-slate-600/50'
                                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                         )}
                         title="Variable Inspector"
                     >
-                        <Database size={14} /> Variables
+                        <Database size={18} />
                     </button>
                     <button
                         onClick={() => setActiveTab('documentation')}
                         className={cn(
-                            "flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-bold rounded-md transition-all",
+                            "flex-1 flex items-center justify-center p-2 rounded-md transition-all",
                             activeTab === 'documentation'
                                 ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm border border-gray-200/50 dark:border-slate-600/50'
                                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                         )}
                         title="Documentation Search"
                     >
-                        <HelpCircle size={14} /> Help
+                        <HelpCircle size={18} />
                     </button>
                     <button
                         onClick={() => setActiveTab('symbols')}
                         className={cn(
-                            "flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-bold rounded-md transition-all",
+                            "flex-1 flex items-center justify-center p-2 rounded-md transition-all",
                             activeTab === 'symbols'
                                 ? 'bg-white dark:bg-slate-700 text-purple-600 dark:text-purple-400 shadow-sm border border-gray-200/50 dark:border-slate-600/50'
                                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                         )}
                         title="Common Symbols"
                     >
-                        <Sigma size={14} /> Symbols
+                        <Sigma size={18} />
                     </button>
                 </div>
 
