@@ -14,7 +14,7 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
-    const { variables, activeDocumentation, setActiveDocumentation, activeTab, setActiveTab, fileList, deleteVariable, searchDocs, searchResults, focusedCellId, cells, updateCell, addCell } = useNotebook();
+    const { variables, activeDocumentation, setActiveDocumentation, activeTab, setActiveTab, fileList, deleteVariable, searchDocs, searchResults, insertTextAtCursor } = useNotebook();
     const [searchQuery, setSearchQuery] = React.useState('');
     useDarkMode(); // Use the dark mode hook to trigger re-renders for dark mode classes
 
@@ -74,16 +74,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     };
 
     const handleInsertSymbol = (code: string) => {
-        if (focusedCellId) {
-            const cell = cells.find(c => c.id === focusedCellId);
-            if (cell) {
-                const separator = cell.content.length > 0 && !cell.content.match(/\s$/) ? ' ' : '';
-                updateCell(focusedCellId, cell.content + separator + code);
-            }
-        } else {
-            const newId = addCell('code');
-            updateCell(newId, code);
-        }
+        // Check if code ends with (), if so move cursor inside
+        const offset = code.endsWith('()') ? -1 : 0;
+        insertTextAtCursor(code, offset);
     };
 
     if (!isOpen) return null;

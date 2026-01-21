@@ -56,6 +56,9 @@ interface NotebookContextType {
     openNotebook: (id: string) => Promise<void>;
     deleteNotebook: (id: string) => Promise<void>;
     renameNotebook: (id: string, title: string) => Promise<void>;
+    displayName?: string;
+    registerInsertHandler: (handler: (text: string, relativeCursorPos?: number) => void) => void;
+    insertTextAtCursor: (text: string, relativeCursorPos?: number) => void;
 }
 
 const NotebookContext = createContext<NotebookContextType | undefined>(undefined);
@@ -91,6 +94,9 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     const [isDirty, setIsDirty] = useState(false);
     const isInitialMount = useRef(true);
     const executionCountRef = useRef(1);
+
+    // Handler for inserting text at the cursor of the active cell
+    const activeInsertHandler = useRef<((text: string, relativeCursorPos?: number) => void) | null>(null);
 
     // Initial Load
     useEffect(() => {
@@ -481,6 +487,21 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         }
     }, [createCell]);
 
+    const registerInsertHandler = useCallback((handler: (text: string, relativeCursorPos?: number) => void) => {
+        activeInsertHandler.current = handler;
+    }, []);
+
+    const insertTextAtCursor = useCallback((text: string, relativeCursorPos?: number) => {
+        if (activeInsertHandler.current) {
+            activeInsertHandler.current(text, relativeCursorPos);
+        } else {
+            // Fallback: if no cell is active (or handler lost), create a new cell at the end
+            const newId = addCell('code');
+            updateCell(newId, text);
+            // We can't easily set cursor position for a new cell from here, but that's acceptable fallback behavior
+        }
+    }, [addCell, updateCell]);
+
 
 
     return (
@@ -495,7 +516,8 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             getCompletions,
             deleteVariable, searchDocs, searchResults,
             fileList, currentNotebookId, isDirty, createNotebook, openNotebook, deleteNotebook, renameNotebook,
-            setActiveDocumentation
+            setActiveDocumentation,
+            registerInsertHandler, insertTextAtCursor
         }}>
             {children}
         </NotebookContext.Provider>

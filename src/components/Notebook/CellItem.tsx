@@ -28,7 +28,8 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
     const {
         updateCell, executeCell, deleteCell, addCell, interrupt, isReady, isGraphicsReady, getCompletions,
         focusedCellId, setFocusedCellId, selectNextCell,
-        setCellEditing, moveCell, duplicateCell, clearCellOutput, toggleCellType
+        setCellEditing, moveCell, duplicateCell, clearCellOutput, toggleCellType,
+        registerInsertHandler
     } = useNotebook();
     const { isDark } = useDarkMode();
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
@@ -86,8 +87,53 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
         if (focusedCellId === cell.id) {
             editor.focus();
             setFocusedCellId(null);
+            // Explicitly register as active if we just focused it
+            // We need to define the handler first, so moving the logic up or defining it separate.
+            // Let's refactor slightly to define handler inside here.
         }
-    }, [cell.id, cell.type, focusedCellId, setFocusedCellId, getCompletions]);
+
+        // Registration of Insert Handler
+        const handleInsert = (text: string, relativeCursorPos?: number) => {
+            const position = editor.getPosition();
+            const selection = editor.getSelection();
+
+            if (position && selection) {
+                const range = new monaco.Range(
+                    selection.startLineNumber,
+                    selection.startColumn,
+                    selection.endLineNumber,
+                    selection.endColumn
+                );
+
+                editor.executeEdits('insert-symbol', [{
+                    range: range,
+                    text: text,
+                    forceMoveMarkers: true
+                }]);
+
+                if (relativeCursorPos) {
+                    const newPos = editor.getPosition();
+                    if (newPos) {
+                        editor.setPosition({
+                            lineNumber: newPos.lineNumber,
+                            column: newPos.column + relativeCursorPos
+                        });
+                    }
+                }
+                editor.focus();
+            }
+        };
+
+        editor.onDidFocusEditorText(() => {
+            registerInsertHandler(handleInsert);
+        });
+
+        // Also register immediately if this cell is the one being focused on mount
+        if (focusedCellId === cell.id) {
+            registerInsertHandler(handleInsert);
+        }
+
+    }, [cell.id, cell.type, focusedCellId, setFocusedCellId, getCompletions, registerInsertHandler]);
 
     // Handle focus when this cell is selected as the next cell
     React.useEffect(() => {
