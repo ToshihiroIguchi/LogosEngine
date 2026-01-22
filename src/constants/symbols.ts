@@ -40,6 +40,9 @@ export const SYMBOL_CATEGORIES: SymbolCategory[] = [
             { name: 'Sinh', latex: '\\sinh', code: 'sinh()', description: 'Hyperbolic Sine' },
             { name: 'Cosh', latex: '\\cosh', code: 'cosh()', description: 'Hyperbolic Cosine' },
             { name: 'Tanh', latex: '\\tanh', code: 'tanh()', description: 'Hyperbolic Tangent' },
+            { name: 'Numerical', latex: 'N', code: 'N()', description: 'Numerical Evaluation' },
+            { name: 'Degrees', latex: '^\\circ', code: 'deg', description: 'Convert to degrees' },
+            { name: 'Radians', latex: 'rad', code: 'rad', description: 'Convert to radians' },
         ]
     },
     {
@@ -59,6 +62,8 @@ export const SYMBOL_CATEGORIES: SymbolCategory[] = [
             { name: 'Limit', latex: '\\lim', code: 'Limit()', description: 'Limit of a function' },
             { name: 'Summation', latex: '\\sum', code: 'Sum()', description: 'Summation' },
             { name: 'Product', latex: '\\prod', code: 'Product()', description: 'Product sequence' },
+            { name: 'Diff Eq', latex: 'y\'=y', code: 'dsolve()', description: 'Solve differential equation' },
+            { name: 'Series', latex: '\\sum c_n x^n', code: 'series()', description: 'Series expansion' },
         ]
     },
     {

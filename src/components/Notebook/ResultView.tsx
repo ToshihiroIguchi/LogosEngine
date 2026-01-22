@@ -227,6 +227,7 @@ const MathActionMenu: React.FC<MathActionMenuProps> = ({ onAction }) => {
         { label: 'Expand', value: 'expand', icon: 'Expand' },
         { label: 'Factor', value: 'factor', icon: 'Factor' },
         { label: 'Simplify', value: 'simplify', icon: '✨' },
+        { label: 'Numerical', value: 'N', icon: '123' },
     ];
 
     return (
