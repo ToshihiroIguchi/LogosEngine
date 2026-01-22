@@ -14,7 +14,7 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
-    const { variables, activeDocumentation, setActiveDocumentation, activeTab, setActiveTab, fileList, deleteVariable, searchDocs, searchResults, insertTextAtCursor } = useNotebook();
+    const { variables, activeDocumentation, setActiveDocumentation, activeTab, setActiveTab, deleteVariable, searchDocs, searchResults, insertTextAtCursor } = useNotebook();
     const [searchQuery, setSearchQuery] = React.useState('');
     useDarkMode(); // Use the dark mode hook to trigger re-renders for dark mode classes
 
