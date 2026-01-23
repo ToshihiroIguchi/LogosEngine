@@ -47,7 +47,6 @@ export const SYMBOL_CATEGORIES: SymbolCategory[] = [
             { name: 'Tanh', latex: '\\tanh', code: 'tanh()', description: 'Hyperbolic Tangent' },
             { name: 'Numerical', latex: 'N', code: 'N()', description: 'Numerical Evaluation' },
             { name: 'Degrees', latex: '^\\circ', code: 'deg', description: 'Convert to degrees' },
-            { name: 'Radians', latex: 'rad', code: 'rad', description: 'Convert to radians' },
         ]
     },
     {
@@ -86,32 +85,27 @@ export const SYMBOL_CATEGORIES: SymbolCategory[] = [
         ]
     },
     {
-        category: 'Discrete Math',
+        category: 'Sets',
         items: [
-            { name: 'GCD', latex: '\\text{gcd}', code: 'gcd()', description: 'Greatest Common Divisor', label: 'GCD' },
-            { name: 'LCM', latex: '\\text{lcm}', code: 'lcm()', description: 'Least Common Multiple', label: 'LCM' },
-            { name: 'Binomial', latex: '\\binom{n}{k}', code: 'binomial()', description: 'Binomial coefficient' },
-            { name: 'Factorial', latex: 'n!', code: 'factorial()', description: 'Factorial function' },
-        ]
-    },
-    {
-        category: 'Logic & Sets',
-        items: [
-            { name: 'Equal', latex: '=', code: 'Eq()', description: 'Equality relation' },
-            { name: 'Not Equal', latex: '\\neq', code: 'Ne()', description: 'Inequality relation' },
-            { name: 'Greater', latex: '>', code: '>', description: 'Greater than' },
-            { name: 'Less', latex: '<', code: '<', description: 'Less than' },
-            { name: 'Greater Eq', latex: '\\ge', code: '>=', description: 'Greater than or equal' },
-            { name: 'Less Eq', latex: '\\le', code: '<=', description: 'Less than or equal' },
-            { name: 'And', latex: '\\land', code: '&', description: 'Logical AND' },
-            { name: 'Or', latex: '\\lor', code: '|', description: 'Logical OR' },
-            { name: 'Not', latex: '\\neg', code: '~', description: 'Logical NOT' },
-            { name: 'Implies', latex: '\\implies', code: '>>', description: 'Logical Implication' },
             { name: 'Integers', latex: '\\mathbb{Z}', code: 'S.Integers', description: 'Set of all integers' },
             { name: 'Reals', latex: '\\mathbb{R}', code: 'S.Reals', description: 'Set of all real numbers' },
             { name: 'Naturals', latex: '\\mathbb{N}', code: 'S.Naturals', description: 'Set of natural numbers' },
             { name: 'Complexes', latex: '\\mathbb{C}', code: 'S.Complexes', description: 'Set of complex numbers' },
             { name: 'Empty Set', latex: '\\emptyset', code: 'S.EmptySet', description: 'The empty set' },
+        ]
+    },
+    {
+        category: 'Special Functions',
+        items: [
+            { name: 'Gamma', latex: '\\Gamma', code: 'gamma()', description: 'Gamma Function' },
+            { name: 'Error Func', latex: '\\text{erf}', code: 'erf()', description: 'Error Function' },
+            { name: 'Floor', latex: '\\lfloor x \\rfloor', code: 'floor()', description: 'Floor function' },
+            { name: 'Ceil', latex: '\\lceil x \\rceil', code: 'ceil()', description: 'Ceiling function' },
+            { name: 'Modulo', latex: '\\text{mod}', code: 'Mod()', description: 'Modulo operation' },
+            { name: 'GCD', latex: '\\text{gcd}', code: 'gcd()', description: 'Greatest Common Divisor', label: 'GCD' },
+            { name: 'LCM', latex: '\\text{lcm}', code: 'lcm()', description: 'Least Common Multiple', label: 'LCM' },
+            { name: 'Binomial', latex: '\\binom{n}{k}', code: 'binomial()', description: 'Binomial coefficient' },
+            { name: 'Factorial', latex: 'n!', code: 'factorial()', description: 'Factorial function' },
         ]
     }
 ];
