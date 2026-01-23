@@ -495,12 +495,28 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         if (activeInsertHandler.current) {
             activeInsertHandler.current(text, relativeCursorPos);
         } else {
-            // Fallback: if no cell is active (or handler lost), create a new cell at the end
-            const newId = addCell('code');
-            updateCell(newId, text);
-            // We can't easily set cursor position for a new cell from here, but that's acceptable fallback behavior
+            // Fallback: Smart Append
+            setCells(prev => {
+                const lastCell = prev[prev.length - 1];
+
+                // If last cell exists, is 'code' type, and is empty -> Reuse it
+                if (lastCell && lastCell.type === 'code' && !lastCell.content.trim()) {
+                    setFocusedCellId(lastCell.id);
+                    return prev.map(c => c.id === lastCell.id ? { ...c, content: text } : c);
+                }
+
+                // Otherwise create new cell
+                const newCell = createCell('code', text);
+                // We need to set focus to this new cell, but we can't do it inside setCells reducer safely if we rely on external state immediately.
+                // However, we can use a useEffect or just fire-and-forget here, or update focusedId separately.
+                // Since this is inside a callback, let's update focusedId after setCells (but we need the ID).
+                // Actually, let's allow the separate state update.
+                setTimeout(() => setFocusedCellId(newCell.id), 0);
+
+                return [...prev, newCell];
+            });
         }
-    }, [addCell, updateCell]);
+    }, [createCell]);
 
 
 
