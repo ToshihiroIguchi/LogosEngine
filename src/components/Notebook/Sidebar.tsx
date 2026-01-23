@@ -333,16 +333,31 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                                 <h3 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 mb-2 flex items-center gap-2">
                                     {category.category}
                                 </h3>
-                                <div className="grid grid-cols-6 gap-1">
+                                <div className={`grid gap-1 ${category.layout === 'wide' ? 'grid-cols-2' : 'grid-cols-6'}`}>
                                     {category.items.map((item) => (
                                         <button
                                             key={item.name}
                                             onClick={() => handleInsertSymbol(item.code)}
-                                            className="h-9 w-9 flex flex-col items-center justify-center p-0.5 rounded border border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200 dark:hover:border-blue-800 transition-all group relative"
+                                            className={cn(
+                                                "flex flex-col items-center justify-center p-0.5 rounded border border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200 dark:hover:border-blue-800 transition-all group relative",
+                                                category.layout === 'wide' ? 'h-9 w-full px-3' : (item.colSpan ? 'h-9 w-full' : 'h-9 w-9'),
+                                                item.colSpan === 2 && "col-span-2"
+                                            )}
                                             title={`${item.name} (${item.code})`}
                                         >
                                             <span className="text-sm text-gray-800 dark:text-gray-200 group-hover:scale-110 transition-transform">
-                                                <KatexRenderer tex={item.latex} />
+                                                {item.icon ? (
+                                                    <item.icon size={18} className="text-gray-600 dark:text-gray-400" />
+                                                ) : item.label ? (
+                                                    <span className={cn(
+                                                        "text-gray-600 dark:text-gray-400",
+                                                        category.layout === 'wide' ? 'font-sans text-xs font-semibold' : 'font-bold text-[11px]'
+                                                    )}>
+                                                        {item.label}
+                                                    </span>
+                                                ) : (
+                                                    <KatexRenderer tex={item.latex} />
+                                                )}
                                             </span>
                                         </button>
                                     ))}

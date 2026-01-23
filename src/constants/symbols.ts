@@ -1,14 +1,19 @@
+import { type LucideIcon } from 'lucide-react';
 
 export interface SymbolItem {
     name: string;
     latex: string;
     code: string;
     description?: string;
+    icon?: LucideIcon;
+    label?: string;
+    colSpan?: number;
 }
 
 export interface SymbolCategory {
     category: string;
     items: SymbolItem[];
+    layout?: 'grid' | 'wide';
 }
 
 export const SYMBOL_CATEGORIES: SymbolCategory[] = [
@@ -47,11 +52,12 @@ export const SYMBOL_CATEGORIES: SymbolCategory[] = [
     },
     {
         category: 'Algebra',
+        layout: 'wide',
         items: [
-            { name: 'Solve', latex: 'x=?', code: 'solve()', description: 'Solve equations' },
-            { name: 'Simplify', latex: '\\text{simp}', code: 'simplify()', description: 'Simplify expression' },
-            { name: 'Expand', latex: '\\text{expd}', code: 'expand()', description: 'Expand expression' },
-            { name: 'Factor', latex: '\\text{fact}', code: 'factor()', description: 'Factor expression' },
+            { name: 'Solve', latex: 'Solve', code: 'solve()', description: 'Solve equations', label: 'Solve' },
+            { name: 'Simplify', latex: 'Simplify', code: 'simplify()', description: 'Simplify expression', label: 'Simplify' },
+            { name: 'Expand', latex: 'Expand', code: 'expand()', description: 'Expand expression', label: 'Expand' },
+            { name: 'Factor', latex: 'Factor', code: 'factor()', description: 'Factor expression', label: 'Factor' },
         ]
     },
     {
@@ -62,8 +68,8 @@ export const SYMBOL_CATEGORIES: SymbolCategory[] = [
             { name: 'Limit', latex: '\\lim', code: 'Limit()', description: 'Limit of a function' },
             { name: 'Summation', latex: '\\sum', code: 'Sum()', description: 'Summation' },
             { name: 'Product', latex: '\\prod', code: 'Product()', description: 'Product sequence' },
-            { name: 'Diff Eq', latex: 'y\'=y', code: 'dsolve()', description: 'Solve differential equation' },
-            { name: 'Series', latex: '\\sum c_n x^n', code: 'series()', description: 'Series expansion' },
+            { name: 'Diff Eq', latex: 'y\'=y', code: 'dsolve()', description: 'Solve differential equation', colSpan: 2 },
+            { name: 'Series', latex: '\\sum c_n x^n', code: 'series()', description: 'Series expansion', colSpan: 2 },
         ]
     },
     {
@@ -74,34 +80,16 @@ export const SYMBOL_CATEGORIES: SymbolCategory[] = [
             { name: 'Zeros', latex: 'O', code: 'zeros()', description: 'Zero matrix' },
             { name: 'Ones', latex: 'J', code: 'ones()', description: 'Matrix of ones' },
             { name: 'Determinant', latex: '\\det', code: 'det()', description: 'Matrix determinant' },
-            { name: 'Inverse', latex: 'A^{-1}', code: 'inv()', description: 'Matrix inverse' }, // SymPy Matrix method, usually called as M.inv() but inserted as function for editing? Actually inv(M) is not standard SymPy, it's M.inv(). BUT generally top-level functions are easier to insert. Wait, SymPy generally uses methods for LA. Let's check consistency. 
-            // Correct approach for SymPy: Matrix([[1,2]]).inv()
-            // However, inserting `.inv()` might be confusing if no cursor management.
-            // Let's stick to standard `M.inv()` style? Or key functions. 
-            // Actually, SymPy has `Inverse(M)` which is symbolic. 
-            // Ideally `M.inv()` is practical. 
-            // Users might prefer `inv()` as a wrapper? 
-            // Let's use `inv()` and assume user knows or we provide wrapper?
-            // SymPy doesn't have global `inv()`. It has `M.inv()`.
-            // But for consistency with `det(M)`, `trace(M)`, sticking to function look is better IF it works.
-            // Wait, `det` IS a top level function in sympy? `from sympy import det`. Yes.
-            // `inv`? No. `M.inv()`.
-            // `transpose`? `transpose(M)` exists? No, `M.T`.
-            // Let's provide `.inv()` style or just text `inv`?
-            // Since we established `()` pattern...
-            // Let's use `inverse_test_functions` logic?
-            // Actually, let's look at `Discrete Math`.
-            { name: 'Transpose', latex: 'A^T', code: '.T', description: 'Matrix Transpose' }, // Special case? No, code is inserted directly.
-            { name: 'Eigenvals', latex: '\\lambda', code: '.eigenvals()', description: 'Eigenvalues' },
-            // For Inverse, let's use `.inv()` to be safe as method.
             { name: 'Inverse', latex: 'A^{-1}', code: '.inv()', description: 'Matrix inverse' },
+            { name: 'Transpose', latex: 'A^T', code: '.T', description: 'Matrix Transpose' },
+            { name: 'Eigenvals', latex: '\\lambda', code: '.eigenvals()', description: 'Eigenvalues' },
         ]
     },
     {
         category: 'Discrete Math',
         items: [
-            { name: 'GCD', latex: '\\text{gcd}', code: 'gcd()', description: 'Greatest Common Divisor' },
-            { name: 'LCM', latex: '\\text{lcm}', code: 'lcm()', description: 'Least Common Multiple' },
+            { name: 'GCD', latex: '\\text{gcd}', code: 'gcd()', description: 'Greatest Common Divisor', label: 'GCD' },
+            { name: 'LCM', latex: '\\text{lcm}', code: 'lcm()', description: 'Least Common Multiple', label: 'LCM' },
             { name: 'Binomial', latex: '\\binom{n}{k}', code: 'binomial()', description: 'Binomial coefficient' },
             { name: 'Factorial', latex: 'n!', code: 'factorial()', description: 'Factorial function' },
         ]
