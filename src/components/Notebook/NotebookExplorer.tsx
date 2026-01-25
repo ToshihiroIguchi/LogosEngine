@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Plus, FileText, Trash2, Search } from 'lucide-react';
+import { Plus, FileText, Trash2, Search, Download } from 'lucide-react';
 import { useNotebook } from '../../state/AppNotebookContext';
 import { useDarkMode } from '../../hooks/useDarkMode';
 import { cn } from '../../lib/utils';
+import { storage } from '../../services/storage';
+import { downloadJsonFile } from '../../utils/fileUtils';
 
 export const NotebookExplorer: React.FC = () => {
     const { fileList, currentNotebookId, openNotebook, createNotebook, deleteNotebook } = useNotebook();
@@ -14,6 +16,20 @@ export const NotebookExplorer: React.FC = () => {
     );
 
     const storageUsage = Math.min(100, (fileList.length / 50) * 100);
+
+    const handleExport = async (e: React.MouseEvent, id: string, title: string) => {
+        e.stopPropagation();
+        try {
+            const notebook = await storage.getNotebook(id);
+            if (notebook) {
+                const dateStr = new Date().toISOString().slice(0, 10);
+                downloadJsonFile(`${title}-${dateStr}.json`, { cells: notebook.cells, version: '1.0' });
+            }
+        } catch (err) {
+            console.error('Failed to export notebook:', err);
+            alert('Failed to export notebook.');
+        }
+    };
 
     return (
         <div className="flex flex-col h-full bg-[#F8FAF8] dark:bg-slate-900 animate-in fade-in duration-500">
@@ -68,17 +84,30 @@ export const NotebookExplorer: React.FC = () => {
                                     </div>
                                 </div>
                             </div>
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (confirm('Permanently delete this notebook?')) {
-                                        deleteNotebook(file.id);
-                                    }
-                                }}
-                                className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 rounded-lg transition-all"
-                            >
-                                <Trash2 size={12} />
-                            </button>
+                            <div className="flex items-center gap-0.5">
+                                <button
+                                    onClick={(e) => handleExport(e, file.id, file.title)}
+                                    className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 rounded-lg transition-all"
+                                    title="Export JSON"
+                                >
+                                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                                        Export JSON
+                                    </div>
+                                    <Download size={14} />
+                                </button>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (confirm('Permanently delete this notebook?')) {
+                                            deleteNotebook(file.id);
+                                        }
+                                    }}
+                                    className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 rounded-lg transition-all"
+                                    title="Delete Notebook"
+                                >
+                                    <Trash2 size={12} />
+                                </button>
+                            </div>
                         </div>
                     ))}
                     {filteredFiles.length === 0 && (

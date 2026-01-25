@@ -11,6 +11,7 @@ import { DisclaimerModal } from './DisclaimerModal';
 import { Sidebar } from './Sidebar';
 import { EXAMPLES } from '../../constants/examples'; // Changed path
 import { AppThemeToggle } from '../AppThemeToggle';
+import { downloadJsonFile } from '../../utils/fileUtils';
 
 export const MainContainer: React.FC = () => {
     const {
@@ -43,14 +44,9 @@ export const MainContainer: React.FC = () => {
     };
 
     const handleExport = () => {
-        const data = JSON.stringify({ cells, version: '1.0' }, null, 2);
-        const blob = new Blob([data], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${currentNotebook?.title || 'notebook'}-${new Date().toISOString().slice(0, 10)}.json`;
-        link.click();
-        URL.revokeObjectURL(url);
+        const title = currentNotebook?.title || 'notebook';
+        const dateStr = new Date().toISOString().slice(0, 10);
+        downloadJsonFile(`${title}-${dateStr}.json`, { cells, version: '1.0' });
     };
 
     const handlePrint = () => {
