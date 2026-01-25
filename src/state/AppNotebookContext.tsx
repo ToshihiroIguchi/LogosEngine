@@ -81,7 +81,10 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     const [variables, setVariables] = useState<Variable[]>([]);
     const [activeDocumentation, setActiveDocumentation] = useState<Documentation | null>(null);
     const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
-    const [activeTab, setActiveTab] = useState<SidebarTab>('variables');
+    const [activeTab, setActiveTab] = useState<SidebarTab>(() => {
+        const saved = localStorage.getItem('logos-engine-active-tab');
+        return (saved as SidebarTab) || 'files';
+    });
     const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
         const saved = localStorage.getItem('logos-engine-sidebar-open');
         return saved === 'true';
@@ -144,6 +147,10 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     useEffect(() => {
         localStorage.setItem('logos-engine-sidebar-open', isSidebarOpen.toString());
     }, [isSidebarOpen]);
+
+    useEffect(() => {
+        localStorage.setItem('logos-engine-active-tab', activeTab);
+    }, [activeTab]);
 
     // Auto-save
     useEffect(() => {
