@@ -326,7 +326,17 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         }));
     }, []);
 
-    const resetNotebook = useCallback(() => {
+    const resetNotebook = useCallback(async () => {
+        // Factory Reset: Clear all data
+        await storage.clearAllData();
+        localStorage.removeItem('logos-engine-last-id');
+
+        // Re-initialize with a fresh default notebook
+        // We reuse createNotebook logic but need to be careful about state updates
+        const id = crypto.randomUUID();
+        const now = Date.now();
+        const meta: NotebookMeta = { id, title: 'Welcome Notebook', createdAt: now, updatedAt: now };
+
         const initialCells: Cell[] = WELCOME_NOTEBOOK_DATA.map((data) => ({
             id: crypto.randomUUID(),
             type: data.type as 'code' | 'markdown',
@@ -335,12 +345,20 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             isExecuting: false
         }));
 
+        // Save new default notebook
+        await storage.saveNotebook(meta, { id, cells: initialCells });
+
+        // Update State
+        setFileList([meta]);
         setCells(initialCells);
+        setCurrentNotebookId(id);
+        setIsDirty(false);
         setVariables([]);
         setActiveDocumentation(null);
         setFocusedCellId(initialCells[0].id);
-        // Reset counter
         executionCountRef.current = 1;
+
+        // Force reload to ensure clean state if needed, but state updates should suffice.
     }, []);
 
     const deleteCell = useCallback((id: string) => {

@@ -7,6 +7,7 @@ import {
 import { useNotebook } from '../../state/AppNotebookContext';
 import { CellItem } from './CellItem';
 import { ErrorBoundary } from '../ErrorBoundary';
+import { ConfirmationModal } from './ConfirmationModal';
 import { DisclaimerModal } from './DisclaimerModal';
 import { Sidebar } from './Sidebar';
 import { EXAMPLES } from '../../constants/examples'; // Changed path
@@ -22,6 +23,7 @@ export const MainContainer: React.FC = () => {
     const [showExamples, setShowExamples] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
     const [showDisclaimer, setShowDisclaimer] = useState(false);
+    const [showResetConfirmation, setShowResetConfirmation] = useState(false);
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [editTitleValue, setEditTitleValue] = useState('');
     const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
@@ -38,9 +40,7 @@ export const MainContainer: React.FC = () => {
     const isExecutingAny = cells.some(c => c.isExecuting);
 
     const handleReset = () => {
-        if (confirm('Are you sure you want to reset the notebook? All your work will be lost.')) {
-            resetNotebook();
-        }
+        setShowResetConfirmation(true);
     };
 
     const handleExport = () => {
@@ -366,6 +366,11 @@ export const MainContainer: React.FC = () => {
             </div>
 
             <DisclaimerModal isOpen={showDisclaimer} onClose={() => setShowDisclaimer(false)} />
+            <ConfirmationModal
+                isOpen={showResetConfirmation}
+                onClose={() => setShowResetConfirmation(false)}
+                onConfirm={resetNotebook}
+            />
         </div>
     );
 };

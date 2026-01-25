@@ -75,6 +75,16 @@ export const storage = {
     async updateMeta(meta: NotebookMeta): Promise<void> {
         const db = await getDB();
         await db.put('meta', meta);
+    },
+
+    async clearAllData(): Promise<void> {
+        const db = await getDB();
+        const tx = db.transaction(['meta', 'notebooks'], 'readwrite');
+        await Promise.all([
+            tx.objectStore('meta').clear(),
+            tx.objectStore('notebooks').clear(),
+            tx.done
+        ]);
     }
 };
 
