@@ -160,22 +160,29 @@ def preprocess_equation_syntax(code):
                     result_tokens.append((tokenize.OP, '('))
                     
                     scan_idx = i + 1
-                    rhs_paren_depth = 0
+                    nesting_level = 0
                     found_end = False
                     end_idx = scan_idx
                     
+                    OPENERS = {tokenize.LPAR, tokenize.LSQB, tokenize.LBRACE}
+                    CLOSERS = {tokenize.RPAR, tokenize.RSQB, tokenize.RBRACE}
+
                     while end_idx < len(tokens):
                         scan_tok = tokens[end_idx]
-                        if scan_tok.exact_type == tokenize.LPAR:
-                            rhs_paren_depth += 1
-                        elif scan_tok.exact_type == tokenize.RPAR:
-                            rhs_paren_depth -= 1
-                        if rhs_paren_depth < 0:
+                        
+                        if scan_tok.exact_type in OPENERS:
+                            nesting_level += 1
+                        elif scan_tok.exact_type in CLOSERS:
+                            nesting_level -= 1
+                            
+                        if nesting_level < 0:
                             found_end = True
                             break
-                        if rhs_paren_depth == 0 and scan_tok.exact_type == tokenize.COMMA:
+                            
+                        if nesting_level == 0 and scan_tok.exact_type == tokenize.COMMA:
                             found_end = True
                             break
+                        
                         end_idx += 1
                     
                     if found_end:
