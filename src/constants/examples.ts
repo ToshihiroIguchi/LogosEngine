@@ -27,6 +27,44 @@ export type ExampleCategory = {
 
 export const EXAMPLES: ExampleCategory[] = [
     {
+        category: "Algebra",
+        items: [
+            {
+                title: "Solve Equations",
+                code: `# Quadratic Equation
+solve(x**2 - 5*x + 6, x)`
+            },
+            {
+                title: "System of Equations",
+                code: `# System of Linear Equations
+solve([x + y - 10, x - y - 2], (x, y))`
+            }
+        ]
+    },
+    {
+        category: "Simplification",
+        items: [
+            {
+                title: "Simplify Expression",
+                code: `# Simplify logical or algebraic expressions
+simplify(sin(x)**2 + cos(x)**2)`
+            },
+            {
+                title: "Expand & Factor",
+                code: `# Expand
+expand((x + 1)**3)
+
+# Factor
+factor(x**3 + 3*x**2 + 3*x + 1)`
+            },
+            {
+                title: "Trig Simplification",
+                code: `# Trigonometric Simplification
+trigsimp(sin(x)*cos(y) + cos(x)*sin(y))`
+            }
+        ]
+    },
+    {
         category: "Analysis",
         items: [
             {
