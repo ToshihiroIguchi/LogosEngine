@@ -5,6 +5,7 @@ import { useDarkMode } from '../../hooks/useDarkMode';
 import { cn } from '../../lib/utils';
 import { storage } from '../../services/storage';
 import { downloadJsonFile } from '../../utils/fileUtils';
+import { downloadNotebook } from '../../utils/exportUtils';
 
 export const NotebookExplorer: React.FC = () => {
     const { fileList, currentNotebookId, openNotebook, createNotebook, deleteNotebook } = useNotebook();
@@ -22,12 +23,27 @@ export const NotebookExplorer: React.FC = () => {
         try {
             const notebook = await storage.getNotebook(id);
             if (notebook) {
+                // Native JSON Backup
                 const dateStr = new Date().toISOString().slice(0, 10);
                 downloadJsonFile(`${title}-${dateStr}.json`, { cells: notebook.cells, version: '1.0' });
             }
         } catch (err) {
-            console.error('Failed to export notebook:', err);
-            alert('Failed to export notebook.');
+            console.error('Failed to backup notebook:', err);
+            alert('Failed to backup notebook.');
+        }
+    };
+
+    const handleExportIpynb = async (e: React.MouseEvent, id: string, title: string) => {
+        e.stopPropagation();
+        try {
+            const notebook = await storage.getNotebook(id);
+            if (notebook) {
+                // Jupyter Export
+                downloadNotebook(notebook, `${title}.ipynb`);
+            }
+        } catch (err) {
+            console.error('Failed to export ipynb:', err);
+            alert('Failed to export .ipynb file.');
         }
     };
 
@@ -88,10 +104,20 @@ export const NotebookExplorer: React.FC = () => {
                                 <button
                                     onClick={(e) => handleExport(e, file.id, file.title)}
                                     className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 rounded-lg transition-all"
-                                    title="Export JSON"
+                                    title="Backup (JSON)"
                                 >
                                     <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-                                        Export JSON
+                                        Backup JSON
+                                    </div>
+                                    <FileText size={14} />
+                                </button>
+                                <button
+                                    onClick={(e) => handleExportIpynb(e, file.id, file.title)}
+                                    className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-orange-50 dark:hover:bg-orange-900/30 text-gray-400 dark:text-gray-500 hover:text-orange-500 dark:hover:text-orange-400 rounded-lg transition-all"
+                                    title="Export .ipynb"
+                                >
+                                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                                        Export .ipynb
                                     </div>
                                     <Download size={14} />
                                 </button>
