@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-    Download, PlayCircle, Loader2, Info, BookOpen, Upload,
-    Square, Database, Printer, Eraser, FileText, Code, RefreshCw,
-    Pencil, Check, CheckCircle2, CloudUpload, FolderOpen, MoreVertical
+    Download, PlayCircle, Loader2, Info, Upload,
+    Square, Printer, Eraser, FileText, Code, RefreshCw,
+    Pencil, Check, CheckCircle2, CloudUpload, MoreVertical, PanelLeft
 } from 'lucide-react';
 import { useNotebook } from '../../state/AppNotebookContext';
 import { CellItem } from './CellItem';
@@ -17,7 +17,7 @@ export const MainContainer: React.FC = () => {
     const {
         cells, addCell, executeAll, interrupt, isReady, importNotebook,
         isSidebarOpen, setIsSidebarOpen, clearAllOutputs, resetNotebook, isGraphicsReady,
-        fileList, currentNotebookId, isDirty, renameNotebook, setActiveTab
+        fileList, currentNotebookId, isDirty, renameNotebook
     } = useNotebook();
     const [showMenu, setShowMenu] = useState(false);
     const [showDisclaimer, setShowDisclaimer] = useState(false);
@@ -80,10 +80,7 @@ export const MainContainer: React.FC = () => {
         setIsEditingTitle(false);
     };
 
-    const toggleSidebarTab = (tab: 'files' | 'variables' | 'examples') => {
-        setActiveTab(tab);
-        setIsSidebarOpen(true);
-    };
+
 
     return (
         <div id="app-root" className="h-screen bg-[#FDFDFD] dark:bg-slate-950 flex flex-col overflow-hidden">
@@ -171,26 +168,11 @@ export const MainContainer: React.FC = () => {
                     <div className="h-6 w-px bg-gray-200 dark:bg-slate-800 mx-2" />
                     <div className="flex items-center bg-gray-100/50 dark:bg-slate-800/50 p-1 rounded-xl border border-gray-200/50 dark:border-slate-700/50 gap-1">
                         <button
-                            onClick={() => toggleSidebarTab('files')}
-                            className="flex items-center justify-center w-8 h-8 bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-300 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 transition-all"
-                            title="Notebook Explorer"
+                            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                            className={`flex items-center justify-center w-8 h-8 rounded-lg shadow-sm border transition-all ${isSidebarOpen ? 'bg-blue-50 dark:bg-slate-700 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-slate-600' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700'}`}
+                            title={isSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
                         >
-                            <FolderOpen size={16} />
-                        </button>
-                        <button
-                            onClick={() => toggleSidebarTab('variables')}
-                            className="flex items-center justify-center w-8 h-8 bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-400 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all"
-                            title="Variable Inspector"
-                        >
-                            <Database size={16} />
-                        </button>
-
-                        <button
-                            onClick={() => toggleSidebarTab('examples')}
-                            className="flex items-center justify-center w-8 h-8 bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-400 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all"
-                            title="Examples"
-                        >
-                            <BookOpen size={16} />
+                            <PanelLeft size={16} />
                         </button>
 
                         <div className="h-6 w-px bg-gray-200 mx-1" />

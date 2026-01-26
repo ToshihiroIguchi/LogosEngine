@@ -87,7 +87,8 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     });
     const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
         const saved = localStorage.getItem('logos-engine-sidebar-open');
-        return saved === 'true';
+        // Default to true if not set, otherwise respect saved value
+        return saved === null ? true : saved === 'true';
     });
     const [focusedCellId, setFocusedCellId] = useState<string | null>(null);
     const { isReady, isGraphicsReady, execute, interrupt: pyodideInterrupt, getCompletions, deleteVariable: deleteVarWorker, searchDocs: searchDocsWorker } = usePyodide();
