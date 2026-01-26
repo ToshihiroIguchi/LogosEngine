@@ -12,7 +12,7 @@ import { usePyodide } from '../hooks/usePyodide';
 import { WELCOME_NOTEBOOK_DATA } from '../constants/examples';
 import { storage } from '../services/storage';
 
-export type SidebarTab = 'variables' | 'documentation' | 'files' | 'symbols';
+export type SidebarTab = 'variables' | 'documentation' | 'files' | 'symbols' | 'examples';
 
 interface NotebookContextType {
     cells: Cell[];

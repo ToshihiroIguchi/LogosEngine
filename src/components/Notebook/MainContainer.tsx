@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-    Download, PlayCircle, Loader2, Info, BookOpen, ChevronDown, Upload,
+    Download, PlayCircle, Loader2, Info, BookOpen, Upload,
     Square, Database, Printer, Eraser, FileText, Code, RefreshCw,
-    Pencil, Check, CheckCircle2, CloudUpload, FolderOpen, MoreVertical, ChevronRight
+    Pencil, Check, CheckCircle2, CloudUpload, FolderOpen, MoreVertical
 } from 'lucide-react';
 import { useNotebook } from '../../state/AppNotebookContext';
 import { CellItem } from './CellItem';
@@ -10,23 +10,20 @@ import { ErrorBoundary } from '../ErrorBoundary';
 import { ConfirmationModal } from './ConfirmationModal';
 import { DisclaimerModal } from './DisclaimerModal';
 import { Sidebar } from './Sidebar';
-import { EXAMPLES } from '../../constants/examples'; // Changed path
 import { AppThemeToggle } from '../AppThemeToggle';
 import { downloadJsonFile } from '../../utils/fileUtils';
 
 export const MainContainer: React.FC = () => {
     const {
-        cells, addCell, executeAll, interrupt, isReady, insertExample, importNotebook,
+        cells, addCell, executeAll, interrupt, isReady, importNotebook,
         isSidebarOpen, setIsSidebarOpen, clearAllOutputs, resetNotebook, isGraphicsReady,
         fileList, currentNotebookId, isDirty, renameNotebook, setActiveTab
     } = useNotebook();
-    const [showExamples, setShowExamples] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
     const [showDisclaimer, setShowDisclaimer] = useState(false);
     const [showResetConfirmation, setShowResetConfirmation] = useState(false);
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [editTitleValue, setEditTitleValue] = useState('');
-    const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const currentNotebook = fileList.find(m => m.id === currentNotebookId);
@@ -76,11 +73,6 @@ export const MainContainer: React.FC = () => {
         event.target.value = '';
     };
 
-    const handleInsertExample = (code: string) => {
-        insertExample(code);
-        setShowExamples(false);
-    };
-
     const handleSaveTitle = async () => {
         if (editTitleValue.trim() && currentNotebookId) {
             await renameNotebook(currentNotebookId, editTitleValue.trim());
@@ -88,18 +80,9 @@ export const MainContainer: React.FC = () => {
         setIsEditingTitle(false);
     };
 
-
-    const toggleSidebarTab = (tab: 'files' | 'variables') => {
+    const toggleSidebarTab = (tab: 'files' | 'variables' | 'examples') => {
         setActiveTab(tab);
         setIsSidebarOpen(true);
-    };
-
-    const toggleCategory = (category: string) => {
-        setExpandedCategories(prev =>
-            prev.includes(category)
-                ? prev.filter(c => c !== category)
-                : [...prev, category]
-        );
     };
 
     return (
@@ -202,51 +185,13 @@ export const MainContainer: React.FC = () => {
                             <Database size={16} />
                         </button>
 
-                        <div className="relative">
-                            <button
-                                onClick={() => { setShowExamples(!showExamples); setShowMenu(false); }}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-400 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all font-medium text-xs whitespace-nowrap outline-none focus:outline-none"
-                            >
-                                <BookOpen size={14} />Examples<ChevronDown size={12} className={`transition-transform ${showExamples ? 'rotate-180' : ''}`} />
-                            </button>
-                            {showExamples && (
-                                <div className="absolute top-full mt-2 right-0 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-lg w-64 max-h-96 overflow-y-auto z-50 outline-none">
-                                    {EXAMPLES.map((category, catIdx) => {
-                                        const isExpanded = expandedCategories.includes(category.category);
-                                        return (
-                                            <div key={catIdx} className="border-b border-gray-200 dark:border-slate-700 last:border-b-0">
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); toggleCategory(category.category); }}
-                                                    className="w-full flex items-center justify-between px-4 py-3 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors outline-none focus:outline-none"
-                                                >
-                                                    <span className="text-xs font-bold text-gray-700 dark:text-gray-200">
-                                                        {category.category}
-                                                    </span>
-                                                    {isExpanded ? <ChevronDown size={14} className="text-gray-500 dark:text-gray-400" /> : <ChevronRight size={14} className="text-gray-500 dark:text-gray-400" />}
-                                                </button>
-
-                                                {isExpanded && (
-                                                    <div className="bg-white dark:bg-slate-950 shadow-inner">
-                                                        {category.items.map((example, itemIdx) => (
-                                                            <button
-                                                                key={itemIdx}
-                                                                onClick={() => handleInsertExample(example.code)}
-                                                                className="w-full text-left pl-10 pr-4 py-2 hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors flex flex-col gap-0.5 outline-none focus:outline-none"
-                                                            >
-                                                                <div className="text-sm font-semibold text-gray-700 dark:text-gray-300 transition-colors">{example.title}</div>
-                                                                <div className="text-[10px] text-gray-400 dark:text-gray-600 font-mono truncate max-w-full opacity-80">
-                                                                    {example.code.split('\n').find(line => !line.startsWith('#') && line.trim()) || 'Code...'}
-                                                                </div>
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
+                        <button
+                            onClick={() => toggleSidebarTab('examples')}
+                            className="flex items-center justify-center w-8 h-8 bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-400 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all"
+                            title="Examples"
+                        >
+                            <BookOpen size={16} />
+                        </button>
 
                         <div className="h-6 w-px bg-gray-200 mx-1" />
 
@@ -267,7 +212,7 @@ export const MainContainer: React.FC = () => {
 
                         <div className="relative">
                             <button
-                                onClick={() => { setShowMenu(!showMenu); setShowExamples(false); }}
+                                onClick={() => { setShowMenu(!showMenu); }}
                                 className={`p-1.5 rounded-lg transition-all ${showMenu ? 'bg-gray-200 dark:bg-slate-700 text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-slate-700/50'}`}
                                 title="More Actions"
                             >

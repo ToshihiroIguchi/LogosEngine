@@ -3,6 +3,7 @@ import { useNotebook } from '../../state/AppNotebookContext';
 import { Database, X, Hash, BookCopy, Info, FolderOpen, Trash2, Search, HelpCircle, Sigma } from 'lucide-react';
 import { NotebookExplorer } from './NotebookExplorer';
 import { SYMBOL_CATEGORIES } from '../../constants/symbols';
+import { EXAMPLES } from '../../constants/examples';
 import DOMPurify from 'dompurify';
 import { KatexRenderer } from '../UI/KatexRenderer';
 import { useDarkMode } from '../../hooks/useDarkMode'; // Assuming this hook exists
@@ -14,8 +15,9 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
-    const { variables, activeDocumentation, setActiveDocumentation, activeTab, setActiveTab, deleteVariable, searchDocs, searchResults, insertTextAtCursor } = useNotebook();
+    const { variables, activeDocumentation, setActiveDocumentation, activeTab, setActiveTab, deleteVariable, searchDocs, searchResults, insertTextAtCursor, insertExample } = useNotebook();
     const [searchQuery, setSearchQuery] = React.useState('');
+    const [expandedExampleCategory, setExpandedExampleCategory] = React.useState<string | null>(null);
     useDarkMode(); // Use the dark mode hook to trigger re-renders for dark mode classes
 
     const [width, setWidth] = React.useState(() => {
@@ -142,6 +144,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                         title="Common Symbols"
                     >
                         <Sigma size={18} />
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('examples')}
+                        className={cn(
+                            "flex-1 flex items-center justify-center p-2 rounded-md transition-all",
+                            activeTab === 'examples'
+                                ? 'bg-white dark:bg-slate-700 text-purple-600 dark:text-purple-400 shadow-sm border border-gray-200/50 dark:border-slate-600/50'
+                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                        )}
+                        title="Examples"
+                    >
+                        <BookCopy size={18} />
                     </button>
                 </div>
 
@@ -364,6 +378,49 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                                 </div>
                             </div>
                         ))}
+                    </div>
+                ) : activeTab === 'examples' ? (
+                    <div className="flex flex-col h-full overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        {EXAMPLES.map((category, catIdx) => {
+                            const isExpanded = expandedExampleCategory === category.category;
+                            return (
+                                <div key={catIdx} className="border-b border-gray-100 dark:border-slate-800 last:border-b-0">
+                                    <button
+                                        onClick={() => setExpandedExampleCategory(prev => prev === category.category ? null : category.category)}
+                                        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50/50 dark:bg-slate-900 hover:bg-gray-100/80 dark:hover:bg-slate-800 transition-colors outline-none focus:outline-none"
+                                    >
+                                        <span className="text-xs font-bold text-gray-700 dark:text-gray-200">
+                                            {category.category}
+                                        </span>
+                                        {isExpanded ? (
+                                            <FolderOpen size={14} className="text-blue-500 dark:text-blue-400" />
+                                        ) : (
+                                            <FolderOpen size={14} className="text-gray-400 dark:text-gray-600" />
+                                        )}
+                                    </button>
+
+                                    {isExpanded && (
+                                        <div className="bg-white dark:bg-slate-950">
+                                            {category.items.map((example, itemIdx) => (
+                                                <button
+                                                    key={itemIdx}
+                                                    onClick={() => insertExample(example.code)}
+                                                    className="w-full text-left pl-8 pr-4 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors flex flex-col gap-0.5 outline-none focus:outline-none border-l-2 border-transparent hover:border-blue-500 dark:hover:border-blue-400"
+                                                >
+                                                    <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2">
+                                                        <span className="w-1 h-1 rounded-full bg-blue-400 dark:bg-blue-500"></span>
+                                                        {example.title}
+                                                    </div>
+                                                    <div className="text-[10px] text-gray-400 dark:text-gray-500 font-mono truncate max-w-full opacity-80 pl-3">
+                                                        {example.code.split('\n').find(line => !line.startsWith('#') && line.trim()) || 'Code...'}
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
                 ) : null}
             </div>
