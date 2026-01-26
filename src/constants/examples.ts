@@ -38,6 +38,16 @@ solve(x**2 - 5*x + 6, x)`
                 title: "System of Equations",
                 code: `# System of Linear Equations
 solve([x + y - 10, x - y - 2], (x, y))`
+            },
+            {
+                title: "Inequalities",
+                code: `# Solve Inequalities
+solve(x**2 - 4 > 0, x)`
+            },
+            {
+                title: "Partial Fractions",
+                code: `# Partial Fraction Decomposition
+apart(1/((x+1)*(x+2)), x)`
             }
         ]
     },
@@ -162,6 +172,29 @@ v = C.x*C.i + C.y*C.j + C.z*C.k
 
 # Divergence
 divergence(v)`
+            },
+            {
+                title: "Gradient & Curl",
+                code: `# Gradient
+C = CoordSys3D('C')
+f = C.x*C.y*C.z
+gradient(f)
+
+# Curl
+v = C.x*C.i + C.y*C.j + C.z*C.k
+curl(v)`
+            },
+            {
+                title: "Dot & Cross Product",
+                code: `C = CoordSys3D('C')
+v1 = C.i + 2*C.j
+v2 = 3*C.i + 4*C.k
+
+# Dot (Scalar) Product
+v1.dot(v2)
+
+# Cross (Vector) Product
+v1.cross(v2)`
             }
         ]
     },
@@ -175,6 +208,25 @@ factorint(2026)
 
 # Primality Test
 isprime(2**31 - 1)`
+            },
+            {
+                title: "Summation",
+                code: `# Summation
+n, k = symbols('n k')
+summation(k**2, (k, 1, n))`
+            },
+            {
+                title: "Logic",
+                code: `# Satisfiability
+from sympy.logic.inference import satisfiable
+satisfiable((x | y) & (~x | z))`
+            },
+            {
+                title: "Recurrence Relations",
+                code: `# Fibonacci (Recurrence)
+y = Function('y')
+n = symbols('n', integer=True)
+rsolve(y(n) - y(n-1) - y(n-2), y(n), {y(0): 0, y(1): 1})`
             }
         ]
     },
