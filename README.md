@@ -1,208 +1,128 @@
-# LogosCalc
+# Logos Engine
 
-A scientific computational notebook that runs entirely in your browser using WebAssembly.
+**Scientific Computing, Reimagined for the Web.**
+
+A powerful, privacy-first computational notebook that runs entirely in your browser. Powered by WebAssembly.
 
 🚀 **[Live Demo](https://logosengine.tosihihiroiguchigithub.workers.dev/)**
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Python](https://img.shields.io/badge/python-3.11-blue.svg)
-![React](https://img.shields.io/badge/react-19.2-blue.svg)
+![Python](https://img.shields.io/badge/python-3.11-yellow.svg)
+![React](https://img.shields.io/badge/react-19-cyan.svg)
+![WASM](https://img.shields.io/badge/WASM-Powered-orange.svg)
+
+---
+
+## Why Logos Engine?
+
+### 🔒 Privacy First & Offline Capable
+Logos Engine runs **100% on your device**. Thanks to Pyodide (Python compiled to WebAssembly), your code and data never leave your browser. No server connection is required for calculation, ensuring your data remains private and secure.
+
+### ✨ Zero Setup
+Forget about managing Python environments, piping dependencies, or server configurations. Logos Engine delivers a full scientific stack (SymPy, NumPy, Matplotlib) instantly in any modern web browser.
+
+### 🎨 Modern & Intuitive UX
+Built with **React 19** and **Tailwind CSS 4**, featuring a carefully crafted UI with:
+- **Symbol Sidebars**: Quick insertion of mathematical symbols and functions.
+- **Documentation Search**: Instant access to SymPy documentation.
+- **Variable Inspector**: Real-time tracking of defined variables.
 
 ## Features
 
-- **Symbolic Mathematics**: Powered by SymPy for differentiation, integration, equation solving, and more
-- **Graphing**: Create plots using Matplotlib, rendered directly in the browser
-- **Browser-Based**: No server required - runs completely in your browser using Pyodide (Python WASM)
-- **Notebook Interface**: Familiar cell-based interface with execution history
-- **Smart Execution Queue**: Start working immediately - code executes automatically when the engine is ready
-- **Example Library**: 8 built-in code templates to help you get started
+- **Symbolic Mathematics**: Solve equations, differentiate, integrate, and manipulate algebraic expressions using the full power of **SymPy**.
+- **High-Quality Plotting**: Generate scientific-grade visualization with **Matplotlib**.
+- **Intelligent Notebook**: A familiar cell-based interface that supports auto-execution and comfortable editing.
+- **Persistent Sessions**: Your work is saved automatically.
 
-## Local Development Setup
-
-To run LogosEngine on your local machine for development or personal use, follow these detailed steps.
-
-### Prerequisites
-
-- **Node.js**: Version 18.0 or higher is recommended.
-- **npm**: Usually comes with Node.js.
-
-### 1. Clone the Repository
-Open your terminal and run:
-```bash
-git clone https://github.com/ToshihiroIguchi/LogosEngine.git
-cd LogosEngine
-```
-
-### 2. Install Dependencies
-Install the required React and build tool dependencies:
-```bash
-npm install
-```
-
-### 3. Start the Development Server
-Launch the Vite development server:
-```bash
-npm run dev
-```
-By default, the application will be available at `http://localhost:5173/`.
-
-## Serving with Python (Static Hosting)
-
-If you prefer not to keep Node.js (npm) running, or if you primarily use a Python environment, you can serve the pre-built static files using Python.
-
-### 1. Build (First time or after code changes)
-The project must be built once in a Node.js environment to transform the source code into a browser-executable format.
-```bash
-npm run build
-```
-This will generate the production-ready files in the `dist` folder.
-
-### 2. Serve using Python Script (Recommended)
-We provide a dedicated serving script to prevent issues like MIME type errors (commonly seen on Windows where JavaScript files might be incorrectly served).
-```bash
-python serve.py
-```
-After running the script, open `http://localhost:8300` in your browser. Wait for the "Engine Ready" indicator to appear.
-
-### 3. Serve using Standard Python Command
-You can also serve the files using a standard one-liner (execute this from within the `dist` directory).
-```bash
-cd dist
-python -m http.server 8300
-```
-
-### Why use a Python server?
-- **Lightweight**: No need to keep heavy Node.js processes running.
-- **Portability**: All you need are the `dist` folder and `serve.py`. LogosEngine can run on any PC with Python installed, even from a USB drive.
-- **Ease of Deployment**: Even if your production server only supports Python, you can deploy by simply uploading the contents of the `dist` folder.
-
-### 4. Setup Complete
-Once the server is running (either via Node.js or Python), proceed to the **First Run Guide** below.
-
-## First Run Guide
-
- Regardless of how you started the server, follow these steps to begin:
-
-1. **Open Browser**: Navigate to your local server address (e.g., `http://localhost:5173` for Node.js or `http://localhost:8300` for Python).
-2. **Initialization**: On the first load, the app will download the Pyodide runtime and required Python packages (SymPy, Matplotlib). **This can take 30-60 seconds.**
-3. **Engine Ready**: Wait for the status indicator in the header to turn **green** ("Engine Ready").
-4. **Execution**: Type your code in a cell and press `Shift+Enter` to run it.
 
 ## Usage Examples
 
-### Differentiation
+### 1. Calculus
+Use `diff` for derivatives and `integrate` for integrals.
+
 ```python
-diff(sin(x), x)
-# Output: cos(x)
+# Derivative of a composite function
+diff(sin(x**2) * exp(x), x)
+# Output: (2*x*sin(x**2) + 2*x**2*cos(x**2))*exp(x)
+
+# Definite Integral
+integrate(exp(-x**2), (x, -oo, oo))
+# Output: sqrt(pi)
 ```
 
-### Integration
+### 2. Linear Algebra
+Perform advanced matrix operations effortlessly.
+
 ```python
-integrate(1/x, x)
-# Output: log(x)
+# Eigenvalues of a matrix
+M = Matrix([[1, 2], [2, 1]])
+M.eigenvals()
+# Output: {-1: 1, 3: 1} (Eigenvalue: Multiplicity)
 ```
 
-### Plotting
+### 3. Differential Equations
+Solve ordinary differential equations (ODEs).
+
 ```python
-plot(sin(x))
-# Displays a graph of sin(x)
+# Solve f''(x) + 9f(x) = 0
+f = symbols('f', cls=Function)
+dsolve(f(x).diff(x, x) + 9*f(x), f(x))
+# Output: C1*sin(3*x) + C2*cos(3*x)
 ```
 
-### Equation Solving
+### 4. Advanced Simplification
+Simplify complex trigonometric or algebraic expressions.
+
 ```python
-solve(x**2 - 4, x)
-# Output: [-2, 2]
+expr = sin(x)**2 + cos(x)**2
+simplify(expr)
+# Output: 1
 ```
 
-### Matrix Operations
-```python
-M = Matrix([[1, 2], [3, 4]])
-M.det()
-# Output: -2
-```
+## Local Development Setup
 
-## Keyboard Shortcuts
+To run Logos Engine locally or contribute to development:
 
-- `Shift+Enter` - Execute current cell
-- `Ctrl+Enter` - Execute cell and stay in place
+### Prerequisites
+- **Node.js**: v18+
+- **npm**
 
-## Building for Production
+### Quick Start
+1.  **Clone**:
+    ```bash
+    git clone https://github.com/ToshihiroIguchi/LogosEngine.git
+    cd LogosEngine
+    ```
+2.  **Install**:
+    ```bash
+    npm install
+    ```
+3.  **Run**:
+    ```bash
+    npm run dev
+    ```
+    Access at `http://localhost:5173`.
 
+### Static Serving (Python)
+You can also build the project and serve it using Python only:
 ```bash
-# Create production build
 npm run build
-
-# Preview production build
-npm run preview
+python serve.py
+# Access at http://localhost:8300
 ```
-
-The build output will be in the `dist/` directory.
 
 ## Technology Stack
 
-- **Frontend**: React 19, TypeScript, Vite
-- **Styling**: Tailwind CSS 4
-- **Math Rendering**: KaTeX
-- **Python Runtime**: Pyodide 0.29.0
-- **Symbolic Math**: SymPy
-- **Plotting**: Matplotlib
+- **Core**: TypeScript, WebAssembly (WASM)
+- **Frontend**: React 19, Vite, Tailwind CSS 4
+- **Conversion**: Pyodide (CPython 3.11 port to WASM)
+- **Math Engine**: SymPy (Python)
+- **Rendering**: KaTeX (LaTeX rendering), Canvas API
 
-## Browser Compatibility
-
-- Chrome/Edge 90+
-- Firefox 88+
-- Safari 15+
-
-**Note**: Requires WebAssembly and Web Worker support.
-
-## Architecture
-
-LogosEngine uses a Web Worker architecture to run Python code without blocking the UI:
-
-```
-┌─────────────┐         ┌──────────────┐
-│   React UI  │ ◄─────► │ Web Worker   │
-│             │         │ (Pyodide)    │
-└─────────────┘         └──────────────┘
-      │                        │
-      │                        ▼
-      │                 ┌──────────────┐
-      │                 │ SymPy        │
-      │                 │ Matplotlib   │
-      └────────────────►└──────────────┘
-           Results
-```
-
-## Disclaimer
-
-This software is provided "AS IS" without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and non-infringement. In no event shall the authors or copyright holders be liable for any claim, damages, or other liability, whether in an action of contract, tort, or otherwise, arising from, out of, or in connection with the software or the use or other dealings in the software (including but not limited to results of calculations).
-
-Users use this software at their own risk. For critical applications such as structural calculations, chemical reaction predictions, or financial transactions, please ensure verification by experts before use.
-
-## Terms of Use
-
-1. **Legal Use**: It is prohibited to use this software for any purpose that violates laws or public order (including malware creation, cyberattacks, or calculations for illegal transactions).
-2. **Platform Protection**: It is prohibited to use this software for cryptocurrency mining or running scripts that place an excessive load on hosting servers (e.g., GitHub Pages).
-
-## License & Credits
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-### Third Party Libraries
-This software uses the following open source libraries:
+## Disclaimer
 
-*   **Pyodide**: Licensed under the Mozilla Public License 2.0 (MPL 2.0).
-*   **SymPy**: Licensed under the New BSD License.
-*   **React**: Licensed under the MIT License.
-*   **Vite**: Licensed under the MIT License.
-*   **Tailwind CSS**: Licensed under the MIT License.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## Acknowledgments
-
-- Built with [Pyodide](https://pyodide.org/)
-- Powered by [SymPy](https://www.sympy.org/)
-- Inspired by scientific computational notebooks and Jupyter Notebook
+This software is provided "AS IS" without warranty of any kind. Users use this software at their own risk. For critical applications, please ensure verification by experts.
