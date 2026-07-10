@@ -12,7 +12,7 @@ import { useNotebook } from '../../state/AppNotebookContext';
 import { ResultView } from './ResultView';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { registerPythonCompletionProvider } from '../../utils/monacoCompletionProvider';
+import { registerPythonCompletionProvider, updateActiveCompletionProvider } from '../../utils/monacoCompletionProvider';
 import { useDarkMode } from '../../hooks/useDarkMode';
 
 function cn(...inputs: ClassValue[]) {
@@ -50,6 +50,11 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
         setCellEditingRef.current = setCellEditing;
     }, [executeCell, selectNextCell, setCellEditing]);
 
+    // Keep the active completion provider updated when getCompletions changes
+    React.useEffect(() => {
+        updateActiveCompletionProvider(getCompletions);
+    }, [getCompletions]);
+
     const handleEditorDidMount = React.useCallback((editor: editor.IStandaloneCodeEditor, monaco: typeof import('monaco-editor')) => {
         editorRef.current = editor;
         monacoRef.current = monaco;
@@ -57,6 +62,8 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
         if (!completionProviderRegistered.current) {
             registerPythonCompletionProvider(monaco, getCompletions);
             completionProviderRegistered.current = true;
+        } else {
+            updateActiveCompletionProvider(getCompletions);
         }
 
         // Apply theme immediately on mount
@@ -125,11 +132,13 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
         };
 
         editor.onDidFocusEditorText(() => {
+            updateActiveCompletionProvider(getCompletions);
             registerInsertHandler(handleInsert);
         });
 
         // Also register immediately if this cell is the one being focused on mount
         if (focusedCellId === cell.id) {
+            updateActiveCompletionProvider(getCompletions);
             registerInsertHandler(handleInsert);
         }
 

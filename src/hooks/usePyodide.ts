@@ -1,6 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { WorkerRequest, WorkerResponse, CompletionRequest, CompletionResponse } from '../worker/workerTypes';
 
+function checkNeedsGraphics(code: string): boolean {
+    // Strip Python comments to prevent false positives
+    const cleanCode = code.replace(/#.*$/gm, '');
+    // Match common plotting libraries/functions (plt, matplotlib, plot, scatter, hist, figure, subplots, etc.)
+    return /\b(plt|matplotlib|plot\w*|scatter|hist|figure|subplots?|gcf|gca|imshow|savefig)\b/.test(cleanCode);
+}
+
 export function usePyodide() {
     const [isReady, setIsReady] = useState(false);
     const [isGraphicsReady, setIsGraphicsReady] = useState(false);
@@ -42,6 +49,7 @@ export function usePyodide() {
 
             if (data.type === 'PROFILE') {
                 console.group('🚀 Logos Engine Startup Profile');
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 console.table((data as any).timings);
                 console.groupEnd();
                 return;
@@ -61,6 +69,7 @@ export function usePyodide() {
     }, []);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         initWorker();
         return () => workerRef.current?.terminate();
     }, [initWorker]);
@@ -77,7 +86,7 @@ export function usePyodide() {
             const { id, code, notebookId, executionCount, resolve } = item;
 
             // Logic to determine if this item can be processed
-            const needsGraphics = /\bplot\w*\s*\(/.test(code);
+            const needsGraphics = checkNeedsGraphics(code);
             const canRun = isReady && (!needsGraphics || isGraphicsReady);
 
             if (canRun) {
@@ -123,11 +132,12 @@ export function usePyodide() {
                 workerRef.current?.postMessage(request);
             };
 
-            const needsGraphics = /\bplot\w*\s*\(/.test(code);
+            const needsGraphics = checkNeedsGraphics(code);
             const canRun = workerRef.current && isReady && (!needsGraphics || isGraphicsReady);
 
             if (!canRun) {
                 // Queue the execution including executionCount
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 queueRef.current.push({ id, code, notebookId, executionCount, resolve: resolve as any });
             } else {
                 executeTask();

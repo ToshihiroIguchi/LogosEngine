@@ -5,7 +5,9 @@ import type { Output } from '../types';
 let pyodide: PyodideInterface;
 
 // Isolated context for user variables (Python dictionary)
-let contexts = new Map<string, any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const contexts = new Map<string, any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let active_context: any;
 
 // Context management helper
@@ -815,6 +817,7 @@ def load_extended_context(ctx):
             console.error('Worker: Background load failed', e);
         });
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
         console.error('Worker: Pyodide initialization failed', err);
         self.postMessage({ type: 'ERROR', message: `Pyodide initialization failed: ${err.message}` });
@@ -916,6 +919,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
             }
 
             // Get variables
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             let variables: any[] = [];
             try {
                 if (pyodide.globals.has('_get_variables')) {
@@ -929,6 +933,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 
             self.postMessage({ id, status: 'SUCCESS', results: output, variables });
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
             self.postMessage({ id, status: 'ERROR', results: [{ type: 'error', value: err.message, timestamp: Date.now() }] });
         }
@@ -940,10 +945,15 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
                 return;
             }
             const get_completions = pyodide.globals.get('_get_completions');
-            const completions = get_completions(code, ctx).toJs();
-            get_completions.destroy();
-            self.postMessage({ id, status: 'SUCCESS', completions });
-        } catch (e) {
+            const completionsProxy = get_completions(code, ctx);
+            try {
+                const completions = completionsProxy.toJs();
+                self.postMessage({ id, status: 'SUCCESS', completions });
+            } finally {
+                completionsProxy.destroy();
+                get_completions.destroy();
+            }
+        } catch {
             self.postMessage({ id, status: 'ERROR', completions: [] });
         }
     }
@@ -954,10 +964,15 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
                 return;
             }
             const search_docs = pyodide.globals.get('_search_docs');
-            const docs = search_docs(code, ctx).toJs();
-            search_docs.destroy();
-            self.postMessage({ id, status: 'SUCCESS', searchResults: docs });
-        } catch (e) {
+            const docsProxy = search_docs(code, ctx);
+            try {
+                const docs = docsProxy.toJs();
+                self.postMessage({ id, status: 'SUCCESS', searchResults: docs });
+            } finally {
+                docsProxy.destroy();
+                search_docs.destroy();
+            }
+        } catch {
             self.postMessage({ id, status: 'ERROR', searchResults: { symbols: [], mentions: [] } });
         }
     }
@@ -969,11 +984,56 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
             }
             const get_help = pyodide.globals.get('_get_help');
             const help = get_help(code, ctx);
-            const helpJs = help ? help.toJs() : null;
-            get_help.destroy();
-            self.postMessage({ id, status: 'SUCCESS', help: helpJs });
-        } catch (e) {
+            try {
+                const helpJs = help ? help.toJs() : null;
+                self.postMessage({ id, status: 'SUCCESS', help: helpJs });
+            } finally {
+                if (help) help.destroy();
+                get_help.destroy();
+            }
+        } catch {
             self.postMessage({ id, status: 'ERROR', help: null });
+        }
+    }
+    else if (action === 'DELETE_VARIABLE') {
+        try {
+            const varName = code;
+            if (varName && ctx.has(varName)) {
+                ctx.delete(varName);
+            }
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            let variables: any[] = [];
+            if (pyodide.globals.has('_get_variables')) {
+                const get_vars = pyodide.globals.get('_get_variables');
+                const varsProxy = get_vars(ctx);
+                try {
+                    variables = varsProxy.toJs();
+                } finally {
+                    varsProxy.destroy();
+                    get_vars.destroy();
+                }
+            }
+            self.postMessage({ id, status: 'SUCCESS', variables });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } catch (err: any) {
+            self.postMessage({ id, status: 'ERROR', message: err.message });
+        }
+    }
+    else if (action === 'RESET_CONTEXT') {
+        try {
+            if (notebookId && contexts.has(notebookId)) {
+                const old_ctx = contexts.get(notebookId);
+                if (old_ctx) {
+                    old_ctx.destroy();
+                }
+                contexts.delete(notebookId);
+            }
+            // Force recreation of context
+            getContext(notebookId);
+            self.postMessage({ id, status: 'SUCCESS' });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } catch (err: any) {
+            self.postMessage({ id, status: 'ERROR', message: err.message });
         }
     }
 };

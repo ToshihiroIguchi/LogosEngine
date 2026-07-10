@@ -34,6 +34,7 @@ interface NotebookContextType {
     executeAll: () => Promise<void>;
     interrupt: () => void;
     insertExample: (code: string) => void;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     importNotebook: (data: any) => void;
     selectNextCell: (currentId: string) => void;
     setCellEditing: (id: string, isEditing: boolean) => void;
@@ -99,6 +100,18 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     const isInitialMount = useRef(true);
     const executionCountRef = useRef(1);
 
+    const fileListRef = useRef(fileList);
+    const currentNotebookIdRef = useRef(currentNotebookId);
+
+    // Keep refs in sync with state changes
+    useEffect(() => {
+        fileListRef.current = fileList;
+    }, [fileList]);
+
+    useEffect(() => {
+        currentNotebookIdRef.current = currentNotebookId;
+    }, [currentNotebookId]);
+
     // Handler for inserting text at the cursor of the active cell
     const activeInsertHandler = useRef<((text: string, relativeCursorPos?: number) => void) | null>(null);
 
@@ -110,7 +123,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             setFileList(metaList.sort((a, b) => b.updatedAt - a.updatedAt));
 
             // 2. Load last active or new
-            let targetId = localStorage.getItem('logos-engine-last-id');
+            const targetId = localStorage.getItem('logos-engine-last-id');
             let initialCells: Cell[] = [];
 
             if (targetId && metaList.some(m => m.id === targetId)) {
@@ -157,15 +170,24 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     useEffect(() => {
         if (isInitialMount.current || !currentNotebookId) return;
 
+        const targetNotebookId = currentNotebookId;
+
         const timer = setTimeout(async () => {
-            const currentMeta = fileList.find(m => m.id === currentNotebookId);
+            const currentMeta = fileListRef.current.find(m => m.id === targetNotebookId);
             if (currentMeta) {
                 const now = Date.now();
                 const updatedMeta = { ...currentMeta, updatedAt: now };
-                await storage.saveNotebook(updatedMeta, { id: currentNotebookId, cells });
+                
+                await storage.saveNotebook(updatedMeta, { id: targetNotebookId, cells });
 
-                setFileList(prev => prev.map(m => m.id === currentNotebookId ? updatedMeta : m).sort((a, b) => b.updatedAt - a.updatedAt));
-                setIsDirty(false);
+                setFileList(prev => {
+                    if (!prev.some(m => m.id === targetNotebookId)) return prev;
+                    return prev.map(m => m.id === targetNotebookId ? updatedMeta : m).sort((a, b) => b.updatedAt - a.updatedAt);
+                });
+
+                if (currentNotebookIdRef.current === targetNotebookId) {
+                    setIsDirty(false);
+                }
             }
         }, 1000);
 
@@ -414,6 +436,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
                 setActiveTab('documentation');
                 setIsSidebarOpen(true);
             }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
             setCells(prev => prev.map(c => c.id === id ? { ...c, outputs: [{ type: 'error', value: err.message, timestamp: Date.now() }], isExecuting: false } : c));
         }
@@ -490,12 +513,14 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         });
     }, [createCell]);
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const importNotebook = useCallback((data: any) => {
         try {
             if (!data.cells || !Array.isArray(data.cells)) {
                 throw new Error('Invalid notebook format: missing cells array');
             }
 
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const importedCells: Cell[] = data.cells.map((cell: any) =>
                 createCell(cell.type || 'code', cell.content || '')
             );
@@ -508,6 +533,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             setVariables([]);
             setActiveDocumentation(null);
             setCells(importedCells);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
             alert(`Import failed: ${err.message}`);
         }
@@ -566,6 +592,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useNotebook = () => {
     const context = useContext(NotebookContext);
     if (!context) throw new Error('useNotebook must be used within NotebookProvider');
