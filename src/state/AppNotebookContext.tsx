@@ -99,6 +99,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     const [isDirty, setIsDirty] = useState(false);
     const isInitialMount = useRef(true);
     const executionCountRef = useRef(1);
+    const lastSavedCellsJsonRef = useRef<string>('');
 
     const fileListRef = useRef(fileList);
     const currentNotebookIdRef = useRef(currentNotebookId);
@@ -145,6 +146,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             }
 
             setCells(initialCells);
+            lastSavedCellsJsonRef.current = JSON.stringify(initialCells);
 
             // Initialize global execution count from the max count in existing cells
             // This ensures we continue numbering where we left off
@@ -170,7 +172,13 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     useEffect(() => {
         if (isInitialMount.current || !currentNotebookId) return;
 
+        const currentCellsJson = JSON.stringify(cells);
+        if (currentCellsJson === lastSavedCellsJsonRef.current) {
+            return;
+        }
+
         const targetNotebookId = currentNotebookId;
+        setIsDirty(true);
 
         const timer = setTimeout(async () => {
             const currentMeta = fileListRef.current.find(m => m.id === targetNotebookId);
@@ -179,19 +187,19 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
                 const updatedMeta = { ...currentMeta, updatedAt: now };
                 
                 await storage.saveNotebook(updatedMeta, { id: targetNotebookId, cells });
+                lastSavedCellsJsonRef.current = currentCellsJson;
 
                 setFileList(prev => {
                     if (!prev.some(m => m.id === targetNotebookId)) return prev;
                     return prev.map(m => m.id === targetNotebookId ? updatedMeta : m).sort((a, b) => b.updatedAt - a.updatedAt);
                 });
 
-                if (currentNotebookIdRef.current === targetNotebookId) {
+                if (currentNotebookIdRef.current === targetNotebookId && JSON.stringify(cells) === currentCellsJson) {
                     setIsDirty(false);
                 }
             }
         }, 1000);
 
-        setIsDirty(true);
         return () => clearTimeout(timer);
     }, [cells, currentNotebookId]);
 
@@ -239,6 +247,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         await storage.saveNotebook(meta, { id, cells: initialCells });
         setFileList(prev => [meta, ...prev]);
         setCells(initialCells);
+        lastSavedCellsJsonRef.current = JSON.stringify(initialCells);
         setCurrentNotebookId(id);
         setIsDirty(false);
         setVariables([]);
@@ -265,6 +274,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         if (notebook) {
             const newCells = notebook.cells.map(c => ({ ...c, isExecuting: false }));
             setCells(newCells);
+            lastSavedCellsJsonRef.current = JSON.stringify(newCells);
             setCurrentNotebookId(id);
             setVariables([]);
             setActiveDocumentation(null);
@@ -405,6 +415,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         // Update State
         setFileList([meta]);
         setCells(initialCells);
+        lastSavedCellsJsonRef.current = JSON.stringify(initialCells);
         setCurrentNotebookId(id);
         setIsDirty(false);
         setVariables([]);
@@ -580,6 +591,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             // Update UI state
             setFileList(prev => [meta, ...prev]);
             setCells(importedCells);
+            lastSavedCellsJsonRef.current = JSON.stringify(importedCells);
             setCurrentNotebookId(id);
             setIsDirty(false);
             setVariables([]);

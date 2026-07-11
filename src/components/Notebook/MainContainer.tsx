@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import {
     Download, PlayCircle, Loader2, Info, Upload,
     Square, Printer, Eraser, FileText, Code, RefreshCw,
@@ -12,6 +12,7 @@ import { DisclaimerModal } from './DisclaimerModal';
 import { Sidebar } from './Sidebar';
 import { AppThemeToggle } from '../AppThemeToggle';
 import { downloadJsonFile } from '../../utils/fileUtils';
+import { downloadNotebook } from '../../utils/exportUtils';
 
 export const MainContainer: React.FC = () => {
     const {
@@ -24,15 +25,15 @@ export const MainContainer: React.FC = () => {
     const [showResetConfirmation, setShowResetConfirmation] = useState(false);
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [editTitleValue, setEditTitleValue] = useState('');
+    const [prevNotebookId, setPrevNotebookId] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const currentNotebook = fileList.find(m => m.id === currentNotebookId);
 
-    useEffect(() => {
-        if (currentNotebook) {
-            setEditTitleValue(currentNotebook.title);
-        }
-    }, [currentNotebook]);
+    if (currentNotebookId !== prevNotebookId) {
+        setPrevNotebookId(currentNotebookId);
+        setEditTitleValue(currentNotebook?.title || '');
+    }
 
     const isExecutingAny = cells.some(c => c.isExecuting);
 
@@ -44,6 +45,11 @@ export const MainContainer: React.FC = () => {
         const title = currentNotebook?.title || 'notebook';
         const dateStr = new Date().toISOString().slice(0, 10);
         downloadJsonFile(`${title}-${dateStr}.json`, { title, cells, version: '1.0' });
+    };
+
+    const handleExportJupyter = () => {
+        const title = currentNotebook?.title || 'notebook';
+        downloadNotebook({ cells }, `${title}.ipynb`);
     };
 
     const handlePrint = () => {
@@ -63,7 +69,7 @@ export const MainContainer: React.FC = () => {
             try {
                 const data = JSON.parse(e.target?.result as string);
                 importNotebook(data, file.name);
-            } catch (err) {
+            } catch {
                 alert('Failed to parse JSON file. Please ensure it is a valid notebook export.');
             }
         };
@@ -210,6 +216,9 @@ export const MainContainer: React.FC = () => {
                                         </button>
                                         <button onClick={() => { handleExport(); setShowMenu(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
                                             <Download size={14} />Export JSON
+                                        </button>
+                                        <button onClick={() => { handleExportJupyter(); setShowMenu(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
+                                            <Download size={14} className="text-orange-500" />Export Jupyter (.ipynb)
                                         </button>
                                         <button onClick={() => { handlePrint(); setShowMenu(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
                                             <Printer size={14} />Print / PDF

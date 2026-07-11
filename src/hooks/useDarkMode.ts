@@ -21,7 +21,8 @@ export const useDarkMode = () => {
         } else {
             root.classList.remove('dark');
         }
-        setIsDark(shouldBeDark);
+        // Defer state update to avoid set-state-in-effect warning
+        setTimeout(() => setIsDark(shouldBeDark), 0);
     }, []);
 
     const setTheme = (newTheme: Theme) => {

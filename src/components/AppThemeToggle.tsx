@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { Moon, Sun, Monitor } from 'lucide-react';
+import { Moon, Sun, Monitor, type LucideIcon } from 'lucide-react';
 import { useDarkMode, type Theme } from '../hooks/useDarkMode';
 
 export const AppThemeToggle: React.FC = () => {
     const { theme, setTheme } = useDarkMode();
     const [isOpen, setIsOpen] = useState(false);
 
-    const themes: { id: Theme; icon: any; label: string }[] = [
+    const themes: { id: Theme; icon: LucideIcon; label: string }[] = [
         { id: 'light', icon: Sun, label: 'Light' },
         { id: 'dark', icon: Moon, label: 'Dark' },
         { id: 'system', icon: Monitor, label: 'System' },

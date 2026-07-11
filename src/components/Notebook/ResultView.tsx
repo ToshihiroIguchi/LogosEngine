@@ -283,7 +283,7 @@ const LatexRenderer: React.FC<{ value: string }> = ({ value }) => {
                     displayMode: true,
                     fleqn: true
                 });
-            } catch (err) {
+            } catch {
                 containerRef.current.textContent = value;
             }
         }

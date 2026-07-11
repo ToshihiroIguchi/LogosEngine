@@ -105,6 +105,7 @@ function convertCell(cell: Cell): NotebookCell {
     }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function convertOutputs(outputs: any[], executionCount?: number): CodeCellOutput[] {
     if (!outputs) return [];
     return outputs.map(out => {
@@ -272,7 +273,7 @@ function findMatchingParen(code: string, start: number): number {
 
 function processFunctionArgs(argsStr: string): string {
     // Split by comma, respecting nested parens/brackets/braces
-    let args: string[] = [];
+    const args: string[] = [];
     let lastSplit = 0;
     let depth = 0;
 

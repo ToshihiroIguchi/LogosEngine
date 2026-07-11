@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const downloadJsonFile = (filename: string, data: any) => {
     const jsonString = JSON.stringify(data, null, 2);
     const blob = new Blob([jsonString], { type: 'application/json' });

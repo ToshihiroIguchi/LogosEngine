@@ -34,6 +34,7 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
     const { isDark } = useDarkMode();
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
     const completionProviderRegistered = useRef(false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const monacoRef = useRef<any>(null);
     const executeCellRef = useRef(executeCell);
     const selectNextCellRef = useRef(selectNextCell);
@@ -142,7 +143,7 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
             registerInsertHandler(handleInsert);
         }
 
-    }, [cell.id, cell.type, focusedCellId, setFocusedCellId, getCompletions, registerInsertHandler]);
+    }, [cell.id, cell.type, focusedCellId, setFocusedCellId, getCompletions, registerInsertHandler, isDark]);
 
     // Handle focus when this cell is selected as the next cell
     React.useEffect(() => {
@@ -207,6 +208,20 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
         }
     };
 
+    const handleFixError = React.useCallback((variables: string[]) => {
+        if (!variables || variables.length === 0) return;
+
+        const varsStr = variables.join(', ');
+        const symbolsStr = variables.join(' ');
+        // Insert at the beginning
+        const definitionLine = `${varsStr} = symbols('${symbolsStr}')`;
+        const newContent = `${definitionLine}\n${cell.content}`;
+
+        updateCell(cell.id, newContent);
+        // Execute immediately with the new content
+        executeCell(cell.id, newContent);
+    }, [cell.id, cell.content, updateCell, executeCell]);
+
     // Auto-fix monitoring
     React.useEffect(() => {
         if (cell.isExecuting) return;
@@ -221,21 +236,7 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                 handleFixError(errorOutput.missingVariables);
             }
         }
-    }, [cell.outputs, cell.isExecuting]);
-
-    const handleFixError = (variables: string[]) => {
-        if (!variables || variables.length === 0) return;
-
-        const varsStr = variables.join(', ');
-        const symbolsStr = variables.join(' ');
-        // Insert at the beginning
-        const definitionLine = `${varsStr} = symbols('${symbolsStr}')`;
-        const newContent = `${definitionLine}\n${cell.content}`;
-
-        updateCell(cell.id, newContent);
-        // Execute immediately with the new content
-        executeCell(cell.id, newContent);
-    };
+    }, [cell.outputs, cell.isExecuting, handleFixError]);
 
     const needsGraphics = /\bplot\w*\s*\(/.test(cell.content);
     const isQueued = cell.isExecuting && (!isReady || (needsGraphics && !isGraphicsReady));
@@ -418,21 +419,21 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                                 remarkPlugins={[remarkMath, remarkGfm]}
                                 rehypePlugins={[rehypeKatex]}
                                 components={{
-                                    pre: ({ node, ...props }) => <pre {...props} className="bg-gray-900 border border-slate-700 text-gray-100 p-4 rounded-lg overflow-x-auto mb-4 font-mono" />,
-                                    code: ({ node, inline, ...props }: any) =>
+                                    pre: ({ ...props }) => <pre {...props} className="bg-gray-900 border border-slate-700 text-gray-100 p-4 rounded-lg overflow-x-auto mb-4 font-mono" />,
+                                    code: ({ inline, ...props }: React.ComponentPropsWithoutRef<'code'> & { inline?: boolean }) =>
                                         inline
                                             ? <code {...props} className="bg-gray-100 dark:bg-slate-800 text-purple-600 dark:text-purple-400 px-1 rounded font-mono text-sm" />
                                             : <code {...props} className="block w-full font-mono" />,
-                                    h1: ({ node, ...props }) => <h1 {...props} className="text-3xl font-bold mb-6 mt-8 border-b dark:border-slate-800 pb-2 text-gray-900 dark:text-gray-100 first:mt-2" />,
-                                    h2: ({ node, ...props }) => <h2 {...props} className="text-2xl font-bold mb-4 mt-8 text-gray-800 dark:text-gray-200" />,
-                                    h3: ({ node, ...props }) => <h3 {...props} className="text-xl font-bold mb-3 mt-6 text-gray-800 dark:text-gray-200" />,
-                                    ul: ({ node, ...props }) => <ul {...props} className="list-disc pl-6 mb-4 space-y-1 text-gray-700 dark:text-gray-300" />,
-                                    ol: ({ node, ...props }) => <ol {...props} className="list-decimal pl-6 mb-4 space-y-1 text-gray-700 dark:text-gray-300" />,
-                                    p: ({ node, ...props }) => <p {...props} className="mb-4 leading-relaxed text-gray-700 dark:text-gray-300" />,
-                                    table: ({ node, ...props }) => <div className="overflow-x-auto mb-4"><table {...props} className="min-w-full divide-y divide-gray-200 dark:divide-slate-800 border dark:border-slate-800" /></div>,
-                                    th: ({ node, ...props }) => <th {...props} className="px-4 py-2 bg-gray-50 dark:bg-slate-800/50 font-bold text-left border dark:border-slate-800" />,
-                                    td: ({ node, ...props }) => <td {...props} className="px-4 py-2 border dark:border-slate-800" />,
-                                    blockquote: ({ node, ...props }) => <blockquote {...props} className="border-l-4 border-blue-500 pl-4 italic text-gray-600 dark:text-gray-400 mb-4" />,
+                                    h1: ({ ...props }) => <h1 {...props} className="text-3xl font-bold mb-6 mt-8 border-b dark:border-slate-800 pb-2 text-gray-900 dark:text-gray-100 first:mt-2" />,
+                                    h2: ({ ...props }) => <h2 {...props} className="text-2xl font-bold mb-4 mt-8 text-gray-800 dark:text-gray-200" />,
+                                    h3: ({ ...props }) => <h3 {...props} className="text-xl font-bold mb-3 mt-6 text-gray-800 dark:text-gray-200" />,
+                                    ul: ({ ...props }) => <ul {...props} className="list-disc pl-6 mb-4 space-y-1 text-gray-700 dark:text-gray-300" />,
+                                    ol: ({ ...props }) => <ol {...props} className="list-decimal pl-6 mb-4 space-y-1 text-gray-700 dark:text-gray-300" />,
+                                    p: ({ ...props }) => <p {...props} className="mb-4 leading-relaxed text-gray-700 dark:text-gray-300" />,
+                                    table: ({ ...props }) => <div className="overflow-x-auto mb-4"><table {...props} className="min-w-full divide-y divide-gray-200 dark:divide-slate-800 border dark:border-slate-800" /></div>,
+                                    th: ({ ...props }) => <th {...props} className="px-4 py-2 bg-gray-50 dark:bg-slate-800/50 font-bold text-left border dark:border-slate-800" />,
+                                    td: ({ ...props }) => <td {...props} className="px-4 py-2 border dark:border-slate-800" />,
+                                    blockquote: ({ ...props }) => <blockquote {...props} className="border-l-4 border-blue-500 pl-4 italic text-gray-600 dark:text-gray-400 mb-4" />,
                                 }}
                             >
                                 {cell.content || '*Empty Markdown Cell*'}
@@ -469,6 +470,7 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                     <div className="border-t border-gray-100 dark:border-slate-800/50 rounded-b-xl print:border-none">
                         <div className="mt-2">
                             <ResultView
+                                /* eslint-disable-next-line react-hooks/refs */
                                 outputs={cell.outputs.filter(o => {
                                     // Hide error if it's being auto-fixed (retry count < max)
                                     if (o.type === 'error' && o.missingVariables && o.missingVariables.length > 0) {
