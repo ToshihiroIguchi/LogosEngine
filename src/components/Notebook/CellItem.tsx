@@ -10,14 +10,9 @@ import type { editor } from 'monaco-editor';
 import type { Cell } from '../../types';
 import { useNotebook } from '../../state/AppNotebookContext';
 import { ResultView } from './ResultView';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '../../lib/utils';
 import { registerPythonCompletionProvider, updateActiveCompletionProvider } from '../../utils/monacoCompletionProvider';
 import { useDarkMode } from '../../hooks/useDarkMode';
-
-function cn(...inputs: ClassValue[]) {
-    return twMerge(clsx(inputs));
-}
 
 interface CellItemProps {
     cell: Cell;

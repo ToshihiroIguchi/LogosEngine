@@ -206,23 +206,79 @@ function createSetupCell(): ICodeCell {
 /**
  * Transpiles LogosEngine specific syntax to standard Python/SymPy.
  * Main target: `solve(x=1)` -> `solve(Eq(x, 1))`
+ * Ignores comments and string literals.
  */
 export function transpileCode(code: string): string {
-    // Simple tokenizer-like loop to find function calls
     let result = "";
     let i = 0;
 
     while (i < code.length) {
-        // Check for target function start
+        // 1. Skip Python comments (# ...)
+        if (code[i] === '#') {
+            let end = code.indexOf('\n', i);
+            if (end === -1) end = code.length;
+            result += code.substring(i, end);
+            i = end;
+            continue;
+        }
+
+        // 2. Skip triple-quoted strings ('''...''' or """...""")
+        if (code.startsWith('"""', i) || code.startsWith("'''", i)) {
+            const quote = code.startsWith('"""', i) ? '"""' : "'''";
+            let end = i + 3;
+            while (end < code.length) {
+                if (code.startsWith(quote, end)) {
+                    // Check if escaped by an odd number of backslashes
+                    let backslashes = 0;
+                    let k = end - 1;
+                    while (k >= i && code[k] === '\\') {
+                        backslashes++;
+                        k--;
+                    }
+                    if (backslashes % 2 === 0) {
+                        end += 3;
+                        break;
+                    }
+                }
+                end++;
+            }
+            result += code.substring(i, Math.min(end, code.length));
+            i = end;
+            continue;
+        }
+
+        // 3. Skip single/double quoted strings ('...' or "...")
+        if (code[i] === '"' || code[i] === "'") {
+            const quote = code[i];
+            let end = i + 1;
+            while (end < code.length) {
+                if (code[end] === quote) {
+                    let backslashes = 0;
+                    let k = end - 1;
+                    while (k >= i && code[k] === '\\') {
+                        backslashes++;
+                        k--;
+                    }
+                    if (backslashes % 2 === 0) {
+                        end += 1;
+                        break;
+                    }
+                }
+                // Stop scanning if we hit a newline (invalid Python string, but prevents infinite loop)
+                if (code[end] === '\n') {
+                    break;
+                }
+                end++;
+            }
+            result += code.substring(i, Math.min(end, code.length));
+            i = end;
+            continue;
+        }
+
+        // 4. Check for target function start
         let matchFound = false;
         for (const func of TARGET_FUNCS) {
-            // Check if code starts with "func(" at current position
-            // We need to ensure it's a whole word match
             const prefix = code.substring(i);
-            const regex = new RegExp(`^${func}\\s*\\(`, 'y'); // Sticky match
-            regex.lastIndex = 0; // Reset for manual usage if needed, but 'y' usually works at start
-            // Actually 'y' is tricky in loops. Let's just check string start.
-            // A clearer check:
             if (prefix.startsWith(func)) {
                 // Check boundary before
                 const isWordStart = i === 0 || !/[a-zA-Z0-9_]/.test(code[i - 1]);
@@ -232,9 +288,7 @@ export function transpileCode(code: string): string {
                 const openParenMatch = afterName.match(/^\s*\(/);
 
                 if (openParenMatch) {
-                    // FOUND!
                     const openParenIndex = i + func.length + openParenMatch.index!;
-                    // Find matching closing paren
                     const closeParenIndex = findMatchingParen(code, openParenIndex);
 
                     if (closeParenIndex !== -1) {

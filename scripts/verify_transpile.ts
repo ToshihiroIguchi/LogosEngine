@@ -8,7 +8,12 @@ const testCases = [
     { input: "dsolve(f(x).diff(x) = x)", expected: "dsolve( Eq(f(x).diff(x), x))" },
     { input: "solve(x=1, y=2)", expected: "solve( Eq(x, 1), Eq(y, 2))" },
     { input: "plot(x**2)", expected: "plot(x**2)" }, // Should not change
-    { input: "func(x=1)", expected: "func(x=1)" } // Should not change (not in target list)
+    { input: "func(x=1)", expected: "func(x=1)" }, // Should not change (not in target list)
+    // Comment and string literal safety tests
+    { input: "# solve(x=1)\nsolve(x=1)", expected: "# solve(x=1)\nsolve( Eq(x, 1))" },
+    { input: "msg = \"solve(x=1)\"", expected: "msg = \"solve(x=1)\"" },
+    { input: "'''solve(x=1)'''", expected: "'''solve(x=1)'''" },
+    { input: "\"\"\"solve(x=1)\"\"\"", expected: "\"\"\"solve(x=1)\"\"\"" }
 ];
 
 let failed = false;
@@ -26,7 +31,7 @@ testCases.forEach(({ input, expected }, index) => {
     // Let's try strict check first.
 
     if (result.replace(/\s+/g, '') === expected.replace(/\s+/g, '')) {
-        console.log(`[PASS] ${input} -> ${result}`);
+        console.log(`[PASS] [Case ${index + 1}] ${input} -> ${result}`);
     } else {
         console.error(`[FAIL] ${input}`);
         console.error(`  Expected: ${expected}`);
