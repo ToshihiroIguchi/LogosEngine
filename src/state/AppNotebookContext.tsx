@@ -33,9 +33,9 @@ interface NotebookContextType {
     executeCell: (id: string, codeOverride?: string) => Promise<void>;
     executeAll: () => Promise<void>;
     interrupt: () => void;
-    insertExample: (code: string) => void;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    importNotebook: (data: any) => void;
+    importNotebook: (data: any, fileName?: string) => Promise<void>;
+    insertExample: (code: string) => void;
     selectNextCell: (currentId: string) => void;
     setCellEditing: (id: string, isEditing: boolean) => void;
     moveCell: (id: string, direction: 'up' | 'down') => void;
@@ -202,6 +202,18 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         }
     }, [currentNotebookId]);
 
+    // Warn before unloading if there are unsaved changes
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (isDirty) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [isDirty]);
+
     const createCell = useCallback((type: 'code' | 'markdown', content = ''): Cell => ({
         id: crypto.randomUUID(),
         type,
@@ -237,6 +249,18 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     const openNotebook = async (id: string) => {
         if (id === currentNotebookId) return;
+
+        // Save current notebook before switching if dirty
+        if (isDirty && currentNotebookId) {
+            const currentMeta = fileListRef.current.find(m => m.id === currentNotebookId);
+            if (currentMeta) {
+                const now = Date.now();
+                const updatedMeta = { ...currentMeta, updatedAt: now };
+                await storage.saveNotebook(updatedMeta, { id: currentNotebookId, cells });
+                setFileList(prev => prev.map(m => m.id === currentNotebookId ? updatedMeta : m).sort((a, b) => b.updatedAt - a.updatedAt));
+            }
+        }
+
         const notebook = await storage.getNotebook(id);
         if (notebook) {
             const newCells = notebook.cells.map(c => ({ ...c, isExecuting: false }));
@@ -514,30 +538,62 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     }, [createCell]);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const importNotebook = useCallback((data: any) => {
+    const importNotebook = useCallback(async (data: any, fileName?: string) => {
         try {
             if (!data.cells || !Array.isArray(data.cells)) {
                 throw new Error('Invalid notebook format: missing cells array');
             }
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const importedCells: Cell[] = data.cells.map((cell: any) =>
-                createCell(cell.type || 'code', cell.content || '')
-            );
+            const importedCells: Cell[] = data.cells.map((cell: any) => ({
+                id: cell.id || crypto.randomUUID(),
+                type: cell.type || 'code',
+                content: cell.content || '',
+                outputs: cell.outputs || [],
+                executionCount: cell.executionCount,
+                executionTime: cell.executionTime,
+                isExecuting: false,
+                isEditing: cell.isEditing
+            }));
 
             if (importedCells.length === 0) {
                 throw new Error('No cells found in the imported file');
             }
 
-            // Clear previous state before loading new notebook
+            // Determine title
+            let title = data.title || '';
+            if (!title && fileName) {
+                // Strip extension and date suffix (e.g. "notebook-2026-07-11.json" -> "notebook")
+                title = fileName.replace(/\.json$/i, '').replace(/-\d{4}-\d{2}-\d{2}$/, '');
+            }
+            if (!title) {
+                title = 'Imported Notebook';
+            }
+
+            const id = crypto.randomUUID();
+            const now = Date.now();
+            const meta: NotebookMeta = { id, title, createdAt: now, updatedAt: now };
+
+            // Save new notebook to database
+            await storage.saveNotebook(meta, { id, cells: importedCells });
+
+            // Update UI state
+            setFileList(prev => [meta, ...prev]);
+            setCells(importedCells);
+            setCurrentNotebookId(id);
+            setIsDirty(false);
             setVariables([]);
             setActiveDocumentation(null);
-            setCells(importedCells);
+
+            // Sync execution count
+            const maxCount = importedCells.reduce((max, cell) =>
+                Math.max(max, cell.executionCount || 0), 0);
+            executionCountRef.current = maxCount + 1;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
             alert(`Import failed: ${err.message}`);
         }
-    }, [createCell]);
+    }, []);
 
     const registerInsertHandler = useCallback((handler: (text: string, relativeCursorPos?: number) => void) => {
         activeInsertHandler.current = handler;

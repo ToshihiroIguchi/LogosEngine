@@ -43,7 +43,7 @@ export const MainContainer: React.FC = () => {
     const handleExport = () => {
         const title = currentNotebook?.title || 'notebook';
         const dateStr = new Date().toISOString().slice(0, 10);
-        downloadJsonFile(`${title}-${dateStr}.json`, { cells, version: '1.0' });
+        downloadJsonFile(`${title}-${dateStr}.json`, { title, cells, version: '1.0' });
     };
 
     const handlePrint = () => {
@@ -62,7 +62,7 @@ export const MainContainer: React.FC = () => {
         reader.onload = (e) => {
             try {
                 const data = JSON.parse(e.target?.result as string);
-                importNotebook(data);
+                importNotebook(data, file.name);
             } catch (err) {
                 alert('Failed to parse JSON file. Please ensure it is a valid notebook export.');
             }
@@ -93,7 +93,7 @@ export const MainContainer: React.FC = () => {
             />
 
             {/* Header - Fixed at top */}
-            <header className="flex-none bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-gray-200/60 dark:border-slate-800/60 px-6 py-3 flex items-center justify-between shadow-sm z-30">
+            <header className="print:hidden flex-none bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-gray-200/60 dark:border-slate-800/60 px-6 py-3 flex items-center justify-between shadow-sm z-30">
                 <div className="flex items-center gap-6">
                     <div className="flex items-center gap-3">
                         <div className="bg-white dark:bg-slate-800 p-1.5 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm"><img src="/logo.png" alt="LogosCalc" className="w-8 h-8 object-contain" /></div>
@@ -239,6 +239,10 @@ export const MainContainer: React.FC = () => {
                 {/* Scrollable Notebook Area */}
                 <div id="notebook-scroll-area" className="flex-1 flex flex-col min-w-0 overflow-y-auto scroll-smooth">
                     <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-12">
+                        {/* Print-only Notebook Title */}
+                        <h1 className="hidden print:block text-3xl font-black text-gray-900 mb-6 border-b border-gray-200 pb-4">
+                            {currentNotebook?.title || 'Notebook'}
+                        </h1>
                         <div className="space-y-4">
                             {cells.map((cell, index) => (
                                 <ErrorBoundary key={cell.id}>
@@ -270,7 +274,7 @@ export const MainContainer: React.FC = () => {
                             </div>
                         </div>
                     </main>
-                    <footer className="py-6 px-8 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between bg-gray-50/50 dark:bg-slate-900/50 mt-auto">
+                    <footer className="print:hidden py-6 px-8 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between bg-gray-50/50 dark:bg-slate-900/50 mt-auto">
                         <div className="flex items-center gap-3 text-xs text-gray-400 font-mono">
                             <span>PYTHON 3.11</span><span className="opacity-30">•</span><span>SYMPY CORE</span><span className="opacity-30">•</span><span>BROWSER-WASM</span>
                         </div>

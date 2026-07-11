@@ -439,16 +439,30 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                             </ReactMarkdown>
                         </div>
                     ) : (
-                        <MonacoEditor
-                            key={`editor-${index}`}
-                            height={Math.max(100, (cell.content.split('\n').length + 1) * 19 + 32) + 'px'}
-                            language={cell.type === 'markdown' ? 'markdown' : 'python'}
-                            value={cell.content}
-                            onChange={handleContentChange}
-                            onMount={handleEditorDidMount}
-                            options={editorOptions}
-                            theme={isDark ? "vs-dark" : "vs"}
-                        />
+                        <>
+                            <div className="print:hidden">
+                                <MonacoEditor
+                                    key={`editor-${index}`}
+                                    height={Math.max(100, (cell.content.split('\n').length + 1) * 19 + 32) + 'px'}
+                                    language={cell.type === 'markdown' ? 'markdown' : 'python'}
+                                    value={cell.content}
+                                    onChange={handleContentChange}
+                                    onMount={handleEditorDidMount}
+                                    options={editorOptions}
+                                    theme={isDark ? "vs-dark" : "vs"}
+                                />
+                            </div>
+                            <div className="hidden print:block">
+                                {cell.type === 'code' && (
+                                    <div className="text-[10px] font-mono text-gray-400 font-bold mb-1 select-none">
+                                        {`In [${cell.executionCount || ' '}]`}
+                                    </div>
+                                )}
+                                <pre className="p-4 font-mono text-sm bg-gray-50/50 text-gray-800 border border-gray-200 rounded-lg whitespace-pre-wrap break-all">
+                                    {cell.content}
+                                </pre>
+                            </div>
+                        </>
                     )}
                 </div>
                 {cell.outputs.length > 0 && showOutputs && (

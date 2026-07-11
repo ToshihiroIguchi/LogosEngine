@@ -25,7 +25,7 @@ export const NotebookExplorer: React.FC = () => {
             if (notebook) {
                 // Native JSON Backup
                 const dateStr = new Date().toISOString().slice(0, 10);
-                downloadJsonFile(`${title}-${dateStr}.json`, { cells: notebook.cells, version: '1.0' });
+                downloadJsonFile(`${title}-${dateStr}.json`, { title, cells: notebook.cells, version: '1.0' });
             }
         } catch (err) {
             console.error('Failed to backup notebook:', err);

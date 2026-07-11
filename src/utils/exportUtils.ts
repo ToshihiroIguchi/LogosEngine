@@ -3,7 +3,12 @@ import type {
     INotebookContent,
     NotebookCell,
     ICodeCell,
-    IMarkdownCell
+    IMarkdownCell,
+    CodeCellOutput,
+    IExecuteResult,
+    IDisplayData,
+    IStream,
+    IError
 } from '../types/nbformat';
 
 // --- Constants ---
@@ -89,15 +94,77 @@ function convertCell(cell: Cell): NotebookCell {
 
         const codeCell: ICodeCell = {
             cell_type: 'code',
-            execution_count: null, // Reset execution count
+            execution_count: cell.executionCount || null,
             metadata: {
                 id: cell.id
             },
             source: splitLines(transpiledCode),
-            outputs: [] // Intentionally empty to reduce bloat
+            outputs: convertOutputs(cell.outputs, cell.executionCount)
         };
         return codeCell;
     }
+}
+
+function convertOutputs(outputs: any[], executionCount?: number): CodeCellOutput[] {
+    if (!outputs) return [];
+    return outputs.map(out => {
+        if (out.type === 'error') {
+            const tracebackLines = out.traceback
+                ? out.traceback.split('\n').map((line: string) => line + '\n')
+                : [out.value || ''];
+            return {
+                output_type: 'error',
+                ename: out.errorName || 'Error',
+                evalue: out.value || '',
+                traceback: tracebackLines
+            } as IError;
+        }
+
+        if (out.type === 'image') {
+            let base64Data = out.value || '';
+            const commaIndex = base64Data.indexOf(',');
+            if (commaIndex !== -1) {
+                base64Data = base64Data.substring(commaIndex + 1);
+            }
+            return {
+                output_type: 'display_data',
+                data: {
+                    'image/png': base64Data
+                },
+                metadata: {}
+            } as IDisplayData;
+        }
+
+        if (out.type === 'latex') {
+            return {
+                output_type: 'execute_result',
+                execution_count: executionCount || null,
+                data: {
+                    'text/latex': out.value,
+                    'text/plain': out.rawText || out.value
+                },
+                metadata: {}
+            } as IExecuteResult;
+        }
+
+        // Default text output
+        if (out.isResult) {
+            return {
+                output_type: 'execute_result',
+                execution_count: executionCount || null,
+                data: {
+                    'text/plain': out.value
+                },
+                metadata: {}
+            } as IExecuteResult;
+        } else {
+            return {
+                output_type: 'stream',
+                name: 'stdout',
+                text: splitLines(out.value)
+            } as IStream;
+        }
+    });
 }
 
 function createSetupCell(): ICodeCell {

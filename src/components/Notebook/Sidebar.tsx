@@ -85,7 +85,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
     return (
         <div
-            className="bg-white dark:bg-slate-900 border-l border-gray-200 dark:border-slate-800 flex flex-col shrink-0 h-full animate-in slide-in-from-right-10 duration-300 relative group/sidebar"
+            className="print:hidden bg-white dark:bg-slate-900 border-l border-gray-200 dark:border-slate-800 flex flex-col shrink-0 h-full animate-in slide-in-from-right-10 duration-300 relative group/sidebar"
             style={{ width: `${width}px`, transition: isResizing ? 'none' : 'width 0.3s ease-in-out' }}
         >
             {/* Drag Handle */}
