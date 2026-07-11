@@ -96,7 +96,7 @@ export const MainContainer: React.FC = () => {
             <header className="print:hidden flex-none bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-gray-200/60 dark:border-slate-800/60 px-6 py-3 flex items-center justify-between shadow-sm z-30">
                 <div className="flex items-center gap-6">
                     <div className="flex items-center gap-3">
-                        <div className="bg-white dark:bg-slate-800 p-1.5 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm"><img src="/logo.png" alt="LogosCalc" className="w-8 h-8 object-contain" /></div>
+                        <div className="bg-white dark:bg-slate-800 p-1.5 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm"><img src={`${import.meta.env.BASE_URL}logo.png`} alt="LogosCalc" className="w-8 h-8 object-contain" /></div>
                         <div className="flex items-center">
                             <h1 className="text-xl font-black text-gray-900 dark:text-gray-100 tracking-tighter">Logos<span className="text-purple-600 dark:text-purple-400">Calc</span></h1>
                         </div>
