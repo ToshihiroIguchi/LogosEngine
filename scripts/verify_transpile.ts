@@ -9,11 +9,22 @@ const testCases = [
     { input: "solve(x=1, y=2)", expected: "solve( Eq(x, 1), Eq(y, 2))" },
     { input: "plot(x**2)", expected: "plot(x**2)" }, // Should not change
     { input: "func(x=1)", expected: "func(x=1)" }, // Should not change (not in target list)
+    // Caret exponentiation tests
+    { input: "2^3", expected: "2**3" },
+    { input: "2.5^2", expected: "2.5**2" },
+    { input: "x^2 + 2*x + 1", expected: "x**2 + 2*x + 1" },
+    { input: "x ^= 2", expected: "x **= 2" },
+    { input: "solve(x^2 = 4)", expected: "solve( Eq(x**2, 4))" },
+    { input: "nsolve(x = y^2, z)", expected: "nsolve( Eq(x, y**2), z)" },
     // Comment and string literal safety tests
     { input: "# solve(x=1)\nsolve(x=1)", expected: "# solve(x=1)\nsolve( Eq(x, 1))" },
+    { input: "# 2^3 is power\n2^3", expected: "# 2^3 is power\n2**3" },
     { input: "msg = \"solve(x=1)\"", expected: "msg = \"solve(x=1)\"" },
+    { input: "msg = \"2^3\"", expected: "msg = \"2^3\"" },
     { input: "'''solve(x=1)'''", expected: "'''solve(x=1)'''" },
-    { input: "\"\"\"solve(x=1)\"\"\"", expected: "\"\"\"solve(x=1)\"\"\"" }
+    { input: "'''2^3'''", expected: "'''2^3'''" },
+    { input: "\"\"\"solve(x=1)\"\"\"", expected: "\"\"\"solve(x=1)\"\"\"" },
+    { input: "\"\"\"2^3\"\"\"", expected: "\"\"\"2^3\"\"\"" }
 ];
 
 let failed = false;

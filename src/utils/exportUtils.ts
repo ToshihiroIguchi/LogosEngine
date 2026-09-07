@@ -275,7 +275,20 @@ export function transpileCode(code: string): string {
             continue;
         }
 
-        // 4. Check for target function start
+        // 4. Check for caret operator (^ or ^=)
+        if (code[i] === '^') {
+            if (i + 1 < code.length && code[i + 1] === '=') {
+                result += '**=';
+                i += 2;
+                continue;
+            } else {
+                result += '**';
+                i++;
+                continue;
+            }
+        }
+
+        // 5. Check for target function start
         let matchFound = false;
         for (const func of TARGET_FUNCS) {
             const prefix = code.substring(i);
@@ -372,15 +385,15 @@ function processFunctionArgs(argsStr: string): string {
             const isSimpleIdentifier = /^[a-zA-Z_]\w*$/.test(lhs);
 
             if (isSimpleIdentifier && SYMPY_RESERVED_ARGS.has(lhs)) {
-                // It is a reserved keyword argument (e.g. check=True) -> Keep as is
-                return arg;
+                // It is a reserved keyword argument (e.g. check=True) -> Keep as is (transpile rhs)
+                return `${lhs}=${transpileCode(rhs)}`;
             } else {
                 // Complex LHS (x+1=0) OR Simple LHS not reserved (x=1) -> Equation
-                return ` Eq(${lhs}, ${rhs})`;
+                return ` Eq(${transpileCode(lhs)}, ${transpileCode(rhs)})`;
             }
         }
 
-        return arg;
+        return transpileCode(arg);
     });
 
     return newArgs.join(',');

@@ -189,7 +189,13 @@ def preprocess_equation_syntax(code):
                     
                     if found_end:
                         for k in range(i + 1, end_idx):
-                            result_tokens.append((tokens[k].type, tokens[k].string))
+                            t = tokens[k]
+                            if t.exact_type == tokenize.CIRCUMFLEX:
+                                result_tokens.append((tokenize.OP, '**'))
+                            elif t.exact_type == tokenize.CIRCUMFLEXEQUAL:
+                                result_tokens.append((tokenize.OP, '**='))
+                            else:
+                                result_tokens.append((t.type, t.string))
                         result_tokens.append((tokenize.OP, ')'))
                         i = end_idx - 1
                     else:
@@ -198,6 +204,10 @@ def preprocess_equation_syntax(code):
                     result_tokens.append(tok_simple)
             else:
                 result_tokens.append(tok_simple)
+        elif tok.exact_type == tokenize.CIRCUMFLEX:
+            result_tokens.append((tokenize.OP, '**'))
+        elif tok.exact_type == tokenize.CIRCUMFLEXEQUAL:
+            result_tokens.append((tokenize.OP, '**='))
         else:
             result_tokens.append(tok_simple)
         i += 1
