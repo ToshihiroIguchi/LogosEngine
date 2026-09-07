@@ -76,8 +76,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     };
 
     const handleInsertSymbol = (code: string) => {
-        // Check if code ends with (), if so move cursor inside
-        const offset = code.endsWith('()') ? -1 : 0;
+        // Snippets manage their own cursor position via placeholders
+        const hasSnippet = /\$\{\d+:[^}]+\}/.test(code);
+        const offset = hasSnippet ? 0 : (code.endsWith('()') ? -1 : 0);
         insertTextAtCursor(code, offset);
     };
 
@@ -357,7 +358,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                                                 category.layout === 'wide' ? 'h-9 w-full px-3' : (item.colSpan ? 'h-9 w-full' : 'h-9 w-9'),
                                                 item.colSpan === 2 && "col-span-2"
                                             )}
-                                            title={`${item.name} (${item.code})`}
+                                            title={item.description ? `${item.name}: ${item.description}` : `${item.name} (${item.code})`}
                                         >
                                             <span className="text-sm text-gray-800 dark:text-gray-200 group-hover:scale-110 transition-transform">
                                                 {item.icon ? (

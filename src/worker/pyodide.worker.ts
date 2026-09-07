@@ -58,11 +58,12 @@ const CORE_SYMPY_IMPORTS = [
     // Algebra / Equations
     'solve', 'nsolve', 'dsolve', 'solveset', 'linsolve', 'nonlinsolve', 'Eq',
     // Calculus
-    'diff', 'integrate', 'limit', 'series', 'summation',
+    'diff', 'integrate', 'limit', 'series', 'summation', 'product',
     // Simplification & Expansion
     'simplify', 'expand', 'factor', 'collect', 'cancel', 'apart',
     // Functions
     'sin', 'cos', 'tan', 'exp', 'log', 'sqrt', 'asin', 'acos', 'atan',
+    'ceiling', 'floor', 'factorial', 'binomial', 'gcd', 'lcm',
     // Matrices
     'Matrix', 'eye', 'zeros', 'ones', 'diag',
     // Complex Numbers

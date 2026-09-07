@@ -619,18 +619,17 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             setCells(prev => {
                 const lastCell = prev[prev.length - 1];
 
+                // Strip snippet syntax for fallback plain text cell
+                const plainText = text.replace(/\$\{\d+:([^}]+)\}/g, '$1');
+
                 // If last cell exists, is 'code' type, and is empty -> Reuse it
                 if (lastCell && lastCell.type === 'code' && !lastCell.content.trim()) {
                     setFocusedCellId(lastCell.id);
-                    return prev.map(c => c.id === lastCell.id ? { ...c, content: text } : c);
+                    return prev.map(c => c.id === lastCell.id ? { ...c, content: plainText } : c);
                 }
 
                 // Otherwise create new cell
-                const newCell = createCell('code', text);
-                // We need to set focus to this new cell, but we can't do it inside setCells reducer safely if we rely on external state immediately.
-                // However, we can use a useEffect or just fire-and-forget here, or update focusedId separately.
-                // Since this is inside a callback, let's update focusedId after setCells (but we need the ID).
-                // Actually, let's allow the separate state update.
+                const newCell = createCell('code', plainText);
                 setTimeout(() => setFocusedCellId(newCell.id), 0);
 
                 return [...prev, newCell];

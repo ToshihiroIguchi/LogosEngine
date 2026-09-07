@@ -95,8 +95,21 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
             // Let's refactor slightly to define handler inside here.
         }
 
-        // Registration of Insert Handler
+        // Registration of Insert Handler with Monaco Snippet Support
         const handleInsert = (text: string, relativeCursorPos?: number) => {
+            const hasSnippet = /\$\{\d+:[^}]+\}/.test(text);
+            if (hasSnippet) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const snippetController = editor.getContribution('snippetController2') as any;
+                if (snippetController && typeof snippetController.insert === 'function') {
+                    snippetController.insert(text);
+                    editor.focus();
+                    return;
+                }
+                // Fallback: strip snippet syntax if snippetController2 is unavailable
+                text = text.replace(/\$\{\d+:([^}]+)\}/g, '$1');
+            }
+
             const position = editor.getPosition();
             const selection = editor.getSelection();
 

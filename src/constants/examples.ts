@@ -75,19 +75,31 @@ trigsimp(sin(x)*cos(y) + cos(x)*sin(y))`
         ]
     },
     {
-        category: "Analysis",
+        category: "Calculus",
         items: [
             {
+                title: "Indefinite Integral",
+                code: `# Basic indefinite integral of polynomial x^2
+# Syntax: integrate(expression, variable)
+integrate(x**2, x)`
+            },
+            {
+                title: "Definite Integral (Area)",
+                code: `# Definite integral from 0 to 1
+# Syntax: integrate(expression, (variable, lower_bound, upper_bound))
+integrate(x**2, (x, 0, 1))`
+            },
+            {
                 title: "Differentiation",
-                code: `# Differentiation of a composite function
+                code: `# Differentiation of composite function
 diff(sin(x)*exp(-x), x)`
             },
             {
-                title: "Integration",
-                code: `# Indefinite Integration
+                title: "Advanced Integration",
+                code: `# Rational function
 integrate(1/(1 + x**2), x)
 
-# Definite Integration (Gaussian integral)
+# Gaussian integral (improper integral)
 integrate(exp(-x**2), (x, -oo, oo))`
             },
             {
