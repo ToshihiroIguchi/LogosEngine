@@ -668,13 +668,78 @@ def _get_variables(ctx):
         except:
              s_val = "<unprintable>"
              
+        # Extract assumptions if Symbol
+        assumptions = {}
+        range_summary = None
+        is_symbol = getattr(val, 'is_Symbol', False)
+        if is_symbol:
+            raw_assumptions = getattr(val, 'assumptions0', {})
+            check_keys = ['positive', 'negative', 'nonnegative', 'nonpositive', 'real', 'integer', 'complex', 'nonzero', 'even', 'odd', 'prime']
+            for k in check_keys:
+                if raw_assumptions.get(k) is True:
+                    assumptions[k] = True
+                elif raw_assumptions.get(k) is False:
+                    assumptions[k] = False
+            
+            # Determine range summary
+            if assumptions.get('positive'):
+                range_summary = f"{name} > 0"
+            elif assumptions.get('nonnegative'):
+                range_summary = f"{name} ≥ 0"
+            elif assumptions.get('negative'):
+                range_summary = f"{name} < 0"
+            elif assumptions.get('nonpositive'):
+                range_summary = f"{name} ≤ 0"
+            elif assumptions.get('integer'):
+                range_summary = f"{name} ∈ ℤ"
+            elif assumptions.get('real'):
+                range_summary = f"{name} ∈ ℝ"
+            elif assumptions.get('nonzero'):
+                range_summary = f"{name} ≠ 0"
+
         variables.append({
             "name": name,
             "type": type_name,
-            "value": s_val
+            "value": s_val,
+            "assumptions": assumptions if is_symbol else None,
+            "rangeSummary": range_summary
         })
         
     return variables
+
+def _define_variable(ctx, name, assumptions):
+    names = [n.strip() for n in str(name).replace(',', ' ').split() if n.strip()]
+    if not names:
+        raise ValueError("Variable name cannot be empty")
+    for n in names:
+        if not n.isidentifier():
+            raise ValueError(f"Invalid variable name: '{n}'")
+
+    kwargs = {}
+    if assumptions:
+        # assumptions can be a JS proxy or dict
+        try:
+            items = dict(assumptions).items()
+        except Exception:
+            items = []
+        for k, v in items:
+            if v is True:
+                kwargs[str(k)] = True
+            elif v is False:
+                kwargs[str(k)] = False
+
+    symbols_fn = ctx.get('symbols')
+    if not symbols_fn:
+        from sympy import symbols
+        symbols_fn = symbols
+
+    syms = symbols_fn(' '.join(names), **kwargs)
+    if len(names) == 1:
+        ctx[names[0]] = syms
+    else:
+        for n, s in zip(names, syms):
+            ctx[n] = s
+    return True
 `;
 
 initPyodide();
@@ -836,7 +901,7 @@ def load_extended_context(ctx):
 }
 
 self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
-    const { id, action, code, notebookId, executionCount } = event.data;
+    const { id, action, code, notebookId, executionCount, assumptions } = event.data;
 
     if (!pyodide) {
         self.postMessage({ id, status: 'ERROR', results: [{ type: 'error', value: 'Pyodide not authorized or not ready', timestamp: Date.now() }] });
@@ -1011,6 +1076,38 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
             const varName = code;
             if (varName && ctx.has(varName)) {
                 ctx.delete(varName);
+            }
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            let variables: any[] = [];
+            if (pyodide.globals.has('_get_variables')) {
+                const get_vars = pyodide.globals.get('_get_variables');
+                const varsProxy = get_vars(ctx);
+                try {
+                    variables = varsProxy.toJs();
+                } finally {
+                    varsProxy.destroy();
+                    get_vars.destroy();
+                }
+            }
+            self.postMessage({ id, status: 'SUCCESS', variables });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } catch (err: any) {
+            self.postMessage({ id, status: 'ERROR', message: err.message });
+        }
+    }
+    else if (action === 'DEFINE_VARIABLE') {
+        try {
+            const varName = code;
+            const varAssumptions = assumptions || {};
+            if (pyodide.globals.has('_define_variable')) {
+                const define_var = pyodide.globals.get('_define_variable');
+                const pyAssumptions = pyodide.toPy(varAssumptions);
+                try {
+                    define_var(ctx, varName, pyAssumptions);
+                } finally {
+                    pyAssumptions.destroy();
+                    define_var.destroy();
+                }
             }
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             let variables: any[] = [];

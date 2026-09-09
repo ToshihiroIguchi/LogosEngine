@@ -1,6 +1,6 @@
-import type { Output, Variable, Documentation, SearchResults } from '../types';
+import type { Output, Variable, VariableAssumptions, Documentation, SearchResults } from '../types';
 
-export type WorkerAction = 'EXECUTE' | 'INTERRUPT' | 'COMPLETE' | 'RESET_CONTEXT' | 'DELETE_VARIABLE' | 'GET_COMPLETIONS' | 'GET_DOCS' | 'GET_HELP';
+export type WorkerAction = 'EXECUTE' | 'INTERRUPT' | 'COMPLETE' | 'RESET_CONTEXT' | 'DELETE_VARIABLE' | 'DEFINE_VARIABLE' | 'GET_COMPLETIONS' | 'GET_DOCS' | 'GET_HELP';
 
 export interface WorkerRequest {
     id: string;
@@ -8,6 +8,7 @@ export interface WorkerRequest {
     code: string;
     notebookId?: string;
     executionCount?: number;
+    assumptions?: VariableAssumptions;
 }
 
 export interface WorkerResponse {

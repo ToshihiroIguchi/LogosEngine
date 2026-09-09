@@ -5,7 +5,7 @@
  * Last Build Trigger: 2026-01-17-FixBuildConsistency
  */
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
-import type { Cell, Variable, Documentation, NotebookMeta, SearchResults } from '../types';
+import type { Cell, Variable, VariableAssumptions, Documentation, NotebookMeta, SearchResults } from '../types';
 
 
 import { usePyodide } from '../hooks/usePyodide';
@@ -46,6 +46,7 @@ interface NotebookContextType {
     isGraphicsReady: boolean;
     getCompletions: (code: string, position: number) => Promise<import('../worker/workerTypes').CompletionResponse>;
     deleteVariable: (name: string) => Promise<void>;
+    defineVariable: (name: string, assumptions: VariableAssumptions) => Promise<void>;
     searchDocs: (query: string) => Promise<void>;
     searchResults: SearchResults | null;
 
@@ -92,7 +93,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         return saved === null ? true : saved === 'true';
     });
     const [focusedCellId, setFocusedCellId] = useState<string | null>(null);
-    const { isReady, isGraphicsReady, execute, interrupt: pyodideInterrupt, getCompletions, deleteVariable: deleteVarWorker, searchDocs: searchDocsWorker } = usePyodide();
+    const { isReady, isGraphicsReady, execute, interrupt: pyodideInterrupt, getCompletions, deleteVariable: deleteVarWorker, defineVariable: defineVarWorker, searchDocs: searchDocsWorker } = usePyodide();
 
     const [fileList, setFileList] = useState<NotebookMeta[]>([]);
     const [currentNotebookId, setCurrentNotebookId] = useState<string | null>(null);
@@ -513,6 +514,21 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         }
     }, [deleteVarWorker, currentNotebookId]);
 
+    const defineVariable = useCallback(async (name: string, assumptions: VariableAssumptions) => {
+        try {
+            const response = await defineVarWorker(name, assumptions, currentNotebookId || 'default');
+            if (response.variables) {
+                setVariables(response.variables);
+            }
+            if (response.status === 'ERROR') {
+                throw new Error(response.error || 'Failed to define variable');
+            }
+        } catch (err) {
+            console.error('Failed to define variable:', err);
+            throw err;
+        }
+    }, [defineVarWorker, currentNotebookId]);
+
     const searchDocs = useCallback(async (query: string) => {
         try {
             const response = await searchDocsWorker(query, currentNotebookId || 'default');
@@ -649,7 +665,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             setCellEditing, moveCell, duplicateCell, clearCellOutput, clearAllOutputs, resetNotebook,
             isGraphicsReady,
             getCompletions,
-            deleteVariable, searchDocs, searchResults,
+            deleteVariable, defineVariable, searchDocs, searchResults,
             fileList, currentNotebookId, isDirty, createNotebook, openNotebook, deleteNotebook, renameNotebook,
             setActiveDocumentation,
             registerInsertHandler, insertTextAtCursor

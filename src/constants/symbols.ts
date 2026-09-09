@@ -119,5 +119,17 @@ export const SYMBOL_CATEGORIES: SymbolCategory[] = [
             { name: 'Ceiling', latex: '\\lceil x \\rceil', code: 'ceiling()', description: 'Ceiling function' },
             { name: 'Floor', latex: '\\lfloor x \\rfloor', code: 'floor()', description: 'Floor function' },
         ]
+    },
+    {
+        category: 'Variable Range & Assumptions',
+        layout: 'wide',
+        items: [
+            { name: 'Positive Symbol', latex: 'x > 0', code: "x = symbols('x', positive=True)", description: 'Positive real symbol (x > 0)', label: 'x > 0 (Positive)' },
+            { name: 'Non-negative Symbol', latex: 'x \\ge 0', code: "x = symbols('x', nonnegative=True)", description: 'Non-negative real symbol (x >= 0)', label: 'x ≥ 0 (Non-negative)' },
+            { name: 'Real Symbol', latex: 'x \\in \\mathbb{R}', code: "x = symbols('x', real=True)", description: 'Real symbol (x in R)', label: 'x ∈ ℝ (Real)' },
+            { name: 'Integer Symbol', latex: 'n \\in \\mathbb{Z}', code: "n = symbols('n', integer=True)", description: 'Integer symbol (n in Z)', label: 'n ∈ ℤ (Integer)' },
+            { name: 'Natural Symbol', latex: 'n \\in \\mathbb{N}', code: "n = symbols('n', integer=True, positive=True)", description: 'Natural number symbol (n > 0, integer)', label: 'n ∈ ℕ (Natural)' },
+            { name: 'Non-zero Symbol', latex: 'x \\ne 0', code: "x = symbols('x', nonzero=True)", description: 'Non-zero symbol (x != 0)', label: 'x ≠ 0 (Non-zero)' },
+        ]
     }
 ];

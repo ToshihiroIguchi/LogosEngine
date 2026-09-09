@@ -28,10 +28,27 @@ export interface NotebookState {
   cells: Cell[];
 }
 
+export interface VariableAssumptions {
+  positive?: boolean;
+  negative?: boolean;
+  nonnegative?: boolean;
+  nonpositive?: boolean;
+  real?: boolean;
+  integer?: boolean;
+  complex?: boolean;
+  nonzero?: boolean;
+  even?: boolean;
+  odd?: boolean;
+  prime?: boolean;
+  [key: string]: boolean | undefined;
+}
+
 export interface Variable {
   name: string;
   type: string;
   value: string;
+  assumptions?: VariableAssumptions;
+  rangeSummary?: string;
 }
 
 export interface Documentation {

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { WorkerRequest, WorkerResponse, CompletionRequest, CompletionResponse } from '../worker/workerTypes';
+import type { VariableAssumptions } from '../types';
 
 function checkNeedsGraphics(code: string): boolean {
     // Strip Python comments to prevent false positives
@@ -183,6 +184,23 @@ export function usePyodide() {
         });
     }, [isReady]);
 
+    const defineVariable = useCallback((variableName: string, assumptions: VariableAssumptions = {}, notebookId?: string): Promise<WorkerResponse> => {
+        if (!workerRef.current || !isReady) return Promise.reject("Worker not ready");
+
+        const id = crypto.randomUUID();
+        return new Promise((resolve) => {
+            resolversRef.current.set(id, (response) => resolve(response as WorkerResponse));
+            const request: WorkerRequest = {
+                id,
+                action: 'DEFINE_VARIABLE',
+                code: variableName,
+                notebookId,
+                assumptions
+            };
+            workerRef.current?.postMessage(request);
+        });
+    }, [isReady]);
+
     const searchDocs = useCallback((query: string, notebookId?: string): Promise<WorkerResponse> => {
         if (!workerRef.current || !isReady) return Promise.resolve({ id: '', status: 'ERROR', results: [] });
 
@@ -199,5 +217,5 @@ export function usePyodide() {
         });
     }, [isReady]);
 
-    return { isReady, isGraphicsReady, execute, interrupt, getCompletions, resetContext, deleteVariable, searchDocs };
+    return { isReady, isGraphicsReady, execute, interrupt, getCompletions, resetContext, deleteVariable, defineVariable, searchDocs };
 }

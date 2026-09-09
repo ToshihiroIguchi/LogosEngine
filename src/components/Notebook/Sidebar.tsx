@@ -1,13 +1,15 @@
 import React from 'react';
 import { useNotebook } from '../../state/AppNotebookContext';
-import { Database, X, Hash, BookCopy, Info, FolderOpen, Trash2, Search, HelpCircle, Sigma } from 'lucide-react';
+import { Database, X, Hash, BookCopy, Info, FolderOpen, Trash2, Search, HelpCircle, Sigma, Plus, Sliders } from 'lucide-react';
 import { NotebookExplorer } from './NotebookExplorer';
+import { DefineVariableModal } from './DefineVariableModal';
 import { SYMBOL_CATEGORIES } from '../../constants/symbols';
 import { EXAMPLES } from '../../constants/examples';
 import DOMPurify from 'dompurify';
 import { KatexRenderer } from '../UI/KatexRenderer';
 import { useDarkMode } from '../../hooks/useDarkMode'; // Assuming this hook exists
 import { cn } from '../../lib/utils'; // Assuming this utility exists
+import type { Variable } from '../../types';
 
 interface SidebarProps {
     isOpen: boolean;
@@ -18,6 +20,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     const { variables, activeDocumentation, setActiveDocumentation, activeTab, setActiveTab, deleteVariable, searchDocs, searchResults, insertTextAtCursor, insertExample } = useNotebook();
     const [searchQuery, setSearchQuery] = React.useState('');
     const [expandedExampleCategory, setExpandedExampleCategory] = React.useState<string | null>(null);
+    const [isDefineModalOpen, setIsDefineModalOpen] = React.useState(false);
+    const [editingVariable, setEditingVariable] = React.useState<Variable | null>(null);
     useDarkMode(); // Use the dark mode hook to trigger re-renders for dark mode classes
 
     const [width, setWidth] = React.useState(() => {
@@ -176,44 +180,95 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 {activeTab === 'files' ? (
                     <NotebookExplorer />
                 ) : activeTab === 'variables' ? (
-                    variables.length === 0 ? (
-                        <div className="h-full flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500">
-                            <div className="w-12 h-12 bg-gray-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4">
-                                <Hash size={24} className="text-gray-300 dark:text-slate-600" />
-                            </div>
-                            <p className="text-sm text-gray-400 dark:text-slate-400 font-medium">No variables defined yet.</p>
-                            <p className="text-xs text-gray-500 dark:text-slate-500 mt-2">Run a cell to see active symbols.</p>
+                    <div className="flex flex-col h-full">
+                        {/* Variables Tab Header */}
+                        <div className="p-3 border-b border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between sticky top-0 z-10">
+                            <span className="text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                                <Database size={14} className="text-blue-500" />
+                                変数 ({variables.length})
+                            </span>
+                            <button
+                                onClick={() => {
+                                    setEditingVariable(null);
+                                    setIsDefineModalOpen(true);
+                                }}
+                                className="flex items-center gap-1 px-2.5 py-1 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400 text-xs font-bold rounded-md transition-all border border-blue-200 dark:border-blue-800 shadow-xs cursor-pointer"
+                                title="新しい変数を定義または数値範囲を設定"
+                            >
+                                <Plus size={13} />
+                                変数を定義
+                            </button>
                         </div>
-                    ) : (
-                        <div className="divide-y divide-gray-50 dark:divide-slate-800 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                            {variables.map((v) => (
-                                <div key={v.name} className="p-4 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors group">
-                                    <div className="flex items-center justify-between mb-1.5">
-                                        <span className="font-mono text-sm font-bold text-blue-600 dark:text-blue-400 truncate">{v.name}</span>
-                                        <div className="flex items-center gap-2">
-                                            <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-slate-800 text-[10px] font-bold text-gray-500 dark:text-gray-400 rounded uppercase">
-                                                {v.type}
-                                            </span>
-                                            <button
-                                                onClick={() => {
-                                                    if (confirm(`Delete variable '${v.name}'?`)) {
-                                                        deleteVariable(v.name);
-                                                    }
-                                                }}
-                                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 rounded transition-all"
-                                                title="Delete variable"
-                                            >
-                                                <Trash2 size={12} />
-                                            </button>
+
+                        {variables.length === 0 ? (
+                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500">
+                                <div className="w-12 h-12 bg-gray-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4">
+                                    <Hash size={24} className="text-gray-300 dark:text-slate-600" />
+                                </div>
+                                <p className="text-sm text-gray-400 dark:text-slate-400 font-medium">No variables defined yet.</p>
+                                <p className="text-xs text-gray-500 dark:text-slate-500 mt-2">Run a cell or define a variable with numerical ranges.</p>
+                                <button
+                                    onClick={() => {
+                                        setEditingVariable(null);
+                                        setIsDefineModalOpen(true);
+                                    }}
+                                    className="mt-4 flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition-all cursor-pointer"
+                                >
+                                    <Plus size={14} />
+                                    変数を定義する
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="divide-y divide-gray-50 dark:divide-slate-800 animate-in fade-in slide-in-from-bottom-2 duration-300 overflow-y-auto flex-1">
+                                {variables.map((v) => (
+                                    <div key={v.name} className="p-4 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors group">
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <div className="flex items-center gap-2 truncate">
+                                                <span className="font-mono text-sm font-bold text-blue-600 dark:text-blue-400 truncate">{v.name}</span>
+                                                {v.rangeSummary && (
+                                                    <span
+                                                        className="px-1.5 py-0.5 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold font-mono text-emerald-700 dark:text-emerald-300 rounded shadow-xs"
+                                                        title={`数値範囲: ${v.rangeSummary}`}
+                                                    >
+                                                        {v.rangeSummary}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-1.5 shrink-0">
+                                                <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-slate-800 text-[10px] font-bold text-gray-500 dark:text-gray-400 rounded uppercase">
+                                                    {v.type}
+                                                </span>
+                                                <button
+                                                    onClick={() => {
+                                                        setEditingVariable(v);
+                                                        setIsDefineModalOpen(true);
+                                                    }}
+                                                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 rounded transition-all cursor-pointer"
+                                                    title="数値範囲・仮定を設定"
+                                                >
+                                                    <Sliders size={13} />
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        if (confirm(`Delete variable '${v.name}'?`)) {
+                                                            deleteVariable(v.name);
+                                                        }
+                                                    }}
+                                                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 rounded transition-all cursor-pointer"
+                                                    title="Delete variable"
+                                                >
+                                                    <Trash2 size={12} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="font-mono text-[11px] text-gray-600 dark:text-gray-300 break-all bg-white dark:bg-slate-900 p-2 border border-gray-100 dark:border-slate-800 rounded-md shadow-sm group-hover:border-blue-100 dark:group-hover:border-blue-900 transition-colors">
+                                            {v.value}
                                         </div>
                                     </div>
-                                    <div className="font-mono text-[11px] text-gray-600 dark:text-gray-300 break-all bg-white dark:bg-slate-900 p-2 border border-gray-100 dark:border-slate-800 rounded-md shadow-sm group-hover:border-blue-100 dark:group-hover:border-blue-900 transition-colors">
-                                        {v.value}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 ) : activeTab === 'documentation' ? (
                     <div className="flex flex-col h-full">
                         <div className="p-4 border-b border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-0 z-10">
@@ -425,6 +480,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                     </div>
                 ) : null}
             </div>
+
+            <DefineVariableModal
+                isOpen={isDefineModalOpen}
+                onClose={() => {
+                    setIsDefineModalOpen(false);
+                    setEditingVariable(null);
+                }}
+                initialVariable={editingVariable}
+            />
         </div>
     );
 };
