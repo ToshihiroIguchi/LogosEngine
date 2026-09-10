@@ -43,9 +43,9 @@ async function runInvestigation() {
         await varTabBtn.click();
         await new Promise(r => setTimeout(r, 600));
 
-        // Verify "+ 変数を定義" button is visible
-        console.log('4. Finding "+ 変数を定義" button...');
-        const defineBtn = await page.waitForSelector('button[title*="変数を定義"]', { timeout: 5000 });
+        // Verify "+ Define Variable" button is visible
+        console.log('4. Finding "+ Define Variable" button...');
+        const defineBtn = await page.waitForSelector('button[title*="Define"]', { timeout: 5000 });
         const defineBtnText = await page.evaluate(el => el.textContent, defineBtn);
         console.log(`   Found button: "${defineBtnText.trim()}"`);
         await defineBtn.click();
@@ -65,15 +65,15 @@ async function runInvestigation() {
             const buttons = Array.from(document.querySelectorAll('button'));
             return buttons
                 .map(b => b.textContent.trim())
-                .filter(t => t.includes('正の値') || t.includes('非負') || t.includes('実数') || t.includes('整数'));
+                .filter(t => t.includes('Positive') || t.includes('Non-negative') || t.includes('Real') || t.includes('Integer'));
         });
         console.log(`   Found presets: ${presets.length} items`);
 
-        // Click "正の値 (Positive)" preset
-        console.log('6. Selecting "正の値 (Positive)" preset...');
+        // Click "Positive" preset
+        console.log('6. Selecting "Positive" preset...');
         await page.evaluate(() => {
             const buttons = Array.from(document.querySelectorAll('button'));
-            const positiveBtn = buttons.find(b => b.textContent.includes('正の値'));
+            const positiveBtn = buttons.find(b => b.textContent.includes('Positive'));
             if (positiveBtn) positiveBtn.click();
         });
         await new Promise(r => setTimeout(r, 400));
@@ -83,11 +83,11 @@ async function runInvestigation() {
         await page.screenshot({ path: modalScreenshotPath });
         console.log(`   📸 Saved modal screenshot: ${modalScreenshotPath}`);
 
-        // Click "セッションに即時適用" (Apply to Session)
+        // Click "Apply to Session"
         console.log('7. Applying variable definition to session...');
         await page.evaluate(() => {
             const buttons = Array.from(document.querySelectorAll('button'));
-            const applyBtn = buttons.find(b => b.textContent.includes('セッションに即時適用') || b.textContent.includes('セッションを更新'));
+            const applyBtn = buttons.find(b => b.textContent.includes('Apply to Session') || b.textContent.includes('Update Session'));
             if (applyBtn) applyBtn.click();
         });
 

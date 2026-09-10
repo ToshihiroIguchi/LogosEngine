@@ -22,72 +22,72 @@ interface PresetOption {
 const PRESETS: PresetOption[] = [
     {
         id: 'positive',
-        label: '正の値 (Positive)',
-        description: '0より大きい実数 (x > 0)',
+        label: 'Positive',
+        description: 'Real number > 0 (x > 0)',
         tex: 'x > 0',
         assumptions: { positive: true },
         badgeColor: 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300'
     },
     {
         id: 'nonnegative',
-        label: '非負 (Non-negative)',
-        description: '0以上の実数 (x ≥ 0)',
+        label: 'Non-negative',
+        description: 'Real number ≥ 0 (x ≥ 0)',
         tex: 'x \\ge 0',
         assumptions: { nonnegative: true },
         badgeColor: 'border-teal-500 bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300'
     },
     {
         id: 'real',
-        label: '実数 (Real)',
-        description: '任意の実数 (x ∈ ℝ)',
+        label: 'Real',
+        description: 'Any real number (x ∈ ℝ)',
         tex: 'x \\in \\mathbb{R}',
         assumptions: { real: true },
         badgeColor: 'border-blue-500 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300'
     },
     {
         id: 'integer',
-        label: '整数 (Integer)',
-        description: '任意の整数 (n ∈ ℤ)',
+        label: 'Integer',
+        description: 'Any integer (n ∈ ℤ)',
         tex: 'n \\in \\mathbb{Z}',
         assumptions: { integer: true },
         badgeColor: 'border-amber-500 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300'
     },
     {
         id: 'positive_integer',
-        label: '正の整数 (Natural)',
-        description: '自然数 (n ∈ ℕ, n > 0)',
+        label: 'Natural (Integer > 0)',
+        description: 'Natural number (n ∈ ℕ, n > 0)',
         tex: 'n \\in \\mathbb{N}_{>0}',
         assumptions: { integer: true, positive: true },
         badgeColor: 'border-lime-500 bg-lime-50 dark:bg-lime-950/40 text-lime-700 dark:text-lime-300'
     },
     {
         id: 'negative',
-        label: '負の値 (Negative)',
-        description: '0未満の実数 (x < 0)',
+        label: 'Negative',
+        description: 'Real number < 0 (x < 0)',
         tex: 'x < 0',
         assumptions: { negative: true },
         badgeColor: 'border-orange-500 bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300'
     },
     {
         id: 'nonpositive',
-        label: '非正 (Non-positive)',
-        description: '0以下の実数 (x ≤ 0)',
+        label: 'Non-positive',
+        description: 'Real number ≤ 0 (x ≤ 0)',
         tex: 'x \\le 0',
         assumptions: { nonpositive: true },
         badgeColor: 'border-rose-500 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300'
     },
     {
         id: 'nonzero',
-        label: '非ゼロ (Non-zero)',
-        description: '0以外の数 (x ≠ 0)',
+        label: 'Non-zero',
+        description: 'Non-zero number (x ≠ 0)',
         tex: 'x \\ne 0',
         assumptions: { nonzero: true },
         badgeColor: 'border-purple-500 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300'
     },
     {
         id: 'unconstrained',
-        label: '制限なし (Unconstrained)',
-        description: '複素数を含む一般的な数',
+        label: 'Unconstrained',
+        description: 'General number including complex (x ∈ ℂ)',
         tex: 'x \\in \\mathbb{C}',
         assumptions: {},
         badgeColor: 'border-gray-400 bg-gray-50 dark:bg-slate-800 text-gray-700 dark:text-gray-300'
@@ -215,7 +215,7 @@ export const DefineVariableModal: React.FC<DefineVariableModalProps> = ({
     const handleApplyToSession = async () => {
         const cleanName = varName.trim();
         if (!cleanName) {
-            setError('変数名を入力してください');
+            setError('Please enter a variable name');
             return;
         }
 
@@ -224,7 +224,7 @@ export const DefineVariableModal: React.FC<DefineVariableModalProps> = ({
         const validIdentifierRegex = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
         for (const n of names) {
             if (!validIdentifierRegex.test(n)) {
-                setError(`'${n}' は有効な変数名ではありません (半角英数字とアンダースコア)`);
+                setError(`'${n}' is not a valid variable name (alphanumeric and underscore only)`);
                 return;
             }
         }
@@ -237,7 +237,7 @@ export const DefineVariableModal: React.FC<DefineVariableModalProps> = ({
             onClose();
         } catch (err: unknown) {
             setIsApplying(false);
-            setError(err instanceof Error ? err.message : '変数の定義に失敗しました');
+            setError(err instanceof Error ? err.message : 'Failed to define variable');
         }
     };
 
@@ -273,10 +273,10 @@ export const DefineVariableModal: React.FC<DefineVariableModalProps> = ({
                         </div>
                         <div>
                             <h2 className="text-base font-bold text-gray-900 dark:text-gray-100">
-                                {initialVariable ? `変数 '${initialVariable.name}' の数値範囲を設定` : '変数の定義と数値範囲の設定'}
+                                {initialVariable ? `Configure Assumptions for '${initialVariable.name}'` : 'Define Variable & Assumptions'}
                             </h2>
                             <p className="text-xs text-gray-500 dark:text-gray-400">
-                                正の値や実数などの条件をSymPyに適用し、計算結果を限定します
+                                Apply assumptions (positive, real, etc.) to SymPy symbols to simplify expressions and constrain results
                             </p>
                         </div>
                     </div>
@@ -291,7 +291,7 @@ export const DefineVariableModal: React.FC<DefineVariableModalProps> = ({
                 {/* Variable Name Input */}
                 <div className="mb-4">
                     <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">
-                        変数名 (Symbol Name)
+                        Variable Name (Symbol)
                     </label>
                     <input
                         type="text"
@@ -300,7 +300,7 @@ export const DefineVariableModal: React.FC<DefineVariableModalProps> = ({
                             setVarName(e.target.value);
                             setError(null);
                         }}
-                        placeholder="例: x, y, r, radius (カンマ区切りで複数可)"
+                        placeholder="e.g. x, y, r, radius (comma-separated)"
                         className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-800/80 border border-gray-200 dark:border-slate-700 rounded-lg text-sm font-mono text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                     />
                 </div>
@@ -309,9 +309,9 @@ export const DefineVariableModal: React.FC<DefineVariableModalProps> = ({
                 <div className="mb-4">
                     <div className="flex items-center justify-between mb-2">
                         <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
-                            数値範囲・前提条件のプリセット
+                            Presets & Assumptions
                         </label>
-                        <span className="text-[10px] text-gray-400 dark:text-gray-500">ワンクリックで選択</span>
+                        <span className="text-[10px] text-gray-400 dark:text-gray-500">Click to select</span>
                     </div>
                     <div className="grid grid-cols-3 gap-2">
                         {PRESETS.map((preset) => {
@@ -324,7 +324,7 @@ export const DefineVariableModal: React.FC<DefineVariableModalProps> = ({
                                     className={`flex flex-col items-start p-2.5 rounded-xl border text-left transition-all relative ${
                                         isSelected
                                             ? `${preset.badgeColor} ring-2 ring-blue-500/40 shadow-sm`
-                                            : 'border-gray-200 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800/60 text-gray-700 dark:text-gray-300'
+                                             : 'border-gray-200 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800/60 text-gray-700 dark:text-gray-300'
                                     }`}
                                 >
                                     <div className="flex items-center justify-between w-full mb-1">
@@ -350,20 +350,20 @@ export const DefineVariableModal: React.FC<DefineVariableModalProps> = ({
                         onClick={() => setShowAdvanced(!showAdvanced)}
                         className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
                     >
-                        {showAdvanced ? '− 詳細な仮定（Assumptions）を閉じる' : '＋ 詳細な仮定（Assumptions）を個別に指定する'}
+                        {showAdvanced ? '− Hide advanced assumptions' : '+ Specify individual assumptions'}
                     </button>
 
                     {showAdvanced && (
                         <div className="mt-2.5 p-3 bg-gray-50 dark:bg-slate-800/60 rounded-xl border border-gray-200 dark:border-slate-800 grid grid-cols-2 gap-2 text-xs">
                             {[
-                                { key: 'positive', label: 'positive (正の値 > 0)' },
-                                { key: 'nonnegative', label: 'nonnegative (非負 ≥ 0)' },
-                                { key: 'negative', label: 'negative (負の値 < 0)' },
-                                { key: 'nonpositive', label: 'nonpositive (非正 ≤ 0)' },
-                                { key: 'real', label: 'real (実数 ∈ ℝ)' },
-                                { key: 'integer', label: 'integer (整数 ∈ ℤ)' },
-                                { key: 'nonzero', label: 'nonzero (非ゼロ ≠ 0)' },
-                                { key: 'complex', label: 'complex (複素数 ∈ ℂ)' },
+                                { key: 'positive', label: 'positive (x > 0)' },
+                                { key: 'nonnegative', label: 'nonnegative (x ≥ 0)' },
+                                { key: 'negative', label: 'negative (x < 0)' },
+                                { key: 'nonpositive', label: 'nonpositive (x ≤ 0)' },
+                                { key: 'real', label: 'real (x ∈ ℝ)' },
+                                { key: 'integer', label: 'integer (n ∈ ℤ)' },
+                                { key: 'nonzero', label: 'nonzero (x ≠ 0)' },
+                                { key: 'complex', label: 'complex (x ∈ ℂ)' },
                             ].map(({ key, label }) => (
                                 <label key={key} className="flex items-center gap-2 cursor-pointer text-gray-700 dark:text-gray-300 select-none">
                                     <input
@@ -384,20 +384,20 @@ export const DefineVariableModal: React.FC<DefineVariableModalProps> = ({
                     <div className="flex items-center justify-between text-[11px] text-gray-400 mb-2 border-b border-slate-800 pb-1.5">
                         <span className="flex items-center gap-1.5 font-bold">
                             <HelpCircle size={12} />
-                            数式プレビュー & 生成コード
+                            Preview & Generated Code
                         </span>
                         <button
                             onClick={handleCopy}
                             className="flex items-center gap-1 text-[10px] hover:text-blue-400 transition-colors"
-                            title="コードをコピー"
+                            title="Copy code"
                         >
                             {copied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
-                            {copied ? 'コピー完了' : 'コピー'}
+                            {copied ? 'Copied' : 'Copy'}
                         </button>
                     </div>
 
                     <div className="flex items-center justify-between mb-2 px-1 text-sm text-blue-300">
-                        <span className="text-xs text-gray-400">数学的表現:</span>
+                        <span className="text-xs text-gray-400">Mathematical Form:</span>
                         <div className="font-mono">
                             <KatexRenderer tex={mathDisplayTex} />
                         </div>
@@ -422,20 +422,20 @@ export const DefineVariableModal: React.FC<DefineVariableModalProps> = ({
                         onClick={handleApplyToSession}
                         disabled={isApplying}
                         className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-blue-500/20 cursor-pointer"
-                        title="Pythonセッションに直ちにこの変数を反映します"
+                        title="Apply this variable definition immediately to the Python session"
                     >
                         <Zap size={14} className={isApplying ? 'animate-spin' : ''} />
-                        {isApplying ? '適用中...' : (initialVariable ? 'セッションを更新' : 'セッションに即時適用')}
+                        {isApplying ? 'Applying...' : (initialVariable ? 'Update Session' : 'Apply to Session')}
                     </button>
 
                     <button
                         type="button"
                         onClick={handleInsertCode}
                         className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 active:scale-98 text-gray-800 dark:text-gray-200 text-xs font-bold rounded-xl transition-all border border-gray-200 dark:border-slate-700 cursor-pointer"
-                        title="アクティブなセルに定義コードを挿入します"
+                        title="Insert definition code into active cell"
                     >
                         <Code2 size={14} />
-                        セルに挿入
+                        Insert into Cell
                     </button>
 
                     <button
@@ -443,7 +443,7 @@ export const DefineVariableModal: React.FC<DefineVariableModalProps> = ({
                         onClick={onClose}
                         className="px-3 py-2.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors cursor-pointer"
                     >
-                        閉じる
+                        Close
                     </button>
                 </div>
             </div>
