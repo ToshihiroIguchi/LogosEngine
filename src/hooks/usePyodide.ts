@@ -9,6 +9,8 @@ const COMPLETION_TIMEOUT_MS = 3_000;
 const TRANSPILE_TIMEOUT_MS = 8_000;
 /** How long a soft interrupt may take before the engine is restarted instead. */
 const SOFT_INTERRUPT_GRACE_MS = 3_000;
+/** While waiting for a soft interrupt to take effect the signal is raised again at this interval. */
+const SOFT_INTERRUPT_RESEND_MS = 200;
 const SIGINT = 2;
 
 /** Extracts the identifier prefix right before the cursor. Returns null when completing an attribute (after '.'). */
@@ -214,8 +216,18 @@ export function usePyodide(onEngineReset?: () => void) {
 
         const waiting = new Set(pendingRef.current.keys());
         const worker = workerRef.current;
+        // A single signal can be missed (observed intermittently), so keep raising it until the
+        // interrupted requests have been answered or the engine was replaced.
+        const resend = setInterval(() => {
+            if (workerRef.current !== worker || ![...waiting].some((id) => pendingRef.current.has(id))) {
+                clearInterval(resend);
+                return;
+            }
+            interruptView[0] = SIGINT;
+        }, SOFT_INTERRUPT_RESEND_MS);
         if (softTimerRef.current) clearTimeout(softTimerRef.current);
         softTimerRef.current = setTimeout(() => {
+            clearInterval(resend);
             if (workerRef.current !== worker) return;
             if ([...waiting].some((id) => pendingRef.current.has(id))) {
                 console.warn('Soft interrupt timed out; restarting the engine.');
