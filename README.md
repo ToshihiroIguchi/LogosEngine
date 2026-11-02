@@ -7,7 +7,7 @@ A powerful, privacy-first computational notebook that runs entirely in your brow
 🚀 **[Live Demo](https://logosengine.tosihihiroiguchigithub.workers.dev/)**
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Python](https://img.shields.io/badge/python-3.11-yellow.svg)
+![Python](https://img.shields.io/badge/python-3.13-yellow.svg)
 ![React](https://img.shields.io/badge/react-19-cyan.svg)
 ![WASM](https://img.shields.io/badge/WASM-Powered-orange.svg)
 
@@ -115,7 +115,7 @@ python serve.py
 
 - **Core**: TypeScript, WebAssembly (WASM)
 - **Frontend**: React 19, Vite, Tailwind CSS 4
-- **Conversion**: Pyodide (CPython 3.11 port to WASM)
+- **Conversion**: Pyodide (CPython 3.13 port to WASM)
 - **Math Engine**: SymPy (Python)
 - **Rendering**: KaTeX (LaTeX rendering), Canvas API
 

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
     Download, PlayCircle, Loader2, Info, Upload,
     Square, Printer, Eraser, FileText, Code, RefreshCw,
@@ -12,6 +12,7 @@ import { DisclaimerModal } from './DisclaimerModal';
 import { Sidebar } from './Sidebar';
 import { AppThemeToggle } from '../AppThemeToggle';
 import { useExport } from '../../hooks/useExport';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 export const MainContainer: React.FC = () => {
     const {
@@ -22,6 +23,7 @@ export const MainContainer: React.FC = () => {
     } = useNotebook();
     const { exportJson, exportJupyter } = useExport();
     const [showMenu, setShowMenu] = useState(false);
+    useEscapeKey(showMenu, useCallback(() => setShowMenu(false), []));
     const [showDisclaimer, setShowDisclaimer] = useState(false);
     const [showResetConfirmation, setShowResetConfirmation] = useState(false);
     const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -100,8 +102,8 @@ export const MainContainer: React.FC = () => {
             />
 
             {/* Header - Fixed at top */}
-            <header className="print:hidden flex-none bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-gray-200/60 dark:border-slate-800/60 px-6 py-3 flex items-center justify-between shadow-sm z-30">
-                <div className="flex items-center gap-6">
+            <header className="print:hidden flex-none bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-gray-200/60 dark:border-slate-800/60 px-3 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 shadow-sm z-30">
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 min-w-0">
                     <div className="flex items-center gap-3">
                         <div className="bg-white dark:bg-slate-800 p-1.5 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm"><img src={`${import.meta.env.BASE_URL}logo.png`} alt="LogosCalc" className="w-8 h-8 object-contain" /></div>
                         <div className="flex items-center">
@@ -109,9 +111,9 @@ export const MainContainer: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="h-8 w-px bg-gray-200" />
+                    <div className="hidden sm:block h-8 w-px bg-gray-200" />
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                         {isEditingTitle ? (
                             <div className="flex items-center gap-2">
                                 <input
@@ -128,7 +130,7 @@ export const MainContainer: React.FC = () => {
                                     }}
                                     onBlur={handleSaveTitle}
                                     autoFocus
-                                    className="bg-gray-50 dark:bg-slate-800 border border-purple-200 dark:border-purple-800 rounded-lg px-3 py-1 text-sm font-bold text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-100 dark:focus:ring-purple-900 min-w-[200px]"
+                                    className="bg-gray-50 dark:bg-slate-800 border border-purple-200 dark:border-purple-800 rounded-lg px-3 py-1 text-sm font-bold text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-100 dark:focus:ring-purple-900 min-w-[120px] sm:min-w-[200px] max-w-full"
                                 />
                                 <button onClick={handleSaveTitle} className="text-green-600 hover:bg-green-50 p-1.5 rounded-lg transition-colors" title="Save name"><Check size={16} /></button>
                             </div>
@@ -165,7 +167,7 @@ export const MainContainer: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     {initError ? (
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 rounded-full border border-red-200" role="alert" title={initError}>
                             <span className="text-xs font-semibold text-red-600">Engine error</span>
@@ -293,10 +295,10 @@ export const MainContainer: React.FC = () => {
             )}
 
             {/* Main Content Area + Sidebar */}
-            <div className="flex-1 flex overflow-hidden">
+            <div className="relative flex-1 flex overflow-hidden">
                 {/* Scrollable Notebook Area */}
                 <div id="notebook-scroll-area" className="flex-1 flex flex-col min-w-0 overflow-y-auto scroll-smooth">
-                    <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-12">
+                    <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 py-6 sm:py-12">
                         {/* Print-only Notebook Title */}
                         <h1 className="hidden print:block text-3xl font-black text-gray-900 mb-6 border-b border-gray-200 pb-4">
                             {currentNotebook?.title || 'Notebook'}
@@ -332,7 +334,7 @@ export const MainContainer: React.FC = () => {
                             </div>
                         </div>
                     </main>
-                    <footer className="print:hidden py-6 px-8 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between bg-gray-50/50 dark:bg-slate-900/50 mt-auto">
+                    <footer className="print:hidden py-6 px-4 sm:px-8 border-t border-gray-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-gray-50/50 dark:bg-slate-900/50 mt-auto">
                         <div className="flex items-center gap-3 text-xs text-gray-400 font-mono">
                             <span>PYTHON 3.13</span><span className="opacity-30">•</span><span>SYMPY CORE</span><span className="opacity-30">•</span><span>BROWSER-WASM</span>
                         </div>

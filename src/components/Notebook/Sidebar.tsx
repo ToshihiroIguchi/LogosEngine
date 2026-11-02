@@ -10,8 +10,10 @@ import { KatexRenderer } from '../UI/KatexRenderer';
 import { useDarkMode } from '../../hooks/useDarkMode'; // Assuming this hook exists
 import { cn } from '../../lib/utils'; // Assuming this utility exists
 import type { Variable } from '../../types';
+import { safeStorage } from '../../utils/safeStorage';
 
 const MIN_WIDTH = 250;
+const NARROW_QUERY = '(max-width: 767px)';
 
 interface SidebarProps {
     isOpen: boolean;
@@ -27,14 +29,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     useDarkMode(); // Use the dark mode hook to trigger re-renders for dark mode classes
 
     const [width, setWidth] = React.useState(() => {
-        if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem('logos-sidebar-width');
-            const parsed = saved ? Number.parseInt(saved, 10) : NaN;
-            return Number.isFinite(parsed) && parsed >= MIN_WIDTH ? parsed : 320;
-        }
-        return 320;
+        const saved = safeStorage.get('logos-sidebar-width');
+        const parsed = saved ? Number.parseInt(saved, 10) : NaN;
+        return Number.isFinite(parsed) && parsed >= MIN_WIDTH ? parsed : 320;
     });
     const [isResizing, setIsResizing] = React.useState(false);
+
+    // On narrow screens the sidebar floats over the notebook instead of squeezing the editor
+    const [isNarrow, setIsNarrow] = React.useState(() => window.matchMedia(NARROW_QUERY).matches);
+    React.useEffect(() => {
+        const mql = window.matchMedia(NARROW_QUERY);
+        const onChange = (e: MediaQueryListEvent) => setIsNarrow(e.matches);
+        mql.addEventListener('change', onChange);
+        return () => mql.removeEventListener('change', onChange);
+    }, []);
 
     const startResizing = React.useCallback((e: React.MouseEvent) => {
         e.preventDefault();
@@ -45,7 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
     const stopResizing = React.useCallback(() => {
         setIsResizing(false);
-        localStorage.setItem('logos-sidebar-width', width.toString());
+        safeStorage.set('logos-sidebar-width', width.toString());
         document.body.style.cursor = '';
     }, [width]);
 
@@ -93,14 +101,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
     return (
         <div
-            className="print:hidden bg-white dark:bg-slate-900 border-l border-gray-200 dark:border-slate-800 flex flex-col shrink-0 h-full animate-in slide-in-from-right-10 duration-300 relative group/sidebar"
-            style={{ width: `${width}px`, minWidth: `${MIN_WIDTH}px`, maxWidth: '80vw', transition: isResizing ? 'none' : 'width 0.3s ease-in-out' }}
+            className={cn(
+                "print:hidden bg-white dark:bg-slate-900 border-l border-gray-200 dark:border-slate-800 flex flex-col shrink-0 h-full animate-in slide-in-from-right-10 duration-300 group/sidebar",
+                isNarrow ? "absolute right-0 top-0 bottom-0 z-30 shadow-2xl" : "relative"
+            )}
+            style={isNarrow
+                ? { width: 'min(100%, 360px)' }
+                : { width: `${width}px`, minWidth: `${MIN_WIDTH}px`, maxWidth: '80vw', transition: isResizing ? 'none' : 'width 0.3s ease-in-out' }}
         >
-            {/* Drag Handle */}
-            <div
-                className={`absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 z-20 transition-colors ${isResizing ? 'bg-blue-500' : 'bg-transparent'}`}
-                onMouseDown={startResizing}
-            />
+            {/* Drag Handle (desktop only) */}
+            {!isNarrow && (
+                <div
+                    className={`absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 z-20 transition-colors ${isResizing ? 'bg-blue-500' : 'bg-transparent'}`}
+                    onMouseDown={startResizing}
+                />
+            )}
 
             {/* Compact Header */}
             <div className="flex-none p-3 border-b border-gray-100 dark:border-slate-800 flex items-center gap-2 bg-gray-50/50 dark:bg-slate-900/50">
