@@ -28,3 +28,6 @@ dist-ssr
 
 # Temporary scratch
 scratch/
+
+# Playwright MCP artifacts
+.playwright-mcp/

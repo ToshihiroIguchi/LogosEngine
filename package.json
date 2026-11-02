@@ -8,7 +8,9 @@
     "prebuild": "node -e \"const fs=require('fs'); if(fs.existsSync('src/context')) fs.rmSync('src/context', { recursive: true, force: true })\"",
     "build": "npm run prebuild && tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:e2e": "node scripts/run_all_browser_tests.cjs"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
@@ -50,6 +52,7 @@
     "tailwindcss": "^4.1.18",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
-    "vite": "^7.2.4"
+    "vite": "^7.2.4",
+    "vitest": "^5.0.5"
   }
 }
