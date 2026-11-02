@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Moon, Sun, Monitor, type LucideIcon } from 'lucide-react';
 import { useDarkMode, type Theme } from '../hooks/useDarkMode';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 export const AppThemeToggle: React.FC = () => {
     const { theme, setTheme } = useDarkMode();
     const [isOpen, setIsOpen] = useState(false);
+    useEscapeKey(isOpen, useCallback(() => setIsOpen(false), []));
 
     const themes: { id: Theme; icon: LucideIcon; label: string }[] = [
         { id: 'light', icon: Sun, label: 'Light' },

@@ -27,7 +27,7 @@ const CellItemImpl: React.FC<CellItemProps> = ({ cell, index }) => {
     const {
         updateCell, executeCell, deleteCell, addCell, interrupt, getCompletions,
         setFocusedCellId, selectNextCell,
-        setCellEditing, moveCell, duplicateCell, clearCellOutput, toggleCellType,
+        setCellEditing, moveCell, duplicateCell, clearCellOutput, toggleCellType, isResultLive,
         registerInsertHandler, unregisterInsertHandler
     } = useNotebookActions();
     const { isReady, isGraphicsReady, focusedCellId } = useNotebookStatus();
@@ -304,7 +304,14 @@ const CellItemImpl: React.FC<CellItemProps> = ({ cell, index }) => {
                             )}
 
                             <button
-                                onClick={() => toggleCellType(cell.id)}
+                                onClick={() => {
+                                    // Converting to markdown discards the outputs and cannot be undone
+                                    if (cell.type === 'code' && cell.outputs.length > 0
+                                        && !window.confirm('Switching to a markdown cell discards its outputs. Continue?')) {
+                                        return;
+                                    }
+                                    toggleCellType(cell.id);
+                                }}
                                 className="text-[9px] font-bold text-gray-300 dark:text-slate-600 select-none uppercase tracking-widest hover:text-blue-500 dark:hover:text-blue-400 cursor-pointer transition-colors"
                                 title="Switch cell type"
                             >
@@ -404,7 +411,9 @@ const CellItemImpl: React.FC<CellItemProps> = ({ cell, index }) => {
                                 executionCount={cell.executionCount}
                                 onFixError={handleFixError}
                                 onClear={() => clearCellOutput(cell.id)}
-                                onMathAction={(action) => {
+                                // Out[n] only exists for results computed in this engine session, not for
+                                // outputs restored from storage, so the fx actions are not offered for those
+                                onMathAction={isResultLive(cell.executionCount) ? (action) => {
                                     if (typeof cell.executionCount !== 'number') return;
                                     const newContent = `${action}(Out[${cell.executionCount}])`;
                                     // addCell inserts after the current index if provided
@@ -412,7 +421,7 @@ const CellItemImpl: React.FC<CellItemProps> = ({ cell, index }) => {
                                     updateCell(newId, newContent);
                                     // Focus the new cell
                                     setFocusedCellId(newId);
-                                }}
+                                } : undefined}
                             />
                         </div>
                     </div>

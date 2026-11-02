@@ -103,19 +103,20 @@ export const ResultView: React.FC<CellOutputProps> = ({ outputs, executionCount,
                         )}
 
                         {/* Unified Toolbar */}
-                        {(output.isResult || output.type !== 'image') && (
+                        {/* Plots have nothing to copy as text, but can still be cleared */}
+                        {(output.type !== 'image' || onClear) && (
                             <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                                 <div className="flex items-center gap-0.5 p-1 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm border border-gray-200 dark:border-slate-700 rounded-lg shadow-sm">
-                                    {output.isResult && onMathAction && executionCount && (
+                                    {output.type !== 'image' && output.isResult && onMathAction && executionCount && (
                                         <>
                                             <MathActionMenu onAction={onMathAction} />
                                             <div className="w-px h-3 bg-gray-200 dark:bg-slate-700 mx-1" />
                                         </>
                                     )}
-                                    <CopyMenu output={output} />
+                                    {output.type !== 'image' && <CopyMenu output={output} />}
                                     {onClear && (
                                         <>
-                                            <div className="w-px h-3 bg-gray-200 dark:bg-slate-700 mx-1" />
+                                            {output.type !== 'image' && <div className="w-px h-3 bg-gray-200 dark:bg-slate-700 mx-1" />}
                                             <ClearButton onClear={onClear} />
                                         </>
                                     )}

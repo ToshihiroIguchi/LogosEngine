@@ -204,10 +204,11 @@ export const DefineVariableModal: React.FC<DefineVariableModalProps> = ({
 
         // Validate identifier names
         const names = cleanName.replace(/,/g, ' ').split(/\s+/).filter(Boolean);
-        const validIdentifierRegex = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+        // Same rule as Python's str.isidentifier(): letters (any script), digits and underscore, not starting with a digit
+        const validIdentifierRegex = /^[\p{L}\p{Nl}_][\p{L}\p{Nl}\p{Mn}\p{Mc}\p{Nd}\p{Pc}]*$/u;
         for (const n of names) {
             if (!validIdentifierRegex.test(n)) {
-                setError(`'${n}' is not a valid variable name (alphanumeric and underscore only)`);
+                setError(`'${n}' is not a valid variable name (letters, digits and underscore only; it must not start with a digit)`);
                 return;
             }
             if (PYTHON_KEYWORDS.has(n)) {

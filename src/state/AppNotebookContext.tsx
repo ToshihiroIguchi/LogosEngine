@@ -60,6 +60,8 @@ export interface NotebookActions {
     deleteCell: (id: string) => void;
     executeCell: (id: string, codeOverride?: string) => Promise<ExecutionOutcome>;
     executeAll: () => Promise<void>;
+    /** True when Out[executionCount] still exists in the engine (false for results restored from storage). */
+    isResultLive: (executionCount?: number) => boolean;
     interrupt: () => void;
     importNotebook: (data: unknown, fileName?: string) => Promise<void>;
     insertExample: (code: string) => void;
@@ -123,7 +125,8 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     const [activeTab, setActiveTab] = useState<SidebarTab>(loadSidebarTab);
     const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
         const saved = safeStorage.get('logos-engine-sidebar-open');
-        return saved === null ? true : saved === 'true';
+        // Open by default on desktop; start closed on phones where it would cover the notebook
+        return saved === null ? !window.matchMedia('(max-width: 767px)').matches : saved === 'true';
     });
     const [focusedCellId, setFocusedCellId] = useState<string | null>(null);
     const [fileList, setFileList] = useState<NotebookMeta[]>([]);
@@ -159,9 +162,13 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     const channelRef = useRef<BroadcastChannel | null>(null);
     const activeInsertHandler = useRef<{ cellId: string; handler: (text: string, relativeCursorPos?: number) => void } | null>(null);
 
+    // Results that exist in the engine's Out[n] right now (not those restored from storage)
+    const liveResultsRef = useRef<Set<string>>(new Set());
+
     const handleEngineReset = useCallback(() => {
         // A restarted engine has empty namespaces and any running Run All must stop
         setVariables([]);
+        liveResultsRef.current.clear();
         runGenerationRef.current += 1;
     }, []);
 
@@ -454,6 +461,35 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         replaceCells(loaded);
     }, [readNotebookCells, replaceCells]);
 
+    /**
+     * The open notebook may have been deleted (or wiped by a factory reset) in another tab.
+     * Without this the tab keeps showing it, cannot save it and sits on "Saving..." forever.
+     */
+    const recoverIfCurrentMissing = useCallback(async () => {
+        const id = currentNotebookIdRef.current;
+        if (!id || !initDoneRef.current) return;
+        try {
+            const metaList = (await storage.getAllMeta()).sort(byRecent);
+            // The user may have switched notebooks while the list was loading
+            if (currentNotebookIdRef.current !== id || metaList.some((m) => m.id === id)) return;
+
+            // Nothing of the vanished notebook may be written back
+            deletedIdsRef.current.add(id);
+            savedRevisionRef.current = revisionRef.current;
+            setSaveStatus('saved');
+            void resetContext(id, true);
+            currentNotebookIdRef.current = null;
+            setFileList(metaList);
+            if (metaList.length > 0) {
+                await openNotebook(metaList[0].id);
+            } else {
+                await createNotebook();
+            }
+        } catch (err) {
+            console.error('Failed to recover from a notebook removed in another tab:', err);
+        }
+    }, [resetContext, openNotebook, createNotebook]);
+
     useEffect(() => {
         if (typeof BroadcastChannel === 'undefined') return;
         const channel = new BroadcastChannel(CHANNEL_NAME);
@@ -463,6 +499,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             if (!message || message.tabId === TAB_ID) return;
             if (message.type === 'list-changed') {
                 void refreshFileList();
+                void recoverIfCurrentMissing();
             } else if (message.type === 'saved') {
                 void refreshFileList();
                 if (message.id && message.id === currentNotebookIdRef.current) {
@@ -480,7 +517,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             channel.close();
             channelRef.current = null;
         };
-    }, [refreshFileList, reloadCurrentFromStorage]);
+    }, [refreshFileList, reloadCurrentFromStorage, recoverIfCurrentMissing]);
 
     const resolveConflict = useCallback(async (choice: 'reload' | 'keep') => {
         if (choice === 'reload') {
@@ -630,6 +667,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             const response = await execute(code, notebookId || 'default', executionCount);
             const executionTime = Math.round(performance.now() - startTime);
             const patch: Partial<Cell> = { outputs: response.results, executionCount, executionTime };
+            if (notebookId && response.status !== 'ERROR') liveResultsRef.current.add(`${notebookId}:${executionCount}`);
 
             if (currentNotebookIdRef.current === notebookId) {
                 updateCells((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch, isExecuting: false } : c)));
@@ -667,6 +705,12 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             if (outcome === 'error' || outcome === 'interrupted') return;
         }
     }, [executeCell]);
+
+    const isResultLive = useCallback((executionCount?: number) => {
+        const notebookId = currentNotebookIdRef.current;
+        return typeof executionCount === 'number' && !!notebookId
+            && liveResultsRef.current.has(`${notebookId}:${executionCount}`);
+    }, []);
 
     const interrupt = useCallback(() => {
         runGenerationRef.current += 1; // stops Run All
@@ -784,7 +828,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     const actions = useMemo<NotebookActions>(() => ({
         setActiveDocumentation, setActiveTab, setIsSidebarOpen, setFocusedCellId,
         retryInit, retryGraphics,
-        addCell, updateCell, toggleCellType, deleteCell, executeCell, executeAll, interrupt,
+        addCell, updateCell, toggleCellType, deleteCell, executeCell, executeAll, isResultLive, interrupt,
         importNotebook, insertExample, selectNextCell, setCellEditing, moveCell, duplicateCell,
         clearCellOutput, clearAllOutputs, resetNotebook, getCompletions,
         deleteVariable, defineVariable, searchDocs, openDocumentation, transpileCodes,
@@ -792,7 +836,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         registerInsertHandler, unregisterInsertHandler, insertTextAtCursor
     }), [
         retryInit, retryGraphics, addCell, updateCell, toggleCellType, deleteCell, executeCell, executeAll,
-        interrupt, importNotebook, insertExample, selectNextCell, setCellEditing, moveCell, duplicateCell,
+        isResultLive, interrupt, importNotebook, insertExample, selectNextCell, setCellEditing, moveCell, duplicateCell,
         clearCellOutput, clearAllOutputs, resetNotebook, getCompletions, deleteVariable, defineVariable,
         searchDocs, openDocumentation, transpileCodes, createNotebook, openNotebook, deleteNotebook,
         renameNotebook, resolveConflict, registerInsertHandler, unregisterInsertHandler, insertTextAtCursor
