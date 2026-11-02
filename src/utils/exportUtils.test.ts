@@ -64,3 +64,16 @@ describe('transpileCode known bugs', () => {
         expect(out).toContain('Eq(x, 1)');
     });
 });
+
+describe('transpileCode: comments and dsolve keywords', () => {
+    it('ignores commas, equals and parentheses inside comments within a call', () => {
+        const out = transpileCode('solve(\n    x = 1,  # a, b = (c\n    y = 2\n)');
+        expect(normalize(out)).toContain(normalize('Eq(x, 1)'));
+        expect(normalize(out)).toContain(normalize('Eq(y, 2)'));
+    });
+
+    it('keeps dsolve func= and n= keywords but converts n= for solve', () => {
+        expect(transpileCode('dsolve(eq, func=f(x), n=6)')).toBe('dsolve(eq, func=f(x), n=6)');
+        expect(normalize(transpileCode('solve(n = 5)'))).toBe(normalize('solve(Eq(n, 5))'));
+    });
+});

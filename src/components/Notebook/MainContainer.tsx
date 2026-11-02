@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import {
     Download, PlayCircle, Loader2, Info, Upload,
     Square, Printer, Eraser, FileText, Code, RefreshCw,
-    Pencil, Check, CheckCircle2, CloudUpload, MoreVertical, PanelLeft
+    Pencil, Check, CheckCircle2, CloudUpload, MoreVertical, PanelLeft, AlertTriangle
 } from 'lucide-react';
 import { useNotebook } from '../../state/AppNotebookContext';
 import { CellItem } from './CellItem';
@@ -11,29 +11,25 @@ import { ConfirmationModal } from './ConfirmationModal';
 import { DisclaimerModal } from './DisclaimerModal';
 import { Sidebar } from './Sidebar';
 import { AppThemeToggle } from '../AppThemeToggle';
-import { downloadJsonFile } from '../../utils/fileUtils';
-import { downloadNotebook } from '../../utils/exportUtils';
+import { useExport } from '../../hooks/useExport';
 
 export const MainContainer: React.FC = () => {
     const {
         cells, addCell, executeAll, interrupt, isReady, initError, retryInit, importNotebook,
         isSidebarOpen, setIsSidebarOpen, clearAllOutputs, resetNotebook, isGraphicsReady,
-        fileList, currentNotebookId, isDirty, renameNotebook
+        graphicsError, retryGraphics,
+        fileList, currentNotebookId, saveStatus, saveError, hasConflict, resolveConflict, renameNotebook
     } = useNotebook();
+    const { exportJson, exportJupyter } = useExport();
     const [showMenu, setShowMenu] = useState(false);
     const [showDisclaimer, setShowDisclaimer] = useState(false);
     const [showResetConfirmation, setShowResetConfirmation] = useState(false);
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [editTitleValue, setEditTitleValue] = useState('');
-    const [prevNotebookId, setPrevNotebookId] = useState<string | null>(null);
+    const cancelTitleEditRef = useRef(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const currentNotebook = fileList.find(m => m.id === currentNotebookId);
-
-    if (currentNotebookId !== prevNotebookId) {
-        setPrevNotebookId(currentNotebookId);
-        setEditTitleValue(currentNotebook?.title || '');
-    }
 
     const isExecutingAny = cells.some(c => c.isExecuting);
 
@@ -42,14 +38,11 @@ export const MainContainer: React.FC = () => {
     };
 
     const handleExport = () => {
-        const title = currentNotebook?.title || 'notebook';
-        const dateStr = new Date().toISOString().slice(0, 10);
-        downloadJsonFile(`${title}-${dateStr}.json`, { title, cells, version: '1.0' });
+        exportJson(cells, currentNotebook?.title || 'notebook');
     };
 
     const handleExportJupyter = () => {
-        const title = currentNotebook?.title || 'notebook';
-        downloadNotebook({ cells }, `${title}.ipynb`);
+        void exportJupyter(cells, currentNotebook?.title || 'notebook');
     };
 
     const handlePrint = () => {
@@ -68,32 +61,40 @@ export const MainContainer: React.FC = () => {
         reader.onload = (e) => {
             try {
                 const data = JSON.parse(e.target?.result as string);
-                importNotebook(data, file.name);
+                void importNotebook(data, file.name);
             } catch {
-                alert('Failed to parse JSON file. Please ensure it is a valid notebook export.');
+                alert('Failed to parse the file. Please choose a LogosEngine JSON export or a Jupyter (.ipynb) notebook.');
             }
         };
+        reader.onerror = () => alert('Failed to read the file.');
         reader.readAsText(file);
 
         // Reset input so the same file can be selected again
         event.target.value = '';
     };
 
-    const handleSaveTitle = async () => {
-        if (editTitleValue.trim() && currentNotebookId) {
-            await renameNotebook(currentNotebookId, editTitleValue.trim());
-        }
-        setIsEditingTitle(false);
+    const startEditingTitle = () => {
+        // Always start from the current name: it may have been renamed from the sidebar
+        setEditTitleValue(currentNotebook?.title || '');
+        cancelTitleEditRef.current = false;
+        setIsEditingTitle(true);
     };
 
-
+    const handleSaveTitle = async () => {
+        const cancelled = cancelTitleEditRef.current;
+        cancelTitleEditRef.current = false;
+        setIsEditingTitle(false);
+        if (!cancelled && editTitleValue.trim() && currentNotebookId && editTitleValue.trim() !== currentNotebook?.title) {
+            await renameNotebook(currentNotebookId, editTitleValue.trim());
+        }
+    };
 
     return (
         <div id="app-root" className="h-screen bg-[#FDFDFD] dark:bg-slate-950 flex flex-col overflow-hidden">
             <input
                 ref={fileInputRef}
                 type="file"
-                accept=".json"
+                accept=".json,.ipynb"
                 onChange={handleFileChange}
                 className="hidden"
             />
@@ -120,17 +121,21 @@ export const MainContainer: React.FC = () => {
                                     onKeyDown={(e) => {
                                         // Blur triggers the single save via onBlur (avoids saving twice on Enter)
                                         if (e.key === 'Enter') e.currentTarget.blur();
+                                        if (e.key === 'Escape') {
+                                            cancelTitleEditRef.current = true;
+                                            e.currentTarget.blur();
+                                        }
                                     }}
                                     onBlur={handleSaveTitle}
                                     autoFocus
                                     className="bg-gray-50 dark:bg-slate-800 border border-purple-200 dark:border-purple-800 rounded-lg px-3 py-1 text-sm font-bold text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-100 dark:focus:ring-purple-900 min-w-[200px]"
                                 />
-                                <button onClick={handleSaveTitle} className="text-green-600 hover:bg-green-50 p-1.5 rounded-lg transition-colors"><Check size={16} /></button>
+                                <button onClick={handleSaveTitle} className="text-green-600 hover:bg-green-50 p-1.5 rounded-lg transition-colors" title="Save name"><Check size={16} /></button>
                             </div>
                         ) : (
                             <div
                                 className="group flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-800 px-3 py-1.5 rounded-xl transition-all"
-                                onClick={() => setIsEditingTitle(true)}
+                                onClick={startEditingTitle}
                             >
                                 <span className="text-lg font-bold text-gray-900 dark:text-gray-100 tracking-tight">
                                     {currentNotebook?.title || 'Loading...'}
@@ -140,7 +145,12 @@ export const MainContainer: React.FC = () => {
                         )}
 
                         <div className="flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                            {isDirty ? (
+                            {saveStatus === 'error' ? (
+                                <div className="flex items-center gap-1.5 text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-100" title={saveError ?? undefined} role="alert">
+                                    <AlertTriangle size={12} />
+                                    <span>Not saved</span>
+                                </div>
+                            ) : saveStatus === 'saving' ? (
                                 <div className="flex items-center gap-1.5 text-amber-500 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100/50">
                                     <CloudUpload size={12} className="animate-bounce" />
                                     <span>Saving...</span>
@@ -158,18 +168,28 @@ export const MainContainer: React.FC = () => {
                 <div className="flex items-center gap-2">
                     {initError ? (
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 rounded-full border border-red-200" role="alert" title={initError}>
-                            <span className="text-xs font-semibold text-red-600">Engine failed to start</span>
+                            <span className="text-xs font-semibold text-red-600">Engine error</span>
                             <button
                                 onClick={retryInit}
                                 className="text-xs font-bold text-red-700 underline hover:text-red-900"
                             >
-                                Retry
+                                Restart
                             </button>
                         </div>
                     ) : !isReady ? (
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 rounded-full border border-amber-100/50">
                             <Loader2 className="animate-spin text-amber-500" size={14} />
                             <span className="text-xs font-semibold text-amber-600">Initializing...</span>
+                        </div>
+                    ) : graphicsError ? (
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 rounded-full border border-orange-200" role="alert" title={graphicsError}>
+                            <span className="text-xs font-semibold text-orange-700">Plotting unavailable</span>
+                            <button
+                                onClick={retryGraphics}
+                                className="text-xs font-bold text-orange-800 underline hover:text-orange-950"
+                            >
+                                Retry
+                            </button>
                         </div>
                     ) : !isGraphicsReady ? (
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-full border border-blue-100/50">
@@ -225,7 +245,7 @@ export const MainContainer: React.FC = () => {
                                     <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
                                     <div className="absolute top-full mt-2 right-0 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-xl w-56 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
                                         <button onClick={() => { handleImport(); setShowMenu(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
-                                            <Upload size={14} />Import Notebook
+                                            <Upload size={14} />Import (.json / .ipynb)
                                         </button>
                                         <button onClick={() => { handleExport(); setShowMenu(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
                                             <Download size={14} />Export JSON
@@ -256,6 +276,22 @@ export const MainContainer: React.FC = () => {
                 </div>
             </header>
 
+            {/* Other-tab conflict / storage problems */}
+            {hasConflict && (
+                <div role="alert" className="print:hidden flex-none flex items-center justify-center gap-3 px-6 py-2 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-900 text-xs text-amber-800 dark:text-amber-200">
+                    <AlertTriangle size={14} />
+                    <span>This notebook was changed in another browser tab. Automatic saving is paused.</span>
+                    <button onClick={() => void resolveConflict('reload')} className="font-bold underline">Load the other version</button>
+                    <button onClick={() => void resolveConflict('keep')} className="font-bold underline">Keep and overwrite with mine</button>
+                </div>
+            )}
+            {saveStatus === 'error' && saveError && (
+                <div role="alert" className="print:hidden flex-none flex items-center justify-center gap-2 px-6 py-2 bg-red-50 dark:bg-red-950/40 border-b border-red-200 dark:border-red-900 text-xs text-red-700 dark:text-red-300">
+                    <AlertTriangle size={14} />
+                    <span>Your changes could not be saved: {saveError}</span>
+                </div>
+            )}
+
             {/* Main Content Area + Sidebar */}
             <div className="flex-1 flex overflow-hidden">
                 {/* Scrollable Notebook Area */}
@@ -267,7 +303,7 @@ export const MainContainer: React.FC = () => {
                         </h1>
                         <div className="space-y-4">
                             {cells.map((cell, index) => (
-                                <ErrorBoundary key={cell.id}>
+                                <ErrorBoundary key={cell.id} resetKeys={[cell.content, cell.type, cell.outputs]}>
                                     <CellItem cell={cell} index={index} />
                                 </ErrorBoundary>
                             ))}

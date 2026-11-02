@@ -114,8 +114,8 @@ async function main() {
 
         // M3: a cell must not run twice when it waits on extensions / contains plot3d
         t = await runCell(page, 1, "print('ONCE')\nplot3d(x*y, (x,-1,1), (y,-1,1), show=False)");
-        // Count only the output section (the cell source also contains the word)
-        const onceCount = (t.split(/Out \[\d+\]:/).slice(1).join(' ').match(/ONCE/g) || []).length;
+        // The source line contains the word once; the printed output must add exactly one more
+        const onceCount = (t.match(/ONCE/g) || []).length - 1;
         check("M3 cell side effects run exactly once", onceCount === 1, `ONCE x${onceCount}: ${t.slice(0, 400)}`);
 
         // M6: sys.exit() must not break the engine
@@ -216,7 +216,7 @@ async function main() {
         });
         await page2.goto(URL, { waitUntil: 'domcontentloaded' });
         const failed = await page2
-            .waitForFunction(() => document.body.innerText.includes('Engine failed to start'), { timeout: 60000 })
+            .waitForFunction(() => document.body.innerText.includes('Engine error'), { timeout: 60000 })
             .then(() => true)
             .catch(() => false);
         check('H5 engine load failure shows an error with Retry', failed);

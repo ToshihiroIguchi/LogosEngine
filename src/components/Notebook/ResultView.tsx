@@ -14,7 +14,8 @@ interface CellOutputProps {
 }
 
 export const ResultView: React.FC<CellOutputProps> = ({ outputs, executionCount, onFixError, onMathAction, onClear }) => {
-    const validOutputs = outputs.filter(o => o.value && o.value.trim().length > 0);
+    // Errors are always shown, even when Python gave them no message (assert False, raise ValueError())
+    const validOutputs = outputs.filter(o => o.type === 'error' || (o.value && o.value.trim().length > 0));
 
     if (validOutputs.length === 0) return null;
 
@@ -23,14 +24,16 @@ export const ResultView: React.FC<CellOutputProps> = ({ outputs, executionCount,
             {validOutputs.map((output, idx) => (
                 <div key={`${output.timestamp}-${idx}`} className="group relative flex gap-4 animate-in fade-in slide-in-from-top-1 duration-300">
                     <div className="flex-shrink-0 w-12 pt-1 text-right">
-                        <span className="text-[10px] font-bold text-gray-400 dark:text-slate-400 font-mono tracking-tighter opacity-80">
-                            {executionCount ? `Out [${executionCount}]:` : 'Out:'}
-                        </span>
+                        {output.isResult && (
+                            <span className="text-[10px] font-bold text-gray-400 dark:text-slate-400 font-mono tracking-tighter opacity-80">
+                                {executionCount ? `Out [${executionCount}]:` : 'Out:'}
+                            </span>
+                        )}
                     </div>
 
                     <div className="flex-1 min-w-0 flex flex-col gap-1 relative pr-10">
                         {output.type === 'latex' ? (
-                            <LatexRenderer value={output.value} />
+                            <LatexRenderer value={output.value} fallback={output.rawText} />
                         ) : output.type === 'image' ? (
                             <div className="py-2">
                                 <img src={output.value} alt="Plot" className="max-w-full h-auto rounded shadow-sm bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-700" />
@@ -52,9 +55,11 @@ export const ResultView: React.FC<CellOutputProps> = ({ outputs, executionCount,
                                                 </span>
                                             )}
                                         </div>
-                                        <div className="font-mono text-sm font-medium text-[#2D3748] dark:text-slate-200 leading-snug select-text">
-                                            {output.value}
-                                        </div>
+                                        {output.value && (
+                                            <div className="font-mono text-sm font-medium text-[#2D3748] dark:text-slate-200 leading-snug select-text whitespace-pre-wrap">
+                                                {output.value}
+                                            </div>
+                                        )}
                                         {(output.missingVariables && output.missingVariables.length > 0) && onFixError && (
                                             <div className="mt-3 pt-2 border-t border-[#FFE3E3]/50 dark:border-red-900/30">
                                                 <button
@@ -87,7 +92,12 @@ export const ResultView: React.FC<CellOutputProps> = ({ outputs, executionCount,
                                 </div>
                             </div>
                         ) : (
-                            <pre className="text-gray-800 dark:text-gray-200 text-sm whitespace-pre-wrap font-mono leading-relaxed px-1">
+                            <pre className={cn(
+                                "text-sm whitespace-pre-wrap font-mono leading-relaxed px-1",
+                                output.stream === 'stderr'
+                                    ? "text-amber-700 dark:text-amber-300"
+                                    : "text-gray-800 dark:text-gray-200"
+                            )}>
                                 {output.value}
                             </pre>
                         )}
@@ -175,13 +185,17 @@ const CopyMenu: React.FC<{ output: Output }> = ({ output }) => {
             {isOpen && (
                 <div className="absolute top-full right-0 mt-1 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg shadow-xl z-50 py-1 min-w-[140px] animate-in fade-in zoom-in-95 duration-150">
                     <button
-                        onClick={() => handleCopy(output.value)}
+                        onClick={() => handleCopy(
+                            output.type === 'error'
+                                ? [`${output.errorName || 'Error'}: ${output.value}`, output.traceback].filter(Boolean).join('\n\n')
+                                : output.value
+                        )}
                         className="w-full text-left px-3 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 flex items-center gap-2 transition-colors font-medium border-b border-gray-50 dark:border-slate-700 last:border-0"
                     >
                         <FileText size={12} className="text-blue-400" />
-                        Copy as LaTeX
+                        {output.type === 'latex' ? 'Copy as LaTeX' : output.type === 'error' ? 'Copy error' : 'Copy text'}
                     </button>
-                    {output.rawText && (
+                    {output.type === 'latex' && output.rawText && (
                         <button
                             onClick={() => handleCopy(output.rawText!)}
                             className="w-full text-left px-3 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 flex items-center gap-2 transition-colors font-medium border-b border-gray-50 dark:border-slate-700 last:border-0"
@@ -272,26 +286,37 @@ const MathActionMenu: React.FC<MathActionMenuProps> = ({ onAction }) => {
 };
 
 
-const LatexRenderer: React.FC<{ value: string }> = ({ value }) => {
+const LatexRenderer: React.FC<{ value: string; fallback?: string }> = ({ value, fallback }) => {
     const containerRef = useRef<HTMLDivElement>(null);
+    const [failed, setFailed] = useState(false);
 
     useEffect(() => {
-        if (containerRef.current) {
-            try {
-                katex.render(value, containerRef.current, {
-                    throwOnError: false,
-                    displayMode: true,
-                    fleqn: true
-                });
-            } catch {
-                containerRef.current.textContent = value;
-            }
+        if (!containerRef.current) return;
+        try {
+            katex.render(value, containerRef.current, {
+                throwOnError: true,
+                displayMode: true,
+                fleqn: true
+            });
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            setFailed(false);
+        } catch {
+            // KaTeX cannot draw every SymPy expression; show the plain text instead of red error markup
+            setFailed(true);
         }
     }, [value]);
 
+    // The math container stays mounted so a later value can render again after a failure
     return (
-        <div className="overflow-x-auto py-1 text-blue-900 dark:text-blue-200 text-left">
-            <div ref={containerRef} />
-        </div>
+        <>
+            {failed && (
+                <pre className="text-gray-800 dark:text-gray-200 text-sm whitespace-pre-wrap font-mono leading-relaxed px-1">
+                    {fallback || value}
+                </pre>
+            )}
+            <div className={cn("overflow-x-auto py-1 text-blue-900 dark:text-blue-200 text-left", failed && "hidden")}>
+                <div ref={containerRef} />
+            </div>
+        </>
     );
 };

@@ -90,7 +90,7 @@ export const SYMBOL_CATEGORIES: SymbolCategory[] = [
             {
                 name: 'Diff Eq',
                 latex: 'y\'=y',
-                code: 'dsolve(${1:f(x).diff(x) - f(x)}, ${2:f(x)})',
+                code: "f = Function('f')\ndsolve(${1:f(x).diff(x) - f(x)}, ${2:f(x)})",
                 description: 'Solve differential equation'
             },
             {

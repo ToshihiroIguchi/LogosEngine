@@ -1,57 +1,27 @@
-import { loadPyodide, type PyodideInterface } from 'pyodide';
-import type { WorkerRequest } from './workerTypes';
+import { loadPyodide, version as pyodideVersion, type PyodideInterface } from 'pyodide';
+import type { WorkerInitMessage, WorkerRequest, WorkerNotification } from './workerTypes';
 import type { Output } from '../types';
+import { needsGraphics } from '../utils/graphicsDetect';
+import preprocessSource from './python/preprocess.py?raw';
+import runtimeSource from './python/runtime.py?raw';
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 let pyodide: PyodideInterface;
 
-// Isolated context for user variables (Python dictionary)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// One isolated Python namespace (dict) per notebook
 const contexts = new Map<string, any>();
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let active_context: any;
+const DEFAULT_NOTEBOOK = 'default';
 
-// Context management helper
-function getContext(notebookId?: string) {
-    if (!notebookId) {
-        // Fallback or initial setup
-        if (!active_context) {
-            active_context = pyodide.runPython("{}");
-            const setup_context = pyodide.globals.get("setup_context");
-            setup_context(active_context);
-            setup_context.destroy();
-        }
-        return active_context;
-    }
-
-    if (!contexts.has(notebookId)) {
-        console.log(`Worker: Creating new context for notebook ${notebookId}`);
-        const new_ctx = pyodide.runPython("{}");
-        const setup_context = pyodide.globals.get("setup_context");
-        setup_context(new_ctx);
-        setup_context.destroy();
-
-        // Inject extensions if ready
-        if (matplotlibReady) {
-            const load_extended_context = pyodide.globals.get('load_extended_context');
-            if (load_extended_context) {
-                load_extended_context(new_ctx);
-                load_extended_context.destroy();
-            }
-        }
-        contexts.set(notebookId, new_ctx);
-    }
-
-    active_context = contexts.get(notebookId);
-    return active_context;
-}
-
-// Keys present in the context before user execution
-// Keys present in the context before user execution
-let matplotlibReady = false;
+let extensionsReady = false;
+let extensionsFailed: string | null = null;
 let extensionsPromise: Promise<void> | null = null;
 
+// Soft-interrupt plumbing (only present when the page is cross-origin isolated)
+let interruptView: Uint8Array | null = null;
+let cancelView: Int32Array | null = null;
+
 // Core SymPy imports for fast startup (Phase 1)
-// CORRECTED: 'Re' -> 're', 'Im' -> 'im'
 const CORE_SYMPY_IMPORTS = [
     // Basic
     'symbols', 'Symbol', 'Integer', 'Float', 'Rational', 'S',
@@ -76,695 +46,63 @@ const CORE_SYMPY_IMPORTS = [
     'latex'
 ].join(', ');
 
-const INITIAL_PYTHON_CODE = `
-import sys
-import io
-import base64
-import traceback
-import ast
-import re as _re
-import builtins
-import keyword
-import tokenize
-from io import BytesIO
+const PYTHON_SOURCE = `${preprocessSource}\n${runtimeSource.replaceAll('__CORE_SYMPY_IMPORTS__', CORE_SYMPY_IMPORTS)}`;
 
-# NOTE: SymPy is NOT imported globally here (Phase 1 Optimization)
+// ---------------------------------------------------------------------------
+// Python call helpers
+// ---------------------------------------------------------------------------
 
-def preprocess_equation_syntax(code):
-    try:
-        # Encoding check
-        tokens = list(tokenize.tokenize(BytesIO(code.encode('utf-8')).readline))
-    except tokenize.TokenError:
-        return code
-
-    # We will store (type, string) tuples only to avoid coordinate issues
-    result_tokens = []
-    
-    # Target functions that expect Equations
-    TARGET_FUNCS = {'solve', 'dsolve', 'nsolve', 'solveset', 'nonlinsolve', 'linsolve'}
-    
-    # SymPy Reserved Keywords
-    SYMPY_RESERVED_ARGS = {
-        'check', 'simplify', 'rational', 'manual', 'implicit', 'hint', 
-        'force', 'dict', 'set', 'verify', 'exclude', 'quick', 'cubics', 
-        'quartics', 'quintics', 'domain', 'symbols', 'flags',
-        'ics', 'prec', 'tol', 'solver', 'maxsteps', 'particular', 'bisect', 'modules'
-    }
-    
-    call_stack = [] 
-    paren_level = 0
-    
-    i = 0
-    while i < len(tokens):
-        tok = tokens[i]
-        tok_simple = (tok.type, tok.string)
-        
-        if tok.exact_type == tokenize.LPAR: # (
-            prev_tok = tokens[i-1] if i > 0 else None
-            func_name = None
-            if prev_tok and prev_tok.type == tokenize.NAME and prev_tok.string in TARGET_FUNCS:
-                func_name = prev_tok.string
-            
-            call_stack.append(func_name)
-            paren_level += 1
-            result_tokens.append(tok_simple)
-            
-        elif tok.exact_type == tokenize.RPAR: # )
-            paren_level -= 1
-            if call_stack:
-                call_stack.pop()
-            result_tokens.append(tok_simple)
-            
-        elif tok.exact_type == tokenize.EQUAL: # =
-            current_func = call_stack[-1] if call_stack else None
-            
-            if current_func in TARGET_FUNCS:
-                lhs_is_simple_name = False
-                prev_tok = tokens[i-1]
-                
-                if prev_tok.type == tokenize.NAME:
-                    prev_prev = tokens[i-2] if i > 1 else None
-                    if prev_prev:
-                        if prev_prev.exact_type in (tokenize.LPAR, tokenize.COMMA, tokenize.NL, tokenize.NEWLINE, tokenize.INDENT):
-                            lhs_is_simple_name = True
-                    else:
-                        pass
-                
-                should_replace = False
-                if not lhs_is_simple_name:
-                    should_replace = True
-                else:
-                    if prev_tok.string not in SYMPY_RESERVED_ARGS:
-                        should_replace = True
-                    else:
-                        should_replace = False
-                
-                if should_replace:
-                    result_tokens.append((tokenize.OP, '-'))
-                    result_tokens.append((tokenize.OP, '('))
-                    
-                    scan_idx = i + 1
-                    nesting_level = 0
-                    found_end = False
-                    end_idx = scan_idx
-                    
-                    OPENERS = {tokenize.LPAR, tokenize.LSQB, tokenize.LBRACE}
-                    CLOSERS = {tokenize.RPAR, tokenize.RSQB, tokenize.RBRACE}
-
-                    while end_idx < len(tokens):
-                        scan_tok = tokens[end_idx]
-                        
-                        if scan_tok.exact_type in OPENERS:
-                            nesting_level += 1
-                        elif scan_tok.exact_type in CLOSERS:
-                            nesting_level -= 1
-                            
-                        if nesting_level < 0:
-                            found_end = True
-                            break
-                            
-                        if nesting_level == 0 and scan_tok.exact_type == tokenize.COMMA:
-                            found_end = True
-                            break
-                        
-                        end_idx += 1
-                    
-                    if found_end:
-                        for k in range(i + 1, end_idx):
-                            t = tokens[k]
-                            if t.exact_type == tokenize.CIRCUMFLEX:
-                                result_tokens.append((tokenize.OP, '**'))
-                            elif t.exact_type == tokenize.CIRCUMFLEXEQUAL:
-                                result_tokens.append((tokenize.OP, '**='))
-                            else:
-                                result_tokens.append((t.type, t.string))
-                        result_tokens.append((tokenize.OP, ')'))
-                        i = end_idx - 1
-                    else:
-                        result_tokens.append(tok_simple)
-                else:
-                    result_tokens.append(tok_simple)
-            else:
-                result_tokens.append(tok_simple)
-        elif tok.exact_type == tokenize.CIRCUMFLEX:
-            result_tokens.append((tokenize.OP, '**'))
-        elif tok.exact_type == tokenize.CIRCUMFLEXEQUAL:
-            result_tokens.append((tokenize.OP, '**='))
-        else:
-            result_tokens.append(tok_simple)
-        i += 1
-
-    return tokenize.untokenize(result_tokens).decode('utf-8')
-
-# Code Analyzer for Smart Batch Fix
-class CodeAnalyzer(ast.NodeVisitor):
-    def __init__(self, ctx_keys):
-        self.ctx_keys = set(ctx_keys) if ctx_keys else set()
-        self.scope_stack = ['global']
-        self.defined_in_scope = {'global': set()}
-        self.candidates = set()
-        self.excluded = set()
-        self.reserved = set(keyword.kwlist)
-        self.reserved.update(dir(builtins))
-        self.reserved.update({'I', 'E', 'N', 'S', 'O', 'pi', 'oo', 'zoo', 'nan', 'true', 'false'})
-
-    def enter_scope(self, scope_name):
-        self.scope_stack.append(scope_name)
-        self.defined_in_scope[scope_name] = set()
-
-    def exit_scope(self):
-        self.scope_stack.pop()
-
-    def visit_FunctionDef(self, node):
-        self.defined_in_scope['global'].add(node.name)
-        for decorator in node.decorator_list:
-            self._exclude_complex_node(decorator)
-        self.enter_scope('function')
-        for arg in node.args.args:
-            self.defined_in_scope['function'].add(arg.arg)
-        self.generic_visit(node)
-        self.exit_scope()
-
-    def visit_ClassDef(self, node):
-        self.defined_in_scope['global'].add(node.name)
-        for decorator in node.decorator_list:
-            self._exclude_complex_node(decorator)
-        for base in node.bases:
-            self._exclude_complex_node(base)
-        self.enter_scope('class')
-        self.generic_visit(node)
-        self.exit_scope()
-    
-    def visit_AnnAssign(self, node):
-        self._exclude_complex_node(node.annotation)
-        self.generic_visit(node)
-
-    def visit_ExceptHandler(self, node):
-        if node.type: self._exclude_complex_node(node.type)
-        if node.name: self.defined_in_scope.setdefault(self.scope_stack[-1], set()).add(node.name)
-        self.generic_visit(node)
-
-    def visit_Lambda(self, node):
-        self.enter_scope('lambda')
-        for arg in node.args.args:
-            self.defined_in_scope['lambda'].add(arg.arg)
-        self.generic_visit(node)
-        self.exit_scope()
-    
-    def visit_ListComp(self, node):
-        self.enter_scope('listcomp')
-        self.generic_visit(node)
-        self.exit_scope()
-
-    def visit_SetComp(self, node):
-        self.enter_scope('setcomp')
-        self.generic_visit(node)
-        self.exit_scope()
-    
-    def visit_DictComp(self, node):
-        self.enter_scope('dictcomp')
-        self.generic_visit(node)
-        self.exit_scope()
-        
-    def visit_GeneratorExp(self, node):
-        self.enter_scope('genexp')
-        self.generic_visit(node)
-        self.exit_scope()
-
-    def visit_Name(self, node):
-        current_scope = self.scope_stack[-1]
-        if isinstance(node.ctx, ast.Store):
-            if current_scope == 'global':
-                 self.defined_in_scope['global'].add(node.id)
-            else:
-                 self.defined_in_scope.setdefault(current_scope, set()).add(node.id)
-        elif isinstance(node.ctx, ast.Load):
-             if current_scope == 'global':
-                 self.candidates.add(node.id)
-
-    def visit_Call(self, node):
-        self._exclude_complex_node(node.func)
-        self.generic_visit(node)
-
-    def visit_Attribute(self, node):
-        if isinstance(node.value, ast.Name):
-             self.excluded.add(node.value.id)
-        self.generic_visit(node)
-        
-    def _exclude_complex_node(self, node):
-        if isinstance(node, ast.Name):
-            self.excluded.add(node.id)
-        elif isinstance(node, ast.Attribute):
-            self._exclude_complex_node(node.value)
-
-    def analyze(self):
-        valid_vars = set()
-        for var in self.candidates:
-            if var in self.defined_in_scope['global']: continue
-            if var in self.excluded: continue
-            if var in self.reserved: continue
-            if var in self.ctx_keys: continue
-            valid_vars.add(var)
-        return sorted(list(valid_vars))
-
-# Setup the user context with default symbols and functions
-def setup_context(ctx):
-    # Phase 1: Core explicit import
-    # This string will be formatted in JS
-    code = "from sympy import ${CORE_SYMPY_IMPORTS}"
-    exec(code, {}, ctx)
-    
-    # Snapshot system state (BEFORE user variables x,y,z,t)
-    ctx['_system_objects'] = {k: id(v) for k, v in ctx.items()}
-    
-    # Default symbols
-    ctx['x'], ctx['y'], ctx['z'], ctx['t'] = ctx['symbols']('x y z t')
-
-    # Initialize Out dictionary and _ variable
-    ctx['Out'] = {}
-    ctx['_'] = None
-    
-    # plt is injected later
-
-def format_error(e, code=None, ctx_keys=None):
-    exc_type, exc_value, exc_traceback = sys.exc_info()
-    error_name = exc_type.__name__
-    message = str(exc_value)
-    
-    line_no = None
-    if isinstance(e, SyntaxError):
-        line_no = e.lineno
-    else:
-        tb_list = traceback.extract_tb(exc_traceback)
-        for frame in reversed(tb_list):
-            if frame.filename == '<string>' or frame.filename == '<exec>':
-                line_no = frame.lineno
-                break
-    
-    tb_lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-    filtered_tb = []
-    for line in tb_lines:
-        if 'File "/lib/' in line or 'File "/tokenize.py"' in line:
-            continue
-        filtered_tb.append(line)
-        
-    formatted_tb = "".join(filtered_tb)
-    
-    missing_vars = []
-    if error_name == 'NameError' and code is not None:
-        try:
-            tree = ast.parse(code)
-            analyzer = CodeAnalyzer(ctx_keys)
-            analyzer.visit(tree)
-            missing_vars = analyzer.analyze()
-        except:
-            pass
-
-    return {
-        "errorName": error_name,
-        "message": message,
-        "lineNo": line_no,
-        "traceback": formatted_tb,
-        "missingVariables": missing_vars
-    }
-
-def has_unresolved_names(code, ctx):
-    """True if the cell reads names that are not yet defined in ctx or builtins.
-    Used to wait for background extensions BEFORE running, instead of re-running
-    the whole cell after a NameError (which would repeat side effects)."""
-    try:
-        if '^' in code or 'solve' in code:
-            code = preprocess_equation_syntax(code)
-        tree = ast.parse(code)
-    except Exception:
-        return False
-    assigned = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name) and isinstance(n.ctx, (ast.Store, ast.Del))}
-    assigned |= {n.name for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef))}
-    assigned |= {a.arg for n in ast.walk(tree) if isinstance(n, ast.arguments) for a in n.args + n.kwonlyargs}
-    assigned |= {(al.asname or al.name).split('.')[0] for n in ast.walk(tree) if isinstance(n, (ast.Import, ast.ImportFrom)) for al in n.names}
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
-            if node.id not in ctx and node.id not in assigned and not hasattr(builtins, node.id):
-                return True
-    return False
-
-def execute_cell(code, ctx, execution_count=None):
-    if 'plt' in ctx:
-        ctx['plt'].close('all')
-    
-    stdout_buffer = io.StringIO()
-    sys.stdout = stdout_buffer
-    error_data = None
-    result_val = None
-    latex_res = None
-    
-    try:
-        if '^' in code or any(_f in code for _f in ('solve', 'dsolve', 'nsolve', 'solveset', 'nonlinsolve', 'linsolve')):
-            try:
-                code = preprocess_equation_syntax(code)
-            except Exception:
-                pass
-
-        tree = ast.parse(code)
-        
-        if not tree.body:
-            pass
-        else:
-            last_node = tree.body[-1]
-            if isinstance(last_node, ast.Expr):
-                if len(tree.body) > 1:
-                    exec_mod = ast.Module(body=tree.body[:-1], type_ignores=[])
-                    exec(compile(exec_mod, '<string>', 'exec'), ctx)
-                
-                eval_expr = ast.Expression(body=last_node.value)
-                result_val = eval(compile(eval_expr, '<string>', 'eval'), ctx)
-            else:
-                exec(compile(tree, '<string>', 'exec'), ctx)
-                result_val = None
-            
-            if result_val is not None:
-                 ctx['_'] = result_val
-                 if execution_count is not None:
-                    if 'Out' not in ctx: ctx['Out'] = {}
-                    ctx['Out'][execution_count] = result_val
-                    ctx[f'_{execution_count}'] = result_val
-    
-    except BaseException as e:
-        error_data = format_error(e, code=code, ctx_keys=list(ctx.keys()))
-        result_val = None
-    finally:
-        sys.stdout = sys.__stdout__
-    stdout_content = stdout_buffer.getvalue()
-    
-    try:
-        from sympy import latex
-    except ImportError:
-         latex = str
-
-    if result_val is not None:
-        try:
-            latex_res = latex(result_val)
-        except:
-            pass
-            
-    images = []
-    if 'plt' in ctx:
-        plt_local = ctx['plt']
-        for fignum in plt_local.get_fignums():
-            plt_local.figure(fignum)
-            buf = io.BytesIO()
-            plt_local.savefig(buf, format='png', bbox_inches='tight')
-            buf.seek(0)
-            img_str = base64.b64encode(buf.read()).decode('utf-8')
-            images.append(img_str)
-        plt_local.close('all')
-        
-    return {
-        "stdout": stdout_content,
-        "result": str(result_val) if result_val is not None else None,
-        "latex": latex_res,
-        "images": images,
-        "error": error_data,
-        "tsv": get_tsv(result_val)
-    }
-
-def get_tsv(val):
-    if val is None: return None
-    try:
-        if hasattr(val, 'rows') and hasattr(val, 'cols'):
-            lines = []
-            for r in range(val.rows):
-                lines.append("\\t".join([str(val[r, c]) for c in range(val.cols)]))
-            return "\\n".join(lines)
-        if isinstance(val, (list, tuple)) and len(val) > 0 and isinstance(val[0], (list, tuple)):
-            lines = []
-            for row in val:
-                lines.append("\\t".join([str(x) for x in row]))
-            return "\\n".join(lines)
-        if isinstance(val, (list, tuple)):
-            return "\\n".join([str(x) for x in val])
-    except:
-        pass
-    return None
-
-def convert_rst_to_html(rst_text):
-    if not rst_text: return ""
-    try:
-        import docutils.core
-        import re
-        processed_rst = re.sub(r'\\$([^\\n$]+)\\$', r':math:\`\\1\`', rst_text)
-        settings = {
-            'output_encoding': 'unicode',
-            'initial_header_level': 3,
-            'doctitle_xform': False,
-            'report_level': 5,
-            'math_output': 'MathJax',
+function pyToJs<T>(value: any): T {
+    if (value && typeof value.toJs === 'function') {
+        try {
+            return value.toJs({ dict_converter: Object.fromEntries }) as T;
+        } finally {
+            value.destroy();
         }
-        return docutils.core.publish_string(source=processed_rst, writer_name='html5', settings_overrides=settings)
-    except ImportError:
-        return f"<div class='info'>Documentation preview unavailable (Loading...)</div><pre>{rst_text}</pre>"
-    except Exception as e:
-        return f"<div class='error'>Conversion Error: {str(e)}</div><pre>{rst_text}</pre>"
-
-def _get_help(name, ctx):
-    import inspect
-    if name not in ctx: return None
-    obj = ctx[name]
-    try: sig = str(inspect.signature(obj))
-    except: sig = ""
-    doc = inspect.getdoc(obj)
-    module = inspect.getmodule(obj)
-    html_doc = convert_rst_to_html(doc) if doc else None
-    return {
-        "name": name,
-        "signature": sig,
-        "docstring": doc or "No documentation found.",
-        "htmlContent": html_doc,
-        "module": module.__name__ if module else None
     }
+    return value as T;
+}
 
-def _get_completions(prefix, ctx):
-    import builtins
-    completions = []
-    all_names = set(dir(builtins)) | set(ctx.keys())
-    for name in all_names:
-        if name.startswith('_'): continue
-        if not prefix or name.startswith(prefix):
-            try:
-                obj = ctx.get(name) if name in ctx else getattr(builtins, name, None)
-                if obj is None: continue
-                obj_type = type(obj).__name__
-                kind = 'Variable'
-                if callable(obj):
-                    kind = 'Class' if obj_type == 'type' else 'Function'
-                elif obj_type == 'module': kind = 'Module'
-                detail = ''
-                try: 
-                    import inspect
-                    if callable(obj) and kind == 'Function': detail = str(inspect.signature(obj))
-                except: pass
-                completions.append({'label': name, 'kind': kind, 'detail': detail})
-            except: pass
-    return completions
+function callPy<T>(name: string, ...args: any[]): T {
+    const fn = pyodide.globals.get(name);
+    try {
+        return pyToJs<T>(fn(...args));
+    } finally {
+        fn.destroy();
+    }
+}
 
-_search_globals = {"analyzed": False, "stop_words": set("the a an and or of to in is it that this for with as by on at from".split())}
+function getContext(notebookId?: string) {
+    const key = notebookId || DEFAULT_NOTEBOOK;
+    let ctx = contexts.get(key);
+    if (!ctx) {
+        console.log(`Worker: Creating new context for notebook ${key}`);
+        ctx = pyodide.runPython('{}');
+        callPy('setup_context', ctx);
+        if (extensionsReady) callPy('load_extended_context', ctx);
+        contexts.set(key, ctx);
+    }
+    return ctx;
+}
 
-def _analyze_frequencies(ctx):
-    import random, collections, sympy, string
-    if _search_globals["analyzed"]: return
-    try:
-        candidates = []
-        for name in dir(sympy):
-            if not name.startswith('_'):
-                try: candidates.append(getattr(sympy, name))
-                except: pass
-        candidates_with_doc = [c for c in candidates if hasattr(c, '__doc__') and isinstance(c.__doc__, str)]
-        sample = random.sample(candidates_with_doc, 100) if len(candidates_with_doc) > 100 else candidates_with_doc
-        doc_counts = collections.Counter()
-        for obj in sample:
-            for w in set(obj.__doc__.lower().split()):
-                w_clean = w.strip(string.punctuation)
-                if len(w_clean) > 2: doc_counts[w_clean] += 1
-        threshold = len(sample) * 0.2
-        _search_globals["stop_words"].update({w for w, count in doc_counts.items() if count > threshold})
-        _search_globals["analyzed"] = True
-    except: pass
+function getVariables(ctx: any) {
+    return callPy<any[]>('_get_variables', ctx);
+}
 
-def _search_docs(query, ctx):
-    import inspect
-    _analyze_frequencies(ctx)
-    query = query.strip()
-    if not query: return {"symbols": [], "mentions": []}
-    query_lower = query.lower()
-    is_stop_word = query_lower in _search_globals["stop_words"]
-    skip_mentions = is_stop_word or len(query) < 3
-    symbols = []; mentions = []
-    targets = {name: obj for name, obj in ctx.items() if not name.startswith('_')}
-    count_mentions = 0
-    limit_mentions = 30
-    
-    for name in sorted(targets.keys()):
-        obj = targets[name]
-        name_lower = name.lower()
-        if query_lower in name_lower:
-            try:
-                doc = inspect.getdoc(obj)
-                module = inspect.getmodule(obj)
-                html_doc = convert_rst_to_html(doc) if doc else None
-                symbols.append({
-                    "name": name,
-                    "signature": str(inspect.signature(obj)) if hasattr(obj, '__call__') else "",
-                    "docstring": doc or "",
-                    "htmlContent": html_doc,
-                    "module": module.__name__ if module else None
-                })
-            except: pass
-        if not skip_mentions and count_mentions < limit_mentions:
-            try:
-                doc = inspect.getdoc(obj)
-                if doc:
-                    doc_lower = doc.lower()
-                    idx = doc_lower.find(query_lower)
-                    if idx != -1:
-                        if query_lower not in name_lower:
-                            start = max(0, idx - 40)
-                            end = min(len(doc), idx + 40 + len(query))
-                            snippet = "..." + doc[start:end].replace('\\n', ' ') + "..."
-                            module = inspect.getmodule(obj)
-                            html_doc = convert_rst_to_html(doc) if doc else None
-                            mentions.append({
-                                "name": name,
-                                "signature": str(inspect.signature(obj)) if hasattr(obj, '__call__') else "",
-                                "docstring": doc,
-                                "htmlContent": html_doc,
-                                "module": module.__name__ if module else None,
-                                "snippet": snippet
-                            })
-                            count_mentions += 1
-            except: pass
+// ---------------------------------------------------------------------------
+// Startup
+// ---------------------------------------------------------------------------
 
-    def symbol_sort_key(item):
-        n = item["name"]
-        n_low = n.lower()
-        q_low = query_lower
-        is_exact = n_low == q_low
-        is_start = n_low.startswith(q_low)
-        return (not is_exact, not is_start, len(n), n)
+let resolveConfig: () => void = () => { };
+const configReceived = new Promise<void>((resolve) => { resolveConfig = resolve; });
 
-    symbols.sort(key=symbol_sort_key)
-    return {"symbols": symbols[:20], "mentions": mentions}
+function post(message: WorkerNotification | Record<string, unknown>) {
+    self.postMessage(message);
+}
 
-def _get_variables(ctx):
-    import sys
-    import builtins
-    import inspect
-    
-    variables = []
-    
-    # Helper to check if a variable is a system internal
-    system_objects = ctx.get('_system_objects', {})
-    
-    for name, val in list(ctx.items()):
-        if name.startswith('_'): continue
-        if name in {'In', 'Out', 'exit', 'quit', 'get_ipython', 'open', 'help', 'license', 'copyright', 'credits'}: continue
-        
-        # Snapshot check: Hidden if name matches AND object identity matches
-        # This allows users to overwrite 'pi' or 'x' and see it, but hides default 'pi'
-        if name in system_objects:
-             if id(val) == system_objects[name]:
-                 continue
-        
-        if hasattr(builtins, name): continue
-        if inspect.ismodule(val): continue
-        if inspect.isclass(val): continue
-        if inspect.isfunction(val): continue
-        
-        # Get type name
-        type_name = type(val).__name__
-        
-        # String repr with truncation
-        try:
-             s_val = str(val)
-             if len(s_val) > 200:
-                 s_val = s_val[:200] + '...'
-        except:
-             s_val = "<unprintable>"
-             
-        # Extract assumptions if Symbol
-        assumptions = {}
-        range_summary = None
-        is_symbol = getattr(val, 'is_Symbol', False)
-        if is_symbol:
-            raw_assumptions = getattr(val, 'assumptions0', {})
-            check_keys = ['positive', 'negative', 'nonnegative', 'nonpositive', 'real', 'integer', 'complex', 'nonzero', 'even', 'odd', 'prime']
-            for k in check_keys:
-                if raw_assumptions.get(k) is True:
-                    assumptions[k] = True
-                elif raw_assumptions.get(k) is False:
-                    assumptions[k] = False
-            
-            # Determine range summary
-            if assumptions.get('positive'):
-                range_summary = f"{name} > 0"
-            elif assumptions.get('nonnegative'):
-                range_summary = f"{name} ≥ 0"
-            elif assumptions.get('negative'):
-                range_summary = f"{name} < 0"
-            elif assumptions.get('nonpositive'):
-                range_summary = f"{name} ≤ 0"
-            elif assumptions.get('integer'):
-                range_summary = f"{name} ∈ ℤ"
-            elif assumptions.get('real'):
-                range_summary = f"{name} ∈ ℝ"
-            elif assumptions.get('nonzero'):
-                range_summary = f"{name} ≠ 0"
-
-        variables.append({
-            "name": name,
-            "type": type_name,
-            "value": s_val,
-            "assumptions": assumptions if is_symbol else None,
-            "rangeSummary": range_summary
-        })
-        
-    return variables
-
-def _define_variable(ctx, name, assumptions):
-    names = [n.strip() for n in str(name).replace(',', ' ').split() if n.strip()]
-    if not names:
-        raise ValueError("Variable name cannot be empty")
-    for n in names:
-        if not n.isidentifier():
-            raise ValueError(f"Invalid variable name: '{n}'")
-
-    kwargs = {}
-    if assumptions:
-        # assumptions can be a JS proxy or dict
-        try:
-            items = dict(assumptions).items()
-        except Exception:
-            items = []
-        for k, v in items:
-            if v is True:
-                kwargs[str(k)] = True
-            elif v is False:
-                kwargs[str(k)] = False
-
-    symbols_fn = ctx.get('symbols')
-    if not symbols_fn:
-        from sympy import symbols
-        symbols_fn = symbols
-
-    syms = symbols_fn(' '.join(names), **kwargs)
-    if len(names) == 1:
-        ctx[names[0]] = syms
-    else:
-        for n, s in zip(names, syms):
-            ctx[n] = s
-    return True
-`;
-
-initPyodide();
+const enginePromise = initPyodide();
+// Requests await this and report the failure themselves
+enginePromise.catch(() => { });
 
 async function initPyodide() {
     const start = performance.now();
@@ -774,406 +112,309 @@ async function initPyodide() {
         console.log(`Worker: ${label} took ${duration.toFixed(0)}ms`);
     };
 
-    console.log('Worker: Initializing Pyodide (v0.29.0)...');
+    console.log(`Worker: Initializing Pyodide (v${pyodideVersion})...`);
     try {
+        // The page sends INIT right after creating the worker; do not wait forever without it.
+        await Promise.race([configReceived, new Promise((r) => setTimeout(r, 2000))]);
+
         const t1 = performance.now();
         pyodide = await loadPyodide({
-            indexURL: "https://cdn.jsdelivr.net/pyodide/v0.29.0/full/"
+            indexURL: `https://cdn.jsdelivr.net/pyodide/v${pyodideVersion}/full/`
         });
         logTime('load_pyodide', performance.now() - t1);
 
-        console.log('Worker: Loading critical packages (sympy)...');
+        if (interruptView) {
+            pyodide.setInterruptBuffer(interruptView);
+        }
+
         const t2 = performance.now();
-        // STAGE 1: Load only critical packages (SymPy)
         await pyodide.loadPackage(['sympy']);
         logTime('load_critical_packages', performance.now() - t2);
 
-        console.log('Worker: Running initial Python code...');
         const t3 = performance.now();
-        await pyodide.runPythonAsync(INITIAL_PYTHON_CODE);
+        await pyodide.runPythonAsync(PYTHON_SOURCE);
         logTime('run_initial_code', performance.now() - t3);
 
-        console.log('Worker: Setting up user context (Core)...');
-        const t4 = performance.now();
-
-        // Initialize default context
-        active_context = pyodide.runPython("{}");
-
-        // Setup with CORE imports
-        // Manually format the Python string to avoid invalid syntax in interpolated string
-        const setup_script = `
-import sympy
-from sympy import ${CORE_SYMPY_IMPORTS}
-x, y, z, t = sympy.symbols('x y z t')
-
-def load_core(ctx):
-    # Explicit imports
-    ctx['sympy'] = sympy
-    # We loop to inject core symbols
-    g = globals()
-    for name in [${CORE_SYMPY_IMPORTS.split(', ').map(s => `'${s}'`).join(', ')}]:
-        if name in g:
-            ctx[name] = g[name]
-    ctx['x'], ctx['y'], ctx['z'], ctx['t'] = x, y, z, t
-`;
-        await pyodide.runPythonAsync(setup_script);
-
-        // Call setup_context in python to finalize (Out, etc.)
-        const setup_context = pyodide.globals.get("setup_context");
-        setup_context(active_context);
-        setup_context.destroy();
-
-        logTime('setup_user_context', performance.now() - t4);
+        getContext(DEFAULT_NOTEBOOK);
 
         const total = performance.now() - start;
         logTime('total_init', total);
-
-        console.log(`Worker: Engine Ready (Core SymPy). Total init time: ${total.toFixed(0)}ms`);
-        self.postMessage({ type: 'READY' });
-
-        self.postMessage({
+        post({ type: 'READY' });
+        post({
             type: 'PROFILE',
             timings: {
                 'Load Pyodide Library': timings['load_pyodide'] || 0,
                 'Load SymPy': timings['load_critical_packages'] || 0,
-                'Run Initial Code (Core)': timings['run_initial_code'] || 0,
-                'Setup User Context (Core)': timings['setup_user_context'] || 0,
+                'Run Initial Code': timings['run_initial_code'] || 0,
                 'Total Initialization (Phase 1)': total
             }
         });
 
-        // STAGE 2: Background Loading (Extensions)
-        console.log('Worker: Loading extensions...');
-        const tBackground = performance.now();
-
-        extensionsPromise = Promise.all([
-            pyodide.loadPackage(['docutils']),
-            pyodide.loadPackage(['matplotlib'])
-        ]).then(async () => {
-            // 2. Load Full SymPy Context & Matplotlib
-            await pyodide.runPythonAsync(`
-import sympy
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-
-def load_extended_context(ctx):
-    # Helper to import and track system objects to preventing UI clutter
-    def tracked_import(exec_code):
-        scope = {}
-        try:
-            exec(exec_code, {}, scope)
-            ctx.update(scope)
-            if '_system_objects' in ctx:
-                for k, v in scope.items():
-                    ctx['_system_objects'][k] = id(v)
-        except ImportError:
-            pass
-
-    # Import everything from SymPy
-    tracked_import("from sympy import *")
-
-    # Import vector module
-    tracked_import("from sympy.vector import *")
-    
-    # Explicitly import available plotting functions
-    try:
-        from sympy.plotting import plot, plot3d, plot_parametric, plot_implicit, plot3d_parametric_surface
-        pkgs = {
-            'plot': plot, 'plot3d': plot3d, 'plot_parametric': plot_parametric,
-            'plot_implicit': plot_implicit, 'plot3d_parametric_surface': plot3d_parametric_surface
-        }
-        ctx.update(pkgs)
-        if '_system_objects' in ctx:
-            for k, v in pkgs.items(): ctx['_system_objects'][k] = id(v)
-            
-    except ImportError:
-        pass
-    
-    # Inject plotting
-    ctx['plt'] = plt
-    ctx['matplotlib'] = matplotlib
-    if '_system_objects' in ctx:
-        ctx['_system_objects']['plt'] = id(plt)
-        ctx['_system_objects']['matplotlib'] = id(matplotlib)
-`);
-
-            // Mark graphics ready
-            matplotlibReady = true;
-
-            // Inject into current context
-            {
-                const load_extended_context = pyodide.globals.get('load_extended_context');
-                const targets = new Set(contexts.values());
-                if (active_context) targets.add(active_context);
-                for (const c of targets) load_extended_context(c);
-                load_extended_context.destroy();
-            }
-
-            self.postMessage({ type: 'GRAPHICS_READY' });
-            console.log(`Worker: Extensions ready (${(performance.now() - tBackground).toFixed(0)}ms)`);
-
-        }).catch(e => {
-            console.error('Worker: Background load failed', e);
-        });
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // Stage 2: heavy extensions load in the background
+        extensionsPromise = loadExtensions();
     } catch (err: any) {
         console.error('Worker: Pyodide initialization failed', err);
-        self.postMessage({ type: 'ERROR', message: `Pyodide initialization failed: ${err.message}` });
+        post({ type: 'ERROR', message: `Pyodide initialization failed: ${err?.message ?? err}` });
+        throw err;
     }
 }
 
-self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
-    const { id, action, code, notebookId, executionCount, assumptions } = event.data;
+function loadExtensions(): Promise<void> {
+    const started = performance.now();
+    extensionsFailed = null;
+    return (async () => {
+        await Promise.all([
+            pyodide.loadPackage(['docutils']),
+            pyodide.loadPackage(['matplotlib'])
+        ]);
+        const targets = new Set<any>(contexts.values());
+        for (const ctx of targets) callPy('load_extended_context', ctx);
+        extensionsReady = true;
+        post({ type: 'GRAPHICS_READY' });
+        console.log(`Worker: Extensions ready (${(performance.now() - started).toFixed(0)}ms)`);
+    })().catch((e) => {
+        extensionsFailed = e?.message ? String(e.message) : String(e);
+        console.error('Worker: Extension load failed', e);
+        post({ type: 'GRAPHICS_FAILED', message: extensionsFailed });
+    });
+}
 
-    if (!pyodide) {
-        self.postMessage({ id, status: 'ERROR', results: [{ type: 'error', value: 'Pyodide not authorized or not ready', timestamp: Date.now() }] });
+// ---------------------------------------------------------------------------
+// Request handling (strictly one at a time, in arrival order)
+// ---------------------------------------------------------------------------
+
+function isCancelled(epoch: number | undefined): boolean {
+    return !!cancelView && Atomics.load(cancelView, 0) > (epoch ?? 0);
+}
+
+function errorOutput(value: string, extra: Partial<Output> = {}): Output {
+    return { type: 'error', value, timestamp: Date.now(), ...extra };
+}
+
+function interruptedResponse(id: string) {
+    post({
+        id,
+        status: 'ERROR',
+        interrupted: true,
+        results: [errorOutput('Execution interrupted.', { errorName: 'KeyboardInterrupt' })]
+    });
+}
+
+function buildOutputs(result: any): Output[] {
+    const output: Output[] = [];
+    const now = Date.now();
+
+    for (const item of result.items ?? []) {
+        if (item.kind === 'stream') {
+            if (item.text) output.push({ type: 'text', value: item.text, stream: item.stream, timestamp: now });
+        } else if (item.kind === 'display') {
+            output.push(item.latex
+                ? { type: 'latex', value: item.latex, rawText: item.text, tsv: item.tsv || undefined, timestamp: now }
+                : { type: 'text', value: item.text, rawText: item.text, tsv: item.tsv || undefined, timestamp: now });
+        }
+    }
+
+    if (result.error) {
+        const e = result.error;
+        output.push(errorOutput(e.message ?? '', {
+            traceback: e.traceback,
+            errorName: e.errorName,
+            lineNo: e.lineNo ?? undefined,
+            missingVariables: Array.from(e.missingVariables ?? [])
+        }));
+    }
+
+    if (result.result) {
+        const r = result.result;
+        output.push({
+            type: r.latex ? 'latex' : 'text',
+            value: r.latex ? r.latex : r.text,
+            rawText: r.text,
+            tsv: r.tsv || undefined,
+            timestamp: now,
+            isResult: true
+        });
+    }
+
+    for (const img of result.images ?? []) {
+        output.push({ type: 'image', value: `data:image/png;base64,${img}`, timestamp: now });
+    }
+    return output;
+}
+
+async function handleExecute(req: WorkerRequest) {
+    const { id, code, notebookId, executionCount } = req;
+
+    if (isCancelled(req.epoch)) {
+        interruptedResponse(id);
         return;
     }
 
     const ctx = getContext(notebookId);
 
-    if (action === 'EXECUTE') {
-        try {
-            // Check for premature plotting/vector usage (Enhanced Regex)
-            // Keywords that require full extensions loaded
-            const extendedKeywords = /\b(plot\w*|CoordSys3D|divergence|curl|gradient)\s*\(/;
+    // Wait for extensions BEFORE running when the cell needs them; never re-run a cell afterwards.
+    if (!extensionsReady && extensionsPromise) {
+        const wantsGraphics = needsGraphics(code);
+        if (wantsGraphics || callPy<boolean>('has_unresolved_names', code, ctx)) {
+            console.log('Worker: Waiting for extensions to load before execution...');
+            await extensionsPromise;
+            if (isCancelled(req.epoch)) {
+                interruptedResponse(id);
+                return;
+            }
+        }
+    }
 
-            if (extendedKeywords.test(code) && !matplotlibReady && extensionsPromise) {
-                console.log("Worker: Waiting for extensions to load before execution...");
+    if (!extensionsReady && extensionsFailed && needsGraphics(code)) {
+        post({
+            id,
+            status: 'ERROR',
+            results: [errorOutput(`Graphics extensions failed to load: ${extensionsFailed}`, { errorName: 'ExtensionError' })]
+        });
+        return;
+    }
+
+    if (interruptView) interruptView[0] = 0;
+    const result = callPy<any>('execute_cell', code, ctx, executionCount);
+    const interrupted = result.error?.errorName === 'KeyboardInterrupt';
+    if (interruptView) interruptView[0] = 0;
+
+    let variables: any[] = [];
+    try {
+        variables = getVariables(ctx);
+    } catch (e) {
+        console.warn('Worker: Failed to retrieve variables', e);
+    }
+
+    post({ id, status: 'SUCCESS', results: buildOutputs(result), variables, interrupted });
+}
+
+async function handleRequest(req: WorkerRequest) {
+    const { id, action, code, notebookId } = req;
+
+    switch (action) {
+        case 'EXECUTE':
+            await handleExecute(req);
+            return;
+
+        case 'GET_COMPLETIONS': {
+            const completions = callPy<any[]>('_get_completions', code, getContext(notebookId));
+            post({ id, status: 'SUCCESS', results: [], completions });
+            return;
+        }
+
+        case 'GET_DOCS': {
+            const searchResults = callPy<any>('_search_docs', code, getContext(notebookId));
+            post({ id, status: 'SUCCESS', results: [], searchResults });
+            return;
+        }
+
+        case 'GET_HELP': {
+            // docutils arrives with the extensions; wait so the first lookup is fully formatted
+            if (!extensionsReady && extensionsPromise) await extensionsPromise;
+            const help = callPy<any>('_get_help', code, getContext(notebookId));
+            post({ id, status: 'SUCCESS', results: [], help });
+            return;
+        }
+
+        case 'GET_VARIABLES': {
+            post({ id, status: 'SUCCESS', results: [], variables: getVariables(getContext(notebookId)) });
+            return;
+        }
+
+        case 'DELETE_VARIABLE': {
+            const ctx = getContext(notebookId);
+            if (code && ctx.has(code)) ctx.delete(code);
+            post({ id, status: 'SUCCESS', results: [], variables: getVariables(ctx) });
+            return;
+        }
+
+        case 'DEFINE_VARIABLE': {
+            const ctx = getContext(notebookId);
+            const pyAssumptions = pyodide.toPy(req.assumptions || {});
+            try {
+                callPy('_define_variable', ctx, code, pyAssumptions);
+            } finally {
+                pyAssumptions.destroy();
+            }
+            post({ id, status: 'SUCCESS', results: [], variables: getVariables(ctx) });
+            return;
+        }
+
+        case 'RESET_CONTEXT': {
+            const key = notebookId || DEFAULT_NOTEBOOK;
+            const old = contexts.get(key);
+            if (old) {
+                old.destroy();
+                contexts.delete(key);
+            }
+            // 'dispose' frees the namespace without recreating it
+            if (code !== 'dispose') getContext(key);
+            post({ id, status: 'SUCCESS', results: [] });
+            return;
+        }
+
+        case 'TRANSPILE': {
+            const sources = req.codes ?? [code];
+            const transpiled = sources.map((src) => {
+                try {
+                    return callPy<string>('transpile_code', src);
+                } catch {
+                    return src;
+                }
+            });
+            post({ id, status: 'SUCCESS', results: [], transpiled });
+            return;
+        }
+
+        case 'RETRY_EXTENSIONS': {
+            if (!extensionsReady) {
+                extensionsPromise = loadExtensions();
                 await extensionsPromise;
             }
-
-            // Wait for extensions BEFORE running if the cell references names that are
-            // not defined yet (e.g. plot3d, gamma). Never re-run a cell after it has executed.
-            if (!matplotlibReady && extensionsPromise) {
-                const has_unresolved = pyodide.globals.get('has_unresolved_names');
-                try {
-                    if (has_unresolved(code, ctx)) {
-                        console.log("Worker: Unresolved names detected during loading. Waiting for extensions...");
-                        await extensionsPromise;
-                    }
-                } finally {
-                    has_unresolved.destroy();
-                }
-            }
-
-            const execute_cell = pyodide.globals.get('execute_cell');
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            let result: any;
-            try {
-                const result_py = execute_cell(code, ctx, executionCount);
-                try {
-                    result = result_py.toJs({ dict_converter: Object.fromEntries });
-                } finally {
-                    result_py.destroy();
-                }
-            } finally {
-                execute_cell.destroy();
-            }
-
-            const output: Output[] = [];
-
-            if (result.stdout) {
-                output.push({ type: 'text', value: result.stdout, timestamp: Date.now() });
-            }
-
-            if (result.error) {
-                const errorData = result.error;
-                output.push({
-                    type: 'error',
-                    value: errorData.message,
-                    traceback: errorData.traceback,
-                    errorName: errorData.errorName,
-                    lineNo: errorData.lineNo,
-                    missingVariables: errorData.missingVariables ? Array.from(errorData.missingVariables) : [],
-                    timestamp: Date.now()
-                });
-            }
-
-            const resultVal = result.result;
-            const latexVal = result.latex;
-            const tsvVal = result.tsv;
-
-            if (resultVal && resultVal !== 'None') {
-                // Determine simplest expression type
-                // Use 'latex' type if available to ensure nice rendering, OR 'text' fallback
-                // Frontend seems to treat 'text' as plain monospaced, 'latex' as block math?
-                // Let's rely on 'latex' property presence.
-                const type = latexVal ? 'latex' : 'text';
-                const value = latexVal ? latexVal : resultVal;
-
-                output.push({
-                    type: type,
-                    value: value,
-                    rawText: resultVal,
-                    tsv: tsvVal || undefined,
-                    timestamp: Date.now(),
-                    isResult: true
-                });
-            }
-
-            if (result.images) {
-                const images = result.images;
-                for (const img of images) {
-                    output.push({ type: 'image', value: `data:image/png;base64,${img}`, timestamp: Date.now() });
-                }
-            }
-
-            // Get variables
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            let variables: any[] = [];
-            try {
-                if (pyodide.globals.has('_get_variables')) {
-                    const get_vars = pyodide.globals.get('_get_variables');
-                    const varsProxy = get_vars(ctx);
-                    try {
-                        variables = varsProxy.toJs();
-                    } finally {
-                        varsProxy.destroy();
-                        get_vars.destroy();
-                    }
-                }
-            } catch (e) {
-                console.warn('Worker: Failed to retrieve variables', e);
-            }
-
-            self.postMessage({ id, status: 'SUCCESS', results: output, variables });
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } catch (err: any) {
-            self.postMessage({ id, status: 'ERROR', results: [{ type: 'error', value: err.message, timestamp: Date.now() }] });
+            post({ id, status: 'SUCCESS', results: [] });
+            return;
         }
     }
-    else if (action === 'GET_COMPLETIONS') {
+}
+
+const FATAL_PATTERN = /fatal error|unreachable|memory access out of bounds|out of memory/i;
+
+let chain: Promise<void> = Promise.resolve();
+
+self.onmessage = (event: MessageEvent<WorkerRequest | WorkerInitMessage>) => {
+    const data = event.data;
+
+    if (data.action === 'INIT') {
+        if (data.interruptBuffer) interruptView = new Uint8Array(data.interruptBuffer);
+        if (data.cancelBuffer) cancelView = new Int32Array(data.cancelBuffer);
+        resolveConfig();
+        return;
+    }
+
+    const req = data as WorkerRequest;
+    chain = chain.then(async () => {
         try {
-            if (!pyodide.globals.has('_get_completions')) {
-                self.postMessage({ id, status: 'SUCCESS', completions: [] });
-                return;
-            }
-            const get_completions = pyodide.globals.get('_get_completions');
-            const completionsProxy = get_completions(code, ctx);
-            try {
-                const completions = completionsProxy.toJs({ dict_converter: Object.fromEntries });
-                self.postMessage({ id, status: 'SUCCESS', completions });
-            } finally {
-                completionsProxy.destroy();
-                get_completions.destroy();
-            }
+            await enginePromise;
         } catch {
-            self.postMessage({ id, status: 'ERROR', completions: [] });
+            post({ id: req.id, status: 'ERROR', results: [errorOutput('Engine is not available.')] });
+            return;
         }
-    }
-    else if (action === 'GET_DOCS') {
         try {
-            if (!pyodide.globals.has('_search_docs')) {
-                self.postMessage({ id, status: 'SUCCESS', searchResults: { symbols: [], mentions: [] } });
-                return;
-            }
-            const search_docs = pyodide.globals.get('_search_docs');
-            const docsProxy = search_docs(code, ctx);
-            try {
-                const docs = docsProxy.toJs();
-                self.postMessage({ id, status: 'SUCCESS', searchResults: docs });
-            } finally {
-                docsProxy.destroy();
-                search_docs.destroy();
-            }
-        } catch {
-            self.postMessage({ id, status: 'ERROR', searchResults: { symbols: [], mentions: [] } });
-        }
-    }
-    else if (action === 'GET_HELP') {
-        try {
-            if (!pyodide.globals.has('_get_help')) {
-                self.postMessage({ id, status: 'SUCCESS', help: null });
-                return;
-            }
-            const get_help = pyodide.globals.get('_get_help');
-            const help = get_help(code, ctx);
-            try {
-                const helpJs = help ? help.toJs() : null;
-                self.postMessage({ id, status: 'SUCCESS', help: helpJs });
-            } finally {
-                if (help) help.destroy();
-                get_help.destroy();
-            }
-        } catch {
-            self.postMessage({ id, status: 'ERROR', help: null });
-        }
-    }
-    else if (action === 'DELETE_VARIABLE') {
-        try {
-            const varName = code;
-            if (varName && ctx.has(varName)) {
-                ctx.delete(varName);
-            }
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            let variables: any[] = [];
-            if (pyodide.globals.has('_get_variables')) {
-                const get_vars = pyodide.globals.get('_get_variables');
-                const varsProxy = get_vars(ctx);
-                try {
-                    variables = varsProxy.toJs();
-                } finally {
-                    varsProxy.destroy();
-                    get_vars.destroy();
-                }
-            }
-            self.postMessage({ id, status: 'SUCCESS', variables });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await handleRequest(req);
         } catch (err: any) {
-            self.postMessage({ id, status: 'ERROR', message: err.message });
-        }
-    }
-    else if (action === 'DEFINE_VARIABLE') {
-        try {
-            const varName = code;
-            const varAssumptions = assumptions || {};
-            if (pyodide.globals.has('_define_variable')) {
-                const define_var = pyodide.globals.get('_define_variable');
-                const pyAssumptions = pyodide.toPy(varAssumptions);
-                try {
-                    define_var(ctx, varName, pyAssumptions);
-                } finally {
-                    pyAssumptions.destroy();
-                    define_var.destroy();
-                }
+            const message = err?.message ? String(err.message) : String(err);
+            console.error(`Worker: ${req.action} failed`, err);
+            if (FATAL_PATTERN.test(message)) {
+                post({ type: 'FATAL', message });
             }
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            let variables: any[] = [];
-            if (pyodide.globals.has('_get_variables')) {
-                const get_vars = pyodide.globals.get('_get_variables');
-                const varsProxy = get_vars(ctx);
-                try {
-                    variables = varsProxy.toJs();
-                } finally {
-                    varsProxy.destroy();
-                    get_vars.destroy();
-                }
-            }
-            self.postMessage({ id, status: 'SUCCESS', variables });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } catch (err: any) {
-            self.postMessage({ id, status: 'ERROR', message: err.message, error: err.message });
+            post({
+                id: req.id,
+                status: 'ERROR',
+                results: [errorOutput(message)],
+                error: message,
+                message
+            });
         }
-    }
-    else if (action === 'RESET_CONTEXT') {
-        try {
-            if (notebookId && contexts.has(notebookId)) {
-                const old_ctx = contexts.get(notebookId);
-                if (old_ctx) {
-                    old_ctx.destroy();
-                }
-                contexts.delete(notebookId);
-            }
-            // Force recreation of context (unless the caller only wants it freed)
-            if (code !== 'dispose') getContext(notebookId);
-            self.postMessage({ id, status: 'SUCCESS' });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } catch (err: any) {
-            self.postMessage({ id, status: 'ERROR', message: err.message });
-        }
-    }
+    });
 };

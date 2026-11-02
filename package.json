@@ -10,7 +10,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:e2e": "node scripts/run_all_browser_tests.cjs"
+    "test:e2e": "node scripts/run_all_browser_tests.cjs",
+    "test:py": "python -m pytest src/worker/python/tests -q",
+    "test:e2e:audit": "node scripts/e2e_audit2.cjs"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

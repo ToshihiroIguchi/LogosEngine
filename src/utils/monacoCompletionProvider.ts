@@ -21,7 +21,6 @@ export function registerPythonCompletionProvider(
         return;
     }
 
-    console.log('[Monaco] Registering Python completion provider');
     monaco.languages.registerCompletionItemProvider('python', {
         provideCompletionItems: async (model, position) => {
             if (!activeGetCompletions) {
@@ -30,11 +29,9 @@ export function registerPythonCompletionProvider(
 
             const code = model.getValue();
             const offset = model.getOffsetAt(position);
-            console.log('[Monaco] Code length:', code.length, 'Offset:', offset);
 
             try {
                 const response = await activeGetCompletions(code, offset);
-                console.log('[Monaco] Got completions:', response);
 
                 const suggestions: languages.CompletionItem[] = response.completions.map(item => {
                     let kind: languages.CompletionItemKind;

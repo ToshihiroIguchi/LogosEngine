@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { useDarkMode } from '../../hooks/useDarkMode';
+import { useModal } from '../../hooks/useModal';
 
 interface DisclaimerModalProps {
     isOpen: boolean;
@@ -9,6 +10,8 @@ interface DisclaimerModalProps {
 
 export const DisclaimerModal: React.FC<DisclaimerModalProps> = ({ isOpen, onClose }) => {
     useDarkMode();
+    const dialogRef = useRef<HTMLDivElement>(null);
+    useModal(isOpen, onClose, dialogRef);
     if (!isOpen) return null;
 
     return (
@@ -20,7 +23,7 @@ export const DisclaimerModal: React.FC<DisclaimerModalProps> = ({ isOpen, onClos
             />
 
             {/* Modal */}
-            <div className="relative bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl shadow-2xl max-w-xl w-full animate-in zoom-in-95 fade-in duration-300 overflow-hidden">
+            <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Legal notice and risk" tabIndex={-1} className="relative bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl shadow-2xl max-w-xl w-full animate-in zoom-in-95 fade-in duration-300 overflow-hidden">
                 <div className="p-8">
                     <div className="flex items-center gap-4 mb-6">
                         <div className="p-3 bg-amber-50 dark:bg-amber-900/30 rounded-2xl text-amber-500 border border-amber-100 dark:border-amber-800/50">

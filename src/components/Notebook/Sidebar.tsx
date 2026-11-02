@@ -11,13 +11,15 @@ import { useDarkMode } from '../../hooks/useDarkMode'; // Assuming this hook exi
 import { cn } from '../../lib/utils'; // Assuming this utility exists
 import type { Variable } from '../../types';
 
+const MIN_WIDTH = 250;
+
 interface SidebarProps {
     isOpen: boolean;
     onClose: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
-    const { variables, activeDocumentation, setActiveDocumentation, activeTab, setActiveTab, deleteVariable, searchDocs, searchResults, insertTextAtCursor, insertExample } = useNotebook();
+    const { variables, activeDocumentation, setActiveDocumentation, openDocumentation, activeTab, setActiveTab, deleteVariable, searchDocs, searchResults, insertTextAtCursor, insertExample } = useNotebook();
     const [searchQuery, setSearchQuery] = React.useState('');
     const [expandedExampleCategory, setExpandedExampleCategory] = React.useState<string | null>(null);
     const [isDefineModalOpen, setIsDefineModalOpen] = React.useState(false);
@@ -28,7 +30,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         if (typeof window !== 'undefined') {
             const saved = localStorage.getItem('logos-sidebar-width');
             const parsed = saved ? Number.parseInt(saved, 10) : NaN;
-            return Number.isFinite(parsed) && parsed >= 200 ? parsed : 320;
+            return Number.isFinite(parsed) && parsed >= MIN_WIDTH ? parsed : 320;
         }
         return 320;
     });
@@ -51,7 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         if (isResizing) {
             const newWidth = window.innerWidth - e.clientX;
             // Min 250px, Max 80% of window
-            if (newWidth >= 250 && newWidth < window.innerWidth * 0.8) {
+            if (newWidth >= MIN_WIDTH && newWidth < window.innerWidth * 0.8) {
                 setWidth(newWidth);
             }
         }
@@ -92,7 +94,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     return (
         <div
             className="print:hidden bg-white dark:bg-slate-900 border-l border-gray-200 dark:border-slate-800 flex flex-col shrink-0 h-full animate-in slide-in-from-right-10 duration-300 relative group/sidebar"
-            style={{ width: `${width}px`, transition: isResizing ? 'none' : 'width 0.3s ease-in-out' }}
+            style={{ width: `${width}px`, minWidth: `${MIN_WIDTH}px`, maxWidth: '80vw', transition: isResizing ? 'none' : 'width 0.3s ease-in-out' }}
         >
             {/* Drag Handle */}
             <div
@@ -239,16 +241,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                                                 <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-slate-800 text-[10px] font-bold text-gray-500 dark:text-gray-400 rounded uppercase">
                                                     {v.type}
                                                 </span>
-                                                <button
-                                                    onClick={() => {
-                                                        setEditingVariable(v);
-                                                        setIsDefineModalOpen(true);
-                                                    }}
-                                                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 rounded transition-all cursor-pointer"
-                                                    title="Set assumptions & numerical range"
-                                                >
-                                                    <Sliders size={13} />
-                                                </button>
+                                                {v.assumptions != null && (
+                                                    <button
+                                                        onClick={() => {
+                                                            setEditingVariable(v);
+                                                            setIsDefineModalOpen(true);
+                                                        }}
+                                                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 rounded transition-all cursor-pointer"
+                                                        title="Set assumptions & numerical range"
+                                                    >
+                                                        <Sliders size={13} />
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={() => {
                                                         if (confirm(`Delete variable '${v.name}'?`)) {
@@ -311,6 +315,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                                         <Info size={14} />
                                         <span className="text-[10px] font-bold uppercase tracking-widest">Description</span>
                                     </div>
+                                    {activeDocumentation.htmlContent ? (
                                     <div
                                         className="text-xs text-gray-700 dark:text-gray-300 font-sans leading-relaxed prose prose-sm prose-blue dark:prose-invert max-w-none 
                                                        prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-headings:font-bold prose-headings:mb-2 prose-headings:mt-4
@@ -319,9 +324,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                                                        prose-code:bg-gray-100 dark:prose-code:bg-slate-800 prose-code:px-1 prose-code:rounded prose-code:text-blue-600 dark:prose-code:text-blue-400
                                                        prose-pre:bg-gray-900 dark:prose-pre:bg-black prose-pre:text-blue-100 dark:prose-pre:text-blue-200"
                                         dangerouslySetInnerHTML={{
-                                            __html: DOMPurify.sanitize(activeDocumentation.htmlContent || activeDocumentation.docstring)
+                                            __html: DOMPurify.sanitize(activeDocumentation.htmlContent)
                                         }}
                                     />
+                                    ) : (
+                                        // A plain docstring is text, not markup ("x < y" must not be parsed as HTML)
+                                        <pre className="text-xs text-gray-700 dark:text-gray-300 font-mono leading-relaxed whitespace-pre-wrap break-words">
+                                            {activeDocumentation.docstring}
+                                        </pre>
+                                    )}
                                 </div>
                             </div>
                         ) : searchResults ? (
@@ -338,7 +349,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                                                 <button
                                                     type="button"
                                                     key={doc.name}
-                                                    onClick={() => setActiveDocumentation(doc)}
+                                                    onClick={() => openDocumentation(doc)}
                                                     className="w-full text-left p-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md group transition-all"
                                                 >
                                                     <div className="flex items-center justify-between">
@@ -363,7 +374,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                                                 <button
                                                     type="button"
                                                     key={`${doc.name}-${idx}`}
-                                                    onClick={() => setActiveDocumentation(doc)}
+                                                    onClick={() => openDocumentation(doc)}
                                                     className="w-full text-left p-2 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-md group transition-all"
                                                 >
                                                     <div className="flex items-center justify-between mb-1">
