@@ -7,6 +7,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import type { Cell, Output, Variable, VariableAssumptions, Documentation, NotebookMeta, SearchResults } from '../types';
 import type { CompletionResponse } from '../worker/workerTypes';
 
+import { randomUUID } from '../utils/uuid';
 import { usePyodide } from '../hooks/usePyodide';
 import { WELCOME_NOTEBOOK_DATA } from '../constants/examples';
 import { storage } from '../services/storage';
@@ -20,7 +21,7 @@ export type ExecutionOutcome = 'ok' | 'error' | 'interrupted' | 'skipped';
 
 const SIDEBAR_TABS: SidebarTab[] = ['variables', 'documentation', 'files', 'symbols', 'examples'];
 const AUTOSAVE_DELAY_MS = 1000;
-const TAB_ID = crypto.randomUUID();
+const TAB_ID = randomUUID();
 const CHANNEL_NAME = 'logos-engine-notebooks';
 
 export interface NotebookData {
@@ -96,7 +97,7 @@ const ActionsContext = createContext<NotebookActions | undefined>(undefined);
 
 function createDefaultCells(): Cell[] {
     return WELCOME_NOTEBOOK_DATA.map((data) => ({
-        id: crypto.randomUUID(),
+        id: randomUUID(),
         type: data.type,
         content: data.content,
         outputs: [],
@@ -292,7 +293,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     const createNotebook = useCallback(async (title: string = 'Untitled Note') => {
         await flushSave();
-        const id = crypto.randomUUID();
+        const id = randomUUID();
         const now = Date.now();
         const meta: NotebookMeta = { id, title, createdAt: now, updatedAt: now };
         const initialCells = createDefaultCells();
@@ -404,7 +405,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         await storage.clearAllData();
         safeStorage.remove('logos-engine-last-id');
 
-        const id = crypto.randomUUID();
+        const id = randomUUID();
         const now = Date.now();
         const meta: NotebookMeta = { id, title: 'Welcome Notebook', createdAt: now, updatedAt: now };
         const initialCells = createDefaultCells();
@@ -424,7 +425,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             const { title, cells: importedCells } = normalizeImportedNotebook(data, fileName);
             await flushSave();
 
-            const id = crypto.randomUUID();
+            const id = randomUUID();
             const now = Date.now();
             const meta: NotebookMeta = { id, title, createdAt: now, updatedAt: now };
             await storage.saveNotebook(meta, { id, cells: importedCells });
@@ -543,7 +544,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     // --- Cell editing -------------------------------------------------------------
 
     const createCell = useCallback((type: 'code' | 'markdown', content = ''): Cell => ({
-        id: crypto.randomUUID(),
+        id: randomUUID(),
         type,
         content,
         outputs: [],
@@ -585,7 +586,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             if (index === -1) return prev;
             const newCell: Cell = {
                 ...prev[index],
-                id: crypto.randomUUID(),
+                id: randomUUID(),
                 outputs: [],
                 executionCount: undefined,
                 executionTime: undefined,

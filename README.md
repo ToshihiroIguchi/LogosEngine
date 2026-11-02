@@ -103,13 +103,104 @@ To run Logos Engine locally or contribute to development:
     ```
     Access at `http://localhost:5173`.
 
-### Static Serving (Python)
-You can also build the project and serve it using Python only:
+## Run with Python Only (No Node.js)
+
+`serve.py` starts a local web server using only the Python standard library. There is nothing to `pip install` and Node.js is not required.
+
+### Requirements
+- **Python 3.10+**
+- **Internet access** the first time (and whenever the browser loads the Python engine): the site files are downloaded once, and the Pyodide runtime is fetched by the browser from the jsDelivr CDN.
+
+### Quick Start
 ```bash
-npm run build
-python serve.py
-# Access at http://localhost:8300
+git clone https://github.com/ToshihiroIguchi/LogosEngine.git
+cd LogosEngine
+python serve.py --open
 ```
+Then open `http://localhost:8300` (the `--open` flag does this for you). Stop the server with `Ctrl+C`.
+
+On the first run, `serve.py` downloads the published site into `.site-cache/` (about 70 files, a few MB). Later runs reuse that copy and start instantly.
+
+### Where the files are served from
+`serve.py` picks the first match:
+
+| Priority | Source | When it is used |
+|---|---|---|
+| 1 | `--dir PATH` | You pass a directory that contains `index.html` |
+| 2 | `dist/` | You built the project yourself with `npm run build` |
+| 3 | `.site-cache/` | Downloaded automatically from the published site |
+
+### Options
+| Option | Default | Description |
+|---|---|---|
+| `--port N` | `8300` | Port to listen on |
+| `--host ADDR` | `127.0.0.1` | Address to bind. Use `0.0.0.0` to allow access from other machines on your network |
+| `--cert FILE` / `--key FILE` | – | Serve over HTTPS with this PEM certificate and private key (both are required together) |
+| `--open` | off | Open the page in your default browser |
+| `--update` | off | Re-download the published site (refreshes `.site-cache/`) before serving |
+| `--dir PATH` | – | Serve a specific directory instead |
+
+Examples:
+```bash
+python serve.py --port 9000          # use another port
+python serve.py --update             # get the latest version
+python serve.py --dir ./dist         # serve your own build
+python serve.py --host 0.0.0.0       # share on your LAN (plain HTTP)
+python serve.py --host 0.0.0.0 --cert cert.pem --key key.pem   # share on your LAN over HTTPS
+```
+
+See [Sharing on your LAN](#sharing-on-your-lan) for details.
+
+### Sharing on your LAN
+Use `--host 0.0.0.0` to let phones, tablets, and other PCs on the same network open your server.
+
+```bash
+python serve.py --host 0.0.0.0
+```
+The server prints every address it can be reached at, for example:
+```
+Serving Logos Engine at http://localhost:8300/
+  From other devices on the network: http://192.168.1.20:8300/
+```
+Open the printed `http://<ip>:8300/` address on the other device.
+
+**Plain HTTP vs. HTTPS.** Browsers treat only `localhost` and HTTPS pages as a *secure context*. Some features depend on it:
+
+| Feature | `localhost` | LAN over `http://` | LAN over `https://` |
+|---|---|---|---|
+| Notebook, SymPy, plots, saving | ✅ | ✅ | ✅ |
+| Stop a running cell **keeping your variables** | ✅ | ❌ the engine restarts and variables are lost | ✅ |
+| Copy buttons (clipboard) | ✅ | ❌ blocked by the browser | ✅ |
+
+In short, plain HTTP on the LAN works for normal use. If you need to interrupt long computations without losing state, use HTTPS.
+
+**Serving over HTTPS.** Python cannot create certificates by itself, so generate one and pass it with `--cert` and `--key`.
+
+*Option A: [mkcert](https://github.com/FiloSottile/mkcert) (recommended: browsers trust it without warnings on this PC)*
+```bash
+mkcert -install
+mkcert -cert-file cert.pem -key-file key.pem 192.168.1.20 localhost
+python serve.py --host 0.0.0.0 --cert cert.pem --key key.pem
+```
+Other devices must also trust mkcert's root CA (`mkcert -CAROOT` shows where it is), otherwise they show a certificate warning.
+
+*Option B: self-signed certificate with OpenSSL (browsers show a warning you must accept)*
+```bash
+openssl req -x509 -newkey rsa:2048 -nodes -days 365 -keyout key.pem -out cert.pem   -subj "/CN=logos-engine" -addext "subjectAltName=DNS:localhost,IP:192.168.1.20"
+python serve.py --host 0.0.0.0 --cert cert.pem --key key.pem
+```
+Replace `192.168.1.20` with your own address (the one `serve.py` prints). Then open `https://192.168.1.20:8300/` and accept the warning once. Do not commit `key.pem`.
+
+**Firewall.** The first time Python listens on a network address, Windows asks whether to allow it. Allow access on **private networks**. On macOS and Linux, make sure the port (default `8300`) is not blocked by the firewall. If another device cannot connect, check that both are on the same network and that the printed IP address is the one of the correct network adapter.
+
+**Security.** The server has no login and serves static files only, so anyone who can reach the port can open the app. Only use `--host 0.0.0.0` on networks you trust, never expose the port to the internet, and stop the server (`Ctrl+C`) when you are done. Notebooks live in each visitor's own browser storage; they are never uploaded to or shared through your server, and each device sees its own notebooks. Calculations run in each visitor's browser, so every device needs internet access to the jsDelivr CDN (Pyodide runtime) unless it is cached.
+
+### Notes
+- **Interrupt support (SharedArrayBuffer):** the server sends `Cross-Origin-Opener-Policy` and `Cross-Origin-Embedder-Policy` headers so that running code can be stopped without losing variables. Browsers only honor these on `localhost` or HTTPS (see the table above).
+- **Offline use:** after the first successful load, calculations need no server round-trips, but the browser still needs the Pyodide files from the CDN unless they are cached.
+- **Port already in use:** pass another port with `--port`.
+- **Download failed:** check your connection and proxy settings, or build locally with `npm install && npm run build` and rerun `python serve.py`.
+- **Reset:** delete the `.site-cache/` folder to force a fresh download.
 
 ## Technology Stack
 

@@ -1,4 +1,5 @@
 import type { NotebookState, Cell } from '../types';
+import { randomUUID } from './uuid';
 import { downloadBlob, sanitizeFileName } from './fileUtils';
 import type {
     INotebookContent,
@@ -538,7 +539,7 @@ function findMatchingBracket(code: string, start: number): number {
 /** nbformat 4.5 cell ids must match ^[a-zA-Z0-9-_]+$ and be 1-64 characters long. */
 function sanitizeCellId(id: string): string {
     const cleaned = (id || '').replace(/[^a-zA-Z0-9-_]/g, '-').slice(0, 64);
-    return cleaned || crypto.randomUUID();
+    return cleaned || randomUUID();
 }
 
 function splitLines(text: string): string[] {

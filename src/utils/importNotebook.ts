@@ -1,3 +1,4 @@
+import { randomUUID } from './uuid';
 import type { Cell, Output } from '../types';
 
 /**
@@ -56,8 +57,8 @@ export function normalizeOutput(raw: unknown): Output | null {
 
 function normalizeCell(raw: unknown, seenIds: Set<string>): Cell {
     const cell = isRecord(raw) ? raw : {};
-    let id = typeof cell.id === 'string' && cell.id ? cell.id : crypto.randomUUID();
-    if (seenIds.has(id)) id = crypto.randomUUID();
+    let id = typeof cell.id === 'string' && cell.id ? cell.id : randomUUID();
+    if (seenIds.has(id)) id = randomUUID();
     seenIds.add(id);
 
     const type = cell.type === 'markdown' ? 'markdown' : 'code';
