@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { randomUUID } from '../utils/uuid';
 import type {
     WorkerInitMessage, WorkerRequest, WorkerResponse, WorkerNotification, CompletionResponse
 } from '../worker/workerTypes';
@@ -182,7 +183,7 @@ export function usePyodide(onEngineReset?: () => void) {
 
     /** Sends a request. The worker answers in order and holds requests until the engine is up. */
     const send = useCallback((request: Omit<WorkerRequest, 'id'>): Promise<WorkerResponse> => {
-        const id = crypto.randomUUID();
+        const id = randomUUID();
         const worker = workerRef.current;
         if (!worker || initErrorRef.current) {
             return Promise.resolve(errorResponse(id, initErrorRef.current ?? 'Engine is not available.'));
