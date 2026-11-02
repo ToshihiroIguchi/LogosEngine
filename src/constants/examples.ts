@@ -61,8 +61,8 @@ simplify(sin(x)**2 + cos(x)**2)`
             },
             {
                 title: "Expand & Factor",
-                code: `# Expand
-expand((x + 1)**3)
+                code: `# Expand (display() shows intermediate values; the last expression is shown automatically)
+display(expand((x + 1)**3))
 
 # Factor
 factor(x**3 + 3*x**2 + 3*x + 1)`
@@ -97,7 +97,7 @@ diff(sin(x)*exp(-x), x)`
             {
                 title: "Advanced Integration",
                 code: `# Rational function
-integrate(1/(1 + x**2), x)
+display(integrate(1/(1 + x**2), x))
 
 # Gaussian integral (improper integral)
 integrate(exp(-x**2), (x, -oo, oo))`
@@ -105,7 +105,7 @@ integrate(exp(-x**2), (x, -oo, oo))`
             {
                 title: "Limits",
                 code: `# Limit at zero
-limit(sin(x)/x, x, 0)
+display(limit(sin(x)/x, x, 0))
 
 # Limit at infinity
 limit((1 + 1/x)**x, x, oo)`
@@ -113,7 +113,7 @@ limit((1 + 1/x)**x, x, oo)`
             {
                 title: "Series Expansion",
                 code: `# Taylor Series
-series(tan(x), x, 0, 6)
+display(series(tan(x), x, 0, 6))
 
 # Laurent Series
 series(1/sin(x), x, 0, 4)`

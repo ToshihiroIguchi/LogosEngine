@@ -44,3 +44,44 @@ describe('convertToJupyterNotebook', () => {
         expect(src).toContain('2**3');
     });
 });
+
+describe('convertToJupyterNotebook output details', () => {
+    const outputsOf = (nb: ReturnType<typeof convertToJupyterNotebook>) =>
+        (nb.cells[1] as unknown as { outputs: Array<Record<string, unknown>> }).outputs;
+
+    it('stores tracebacks one string per line without trailing newlines', () => {
+        const nb = convertToJupyterNotebook({
+            cells: [cell({ outputs: [{ type: 'error', value: 'bad', errorName: 'ValueError', traceback: 'a\nb\n', timestamp: 0 }] })],
+        });
+        expect(outputsOf(nb)[0].traceback).toEqual(['a', 'b']);
+    });
+
+    it('exports display() values as display_data and results as execute_result', () => {
+        const nb = convertToJupyterNotebook({
+            cells: [cell({
+                executionCount: 2,
+                outputs: [
+                    { type: 'latex', value: 'a', timestamp: 0 },
+                    { type: 'latex', value: 'b', timestamp: 0, isResult: true },
+                ],
+            })],
+        });
+        expect(outputsOf(nb).map((o) => o.output_type)).toEqual(['display_data', 'execute_result']);
+    });
+
+    it('keeps stderr streams', () => {
+        const nb = convertToJupyterNotebook({
+            cells: [cell({ outputs: [{ type: 'text', value: 'w', stream: 'stderr', timestamp: 0 }] })],
+        });
+        expect(outputsOf(nb)[0]).toMatchObject({ output_type: 'stream', name: 'stderr' });
+    });
+
+    it('uses a custom transpiler when given (engine-provided rewrite)', () => {
+        const nb = convertToJupyterNotebook(
+            { cells: [cell({ content: 'solve(x=1)' })] },
+            { transpile: (code) => `# via engine\n${code}` },
+        );
+        const src = ([] as string[]).concat((nb.cells[1] as { source: string | string[] }).source).join('');
+        expect(src.startsWith('# via engine')).toBe(true);
+    });
+});

@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Check, Code2, Zap, Sliders, Copy, HelpCircle } from 'lucide-react';
 import { KatexRenderer } from '../UI/KatexRenderer';
 import { useNotebook } from '../../state/AppNotebookContext';
 import type { Variable, VariableAssumptions } from '../../types';
+import { useModal } from '../../hooks/useModal';
+import { matchPresetId, toggleAssumption, PYTHON_KEYWORDS } from '../../utils/assumptions';
 
 interface DefineVariableModalProps {
     isOpen: boolean;
@@ -100,6 +102,8 @@ export const DefineVariableModal: React.FC<DefineVariableModalProps> = ({
     initialVariable
 }) => {
     const { defineVariable, insertTextAtCursor } = useNotebook();
+    const dialogRef = useRef<HTMLDivElement>(null);
+    useModal(isOpen, onClose, dialogRef);
 
     const [varName, setVarName] = useState('x');
     const [selectedPreset, setSelectedPreset] = useState<string>('positive');
@@ -121,13 +125,8 @@ export const DefineVariableModal: React.FC<DefineVariableModalProps> = ({
             const initAssumptions = initialVariable.assumptions || {};
             setAssumptions(initAssumptions);
 
-            // Match preset if possible
-            const matched = PRESETS.find(p => {
-                const keys = Object.keys(p.assumptions);
-                if (keys.length === 0 && Object.keys(initAssumptions).length === 0) return true;
-                return keys.length > 0 && keys.every(k => initAssumptions[k] === p.assumptions[k]);
-            });
-            setSelectedPreset(matched ? matched.id : 'custom');
+            // Only an exact match counts: integer+positive must not show up as plain "Positive"
+            setSelectedPreset(matchPresetId(initAssumptions, PRESETS) ?? 'custom');
         } else {
             setVarName('x');
             setSelectedPreset('positive');
@@ -143,23 +142,7 @@ export const DefineVariableModal: React.FC<DefineVariableModalProps> = ({
 
     const handleToggleAssumption = (key: string) => {
         setSelectedPreset('custom');
-        setAssumptions(prev => {
-            const next = { ...prev };
-            if (next[key]) {
-                delete next[key];
-            } else {
-                next[key] = true;
-                // Conflict resolution
-                if (key === 'positive') {
-                    delete next['negative'];
-                    delete next['nonpositive'];
-                } else if (key === 'negative') {
-                    delete next['positive'];
-                    delete next['nonnegative'];
-                }
-            }
-            return next;
-        });
+        setAssumptions(prev => toggleAssumption(prev, key));
     };
 
     // Generated Python code
@@ -227,6 +210,10 @@ export const DefineVariableModal: React.FC<DefineVariableModalProps> = ({
                 setError(`'${n}' is not a valid variable name (alphanumeric and underscore only)`);
                 return;
             }
+            if (PYTHON_KEYWORDS.has(n)) {
+                setError(`'${n}' is a reserved Python keyword`);
+                return;
+            }
         }
 
         setIsApplying(true);
@@ -247,10 +234,14 @@ export const DefineVariableModal: React.FC<DefineVariableModalProps> = ({
         onClose();
     };
 
-    const handleCopy = () => {
-        navigator.clipboard.writeText(generatedCode);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+    const handleCopy = async () => {
+        try {
+            await navigator.clipboard.writeText(generatedCode);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch {
+            setError('Could not copy to the clipboard.');
+        }
     };
 
     if (!isOpen) return null;
@@ -264,7 +255,7 @@ export const DefineVariableModal: React.FC<DefineVariableModalProps> = ({
             />
 
             {/* Dialog */}
-            <div className="relative bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-lg w-full p-6 animate-in zoom-in-95 fade-in duration-200 overflow-hidden my-auto">
+            <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Define variable and assumptions" tabIndex={-1} className="relative bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-lg w-full p-6 animate-in zoom-in-95 fade-in duration-200 overflow-hidden my-auto">
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-gray-100 dark:border-slate-800 pb-4 mb-5">
                     <div className="flex items-center gap-2.5">

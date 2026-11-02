@@ -11,6 +11,8 @@ export interface Output {
   missingVariables?: string[];
   timestamp: number;
   isResult?: boolean;
+  /** Which stream a text output came from (stdout is the default). */
+  stream?: 'stdout' | 'stderr';
 }
 
 export interface Cell {

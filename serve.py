@@ -11,9 +11,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         super().__init__(*args, directory=DIRECTORY, **kwargs)
 
     def end_headers(self):
-        # Enable COOP/COEP for better performance/security if needed
-        # self.send_header('Cross-Origin-Opener-Policy', 'same-origin')
-        # self.send_header('Cross-Origin-Embedder-Policy', 'require-corp')
+        # Cross-origin isolation enables SharedArrayBuffer (interrupting code without losing variables)
+        self.send_header('Cross-Origin-Opener-Policy', 'same-origin')
+        self.send_header('Cross-Origin-Embedder-Policy', 'credentialless')
         super().end_headers()
 
 # Fix for Windows where .js might be served as text/plain

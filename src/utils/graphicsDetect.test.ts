@@ -25,3 +25,19 @@ describe('needsGraphics', () => {
         expect(needsGraphics(code)).toBe(false);
     });
 });
+
+describe('needsGraphics ignores text that is not code', () => {
+    it.each([
+        'x = 1  # plot(sin(x))',
+        's = "plot(x)"',
+        "s = 'uses plt here'",
+        'doc = """\nplot(x)\ncurl(f)\n"""\nx + 1',
+        'msg = "it\'s plot(x)"',
+    ])('%j', (code) => {
+        expect(needsGraphics(code)).toBe(false);
+    });
+
+    it('still detects real code after a comment or string', () => {
+        expect(needsGraphics('s = "a"  # note\nplot(x)')).toBe(true);
+    });
+});

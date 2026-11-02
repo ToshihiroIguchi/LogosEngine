@@ -8,7 +8,7 @@ import remarkGfm from 'remark-gfm';
 import 'katex/dist/katex.min.css';
 import type { editor } from 'monaco-editor';
 import type { Cell } from '../../types';
-import { useNotebook } from '../../state/AppNotebookContext';
+import { useNotebookActions, useNotebookStatus } from '../../state/AppNotebookContext';
 import { ResultView } from './ResultView';
 import { cn } from '../../lib/utils';
 import { registerPythonCompletionProvider, updateActiveCompletionProvider } from '../../utils/monacoCompletionProvider';
@@ -20,64 +20,45 @@ interface CellItemProps {
     index: number;
 }
 
-export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
+const SNIPPET_PATTERN = /\$\{\d+:[^}]+\}/;
+const SNIPPET_STRIP_PATTERN = /\$\{\d+:([^}]+)\}/g;
+
+const CellItemImpl: React.FC<CellItemProps> = ({ cell, index }) => {
     const {
-        updateCell, executeCell, deleteCell, addCell, interrupt, isReady, isGraphicsReady, getCompletions,
-        focusedCellId, setFocusedCellId, selectNextCell,
+        updateCell, executeCell, deleteCell, addCell, interrupt, getCompletions,
+        setFocusedCellId, selectNextCell,
         setCellEditing, moveCell, duplicateCell, clearCellOutput, toggleCellType,
-        registerInsertHandler
-    } = useNotebook();
+        registerInsertHandler, unregisterInsertHandler
+    } = useNotebookActions();
+    const { isReady, isGraphicsReady, focusedCellId } = useNotebookStatus();
     const { isDark } = useDarkMode();
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
-    const completionProviderRegistered = useRef(false);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const monacoRef = useRef<any>(null);
-    const executeCellRef = useRef(executeCell);
-    const selectNextCellRef = useRef(selectNextCell);
-    const setCellEditingRef = useRef(setCellEditing);
-
-    // Auto-fix retry counter
-    const autoRetryCount = useRef(0);
-    const MAX_AUTO_RETRIES = 2;
-    // Auto-fix only reacts to executions that happened while this cell was mounted,
-    // never to stale error outputs loaded from storage or an imported file.
-    const hasExecutedRef = useRef(false);
+    const [editorHeight, setEditorHeight] = React.useState(() =>
+        Math.max(100, (cell.content.split('\n').length + 1) * 19 + 32));
 
     // Latest values for Monaco handlers registered once at mount (avoids stale closures)
     const cellRef = useRef({ id: cell.id, type: cell.type });
-    const getCompletionsRef = useRef(getCompletions);
+    const focusedCellIdRef = useRef(focusedCellId);
     React.useEffect(() => {
         cellRef.current = { id: cell.id, type: cell.type };
-        getCompletionsRef.current = getCompletions;
-    }, [cell.id, cell.type, getCompletions]);
+        focusedCellIdRef.current = focusedCellId;
+    }, [cell.id, cell.type, focusedCellId]);
 
-    // Keep the refs updated with the latest functions to prevent stale closures
+    // Insert targets must not outlive their editor (deleted cell, markdown preview)
     React.useEffect(() => {
-        executeCellRef.current = executeCell;
-        selectNextCellRef.current = selectNextCell;
-        setCellEditingRef.current = setCellEditing;
-    }, [executeCell, selectNextCell, setCellEditing]);
-
-    // Keep the active completion provider updated when getCompletions changes
-    React.useEffect(() => {
-        updateActiveCompletionProvider(getCompletions);
-    }, [getCompletions]);
-
-    const stableGetCompletions = React.useCallback(
-        (code: string, position: number) => getCompletionsRef.current(code, position),
-        []
-    );
+        const id = cell.id;
+        return () => unregisterInsertHandler(id);
+    }, [cell.id, unregisterInsertHandler]);
 
     const handleEditorDidMount = React.useCallback((editor: editor.IStandaloneCodeEditor, monaco: typeof import('monaco-editor')) => {
         editorRef.current = editor;
         monacoRef.current = monaco;
+        const cellId = cell.id;
 
-        if (!completionProviderRegistered.current) {
-            registerPythonCompletionProvider(monaco, stableGetCompletions);
-            completionProviderRegistered.current = true;
-        } else {
-            updateActiveCompletionProvider(stableGetCompletions);
-        }
+        registerPythonCompletionProvider(monaco, getCompletions);
+        updateActiveCompletionProvider(getCompletions);
 
         // Apply theme immediately on mount
         monaco.editor.setTheme(isDark ? 'vs-dark' : 'vs');
@@ -90,33 +71,24 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                 monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter
             ],
             run: async () => {
-                // Reset retry count on manual execution
-                autoRetryCount.current = 0;
-
                 const { id: currentId, type: currentType } = cellRef.current;
                 if (currentType === 'markdown') {
-                    setCellEditingRef.current(currentId, false);
+                    setCellEditing(currentId, false);
                 } else {
-                    await executeCellRef.current(currentId);
+                    await executeCell(currentId);
                 }
-                selectNextCellRef.current(currentId);
+                selectNextCell(currentId);
             }
         });
 
-        // Check if we should focus immediately after mounting
-        // This is necessary for newly created cells
-        if (focusedCellId === cell.id) {
-            editor.focus();
-            setFocusedCellId(null);
-            // Explicitly register as active if we just focused it
-            // We need to define the handler first, so moving the logic up or defining it separate.
-            // Let's refactor slightly to define handler inside here.
-        }
+        // Grow with the content, including wrapped lines
+        const updateHeight = () => setEditorHeight(Math.max(100, editor.getContentHeight()));
+        editor.onDidContentSizeChange(updateHeight);
+        updateHeight();
 
-        // Registration of Insert Handler with Monaco Snippet Support
+        // Insert handler with Monaco snippet support
         const handleInsert = (text: string, relativeCursorPos?: number) => {
-            const hasSnippet = /\$\{\d+:[^}]+\}/.test(text);
-            if (hasSnippet) {
+            if (SNIPPET_PATTERN.test(text)) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const snippetController = editor.getContribution('snippetController2') as any;
                 if (snippetController && typeof snippetController.insert === 'function') {
@@ -125,23 +97,17 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                     return;
                 }
                 // Fallback: strip snippet syntax if snippetController2 is unavailable
-                text = text.replace(/\$\{\d+:([^}]+)\}/g, '$1');
+                text = text.replace(SNIPPET_STRIP_PATTERN, '$1');
             }
 
-            const position = editor.getPosition();
             const selection = editor.getSelection();
-
-            if (position && selection) {
-                const range = new monaco.Range(
-                    selection.startLineNumber,
-                    selection.startColumn,
-                    selection.endLineNumber,
-                    selection.endColumn
-                );
-
+            if (selection) {
                 editor.executeEdits('insert-symbol', [{
-                    range: range,
-                    text: text,
+                    range: new monaco.Range(
+                        selection.startLineNumber, selection.startColumn,
+                        selection.endLineNumber, selection.endColumn
+                    ),
+                    text,
                     forceMoveMarkers: true
                 }]);
 
@@ -159,17 +125,19 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
         };
 
         editor.onDidFocusEditorText(() => {
-            updateActiveCompletionProvider(stableGetCompletions);
-            registerInsertHandler(handleInsert);
+            updateActiveCompletionProvider(getCompletions);
+            registerInsertHandler(cellId, handleInsert);
         });
+        editor.onDidDispose(() => unregisterInsertHandler(cellId));
 
-        // Also register immediately if this cell is the one being focused on mount
-        if (focusedCellId === cell.id) {
-            updateActiveCompletionProvider(stableGetCompletions);
-            registerInsertHandler(handleInsert);
+        // Newly created cells ask for focus before the editor exists
+        if (focusedCellIdRef.current === cellId) {
+            editor.focus();
+            setFocusedCellId(null);
+            registerInsertHandler(cellId, handleInsert);
         }
-
-    }, [cell.id, focusedCellId, setFocusedCellId, stableGetCompletions, registerInsertHandler, isDark]);
+    }, [cell.id, getCompletions, isDark, setCellEditing, executeCell, selectNextCell,
+        registerInsertHandler, unregisterInsertHandler, setFocusedCellId]);
 
     // Handle focus when this cell is selected as the next cell
     React.useEffect(() => {
@@ -180,18 +148,9 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
         }
     }, [focusedCellId, cell.id, setFocusedCellId, cell.isEditing, cell.type]);
 
-    // Force sync Monaco theme when isDark changes
+    // Keep the Monaco theme in sync with the app theme
     React.useEffect(() => {
-        const theme = isDark ? 'vs-dark' : 'vs';
-        if (monacoRef.current) {
-            monacoRef.current.editor.setTheme(theme);
-        }
-        if (editorRef.current && monacoRef.current) {
-            // Some versions of monaco react need explicit internal theme update via instance
-            editorRef.current.updateOptions({ theme: theme });
-            // And global call again just to be sure
-            monacoRef.current.editor.setTheme(theme);
-        }
+        monacoRef.current?.editor.setTheme(isDark ? 'vs-dark' : 'vs');
     }, [isDark]);
 
     // Sync error markers
@@ -208,13 +167,13 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
         }
 
         const errorOutput = cell.outputs.find(o => o.type === 'error');
-        if (errorOutput && typeof errorOutput.lineNo === 'number') {
+        if (errorOutput && typeof errorOutput.lineNo === 'number' && errorOutput.lineNo <= model.getLineCount()) {
             monacoRef.current.editor.setModelMarkers(model, 'python', [{
                 startLineNumber: errorOutput.lineNo,
                 startColumn: 1,
                 endLineNumber: errorOutput.lineNo,
-                endColumn: 1000,
-                message: errorOutput.value,
+                endColumn: model.getLineMaxColumn(errorOutput.lineNo),
+                message: errorOutput.value || errorOutput.errorName || 'Error',
                 severity: monacoRef.current.MarkerSeverity.Error
             }]);
         } else {
@@ -234,43 +193,20 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
         }
     };
 
+    // Manual quick fix: define the missing names as symbols and run again
     const handleFixError = React.useCallback((variables: string[]) => {
         if (!variables || variables.length === 0) return;
 
-        const varsStr = variables.join(', ');
-        const symbolsStr = variables.join(' ');
-        // Insert at the beginning
-        const definitionLine = `${varsStr} = symbols('${symbolsStr}')`;
+        const definitionLine = `${variables.join(', ')} = symbols('${variables.join(' ')}')`;
         const newContent = `${definitionLine}\n${cell.content}`;
 
         updateCell(cell.id, newContent);
-        // Execute immediately with the new content
-        executeCell(cell.id, newContent);
+        void executeCell(cell.id, newContent);
     }, [cell.id, cell.content, updateCell, executeCell]);
-
-    // Auto-fix monitoring
-    React.useEffect(() => {
-        if (cell.isExecuting) {
-            hasExecutedRef.current = true;
-            return;
-        }
-        if (!hasExecutedRef.current) return;
-
-        const errorOutput = cell.outputs.find(o => o.type === 'error' && o.missingVariables && o.missingVariables.length > 0);
-
-        if (errorOutput && errorOutput.missingVariables && errorOutput.missingVariables.length > 0) {
-            // Check if we can auto-retry
-            if (autoRetryCount.current < MAX_AUTO_RETRIES) {
-                console.log(`Auto-defining variables: ${errorOutput.missingVariables.join(', ')} (Attempt ${autoRetryCount.current + 1}/${MAX_AUTO_RETRIES})`);
-                autoRetryCount.current += 1;
-                handleFixError(errorOutput.missingVariables);
-            }
-        }
-    }, [cell.outputs, cell.isExecuting, handleFixError]);
 
     const needsGraphics = detectNeedsGraphics(cell.content);
     const isQueued = cell.isExecuting && (!isReady || (needsGraphics && !isGraphicsReady));
-    const isEditing = cell.isEditing !== false; // For Markdown: true=edit, false=preview. For Code: irrelevant for display but handles undefined safely.
+    const isEditing = cell.isEditing !== false; // For Markdown: true=edit, false=preview
     const showOutputs = cell.type === 'code' || !isEditing;
 
     const editorOptions = React.useMemo<editor.IStandaloneEditorConstructionOptions>(() => ({
@@ -287,7 +223,8 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
         padding: { top: 16, bottom: 16 },
         wordWrap: 'on',
         scrollbar: {
-            vertical: 'auto',
+            vertical: 'hidden',
+            alwaysConsumeMouseWheel: false,
             horizontal: 'hidden',
         },
         overviewRulerLanes: 0,
@@ -316,9 +253,6 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
             return;
         }
 
-        // Reset retry count on manual execution
-        autoRetryCount.current = 0;
-
         if (cell.type === 'markdown') {
             setCellEditing(cell.id, false);
         } else {
@@ -345,7 +279,7 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                                     ? "bg-red-50 text-red-500 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30"
                                     : "bg-blue-50 text-blue-500 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 hover:scale-105 active:scale-95"
                             )}
-                            title={cell.isExecuting ? "Interrupt (Warning: This will reset all variables)" : "Run Cell (Shift+Enter)"}
+                            title={cell.isExecuting ? "Stop execution (if it cannot be interrupted cleanly the engine restarts and variables are lost)" : "Run Cell (Shift+Enter)"}
                         >
                             {cell.isExecuting ? (
                                 <Square size={14} fill="currentColor" />
@@ -369,15 +303,13 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                                 </span>
                             )}
 
-                            {(cell.type === 'code' || cell.type === 'markdown') && (
-                                <button
-                                    onClick={() => toggleCellType(cell.id)}
-                                    className="text-[9px] font-bold text-gray-300 dark:text-slate-600 select-none uppercase tracking-widest hover:text-blue-500 dark:hover:text-blue-400 cursor-pointer transition-colors"
-                                    title="Switch cell type"
-                                >
-                                    {cell.type}
-                                </button>
-                            )}
+                            <button
+                                onClick={() => toggleCellType(cell.id)}
+                                className="text-[9px] font-bold text-gray-300 dark:text-slate-600 select-none uppercase tracking-widest hover:text-blue-500 dark:hover:text-blue-400 cursor-pointer transition-colors"
+                                title="Switch cell type"
+                            >
+                                {cell.type}
+                            </button>
                             {isQueued && (
                                 <span className="flex items-center gap-1 text-[8px] font-medium text-amber-600 dark:text-amber-400 uppercase tracking-widest bg-amber-50 dark:bg-amber-900/20 px-1 py-0.5 rounded border border-amber-200 dark:border-amber-800 self-center">
                                     <Clock size={8} /> QUEUED
@@ -419,11 +351,10 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                                 remarkPlugins={[remarkMath, remarkGfm]}
                                 rehypePlugins={[rehypeKatex]}
                                 components={{
-                                    pre: ({ ...props }) => <pre {...props} className="bg-gray-900 border border-slate-700 text-gray-100 p-4 rounded-lg overflow-x-auto mb-4 font-mono" />,
-                                    code: ({ inline, ...props }: React.ComponentPropsWithoutRef<'code'> & { inline?: boolean }) =>
-                                        inline
-                                            ? <code {...props} className="bg-gray-100 dark:bg-slate-800 text-purple-600 dark:text-purple-400 px-1 rounded font-mono text-sm" />
-                                            : <code {...props} className="block w-full font-mono" />,
+                                    // Fenced blocks render as <pre><code>; the nested code resets its inline styling
+                                    pre: ({ ...props }) => <pre {...props} className="bg-gray-900 border border-slate-700 text-gray-100 p-4 rounded-lg overflow-x-auto mb-4 font-mono [&_code]:!bg-transparent [&_code]:!p-0 [&_code]:!text-gray-100" />,
+                                    code: ({ ...props }: React.ComponentPropsWithoutRef<'code'>) =>
+                                        <code {...props} className={cn("bg-gray-100 dark:bg-slate-800 text-purple-600 dark:text-purple-400 px-1 rounded font-mono text-sm", props.className)} />,
                                     h1: ({ ...props }) => <h1 {...props} className="text-3xl font-bold mb-6 mt-8 border-b dark:border-slate-800 pb-2 text-gray-900 dark:text-gray-100 first:mt-2" />,
                                     h2: ({ ...props }) => <h2 {...props} className="text-2xl font-bold mb-4 mt-8 text-gray-800 dark:text-gray-200" />,
                                     h3: ({ ...props }) => <h3 {...props} className="text-xl font-bold mb-3 mt-6 text-gray-800 dark:text-gray-200" />,
@@ -443,8 +374,7 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                         <>
                             <div className="print:hidden">
                                 <MonacoEditor
-                                    key={`editor-${cell.id}`}
-                                    height={Math.max(100, (cell.content.split('\n').length + 1) * 19 + 32) + 'px'}
+                                    height={`${editorHeight}px`}
                                     language={cell.type === 'markdown' ? 'markdown' : 'python'}
                                     value={cell.content}
                                     onChange={handleContentChange}
@@ -470,16 +400,7 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                     <div className="border-t border-gray-100 dark:border-slate-800/50 rounded-b-xl print:border-none">
                         <div className="mt-2">
                             <ResultView
-                                /* eslint-disable-next-line react-hooks/refs */
-                                outputs={cell.outputs.filter(o => {
-                                    // Hide error if it's being auto-fixed (retry count < max)
-                                    if (o.type === 'error' && o.missingVariables && o.missingVariables.length > 0) {
-                                        if (autoRetryCount.current < MAX_AUTO_RETRIES) {
-                                            return false;
-                                        }
-                                    }
-                                    return true;
-                                })}
+                                outputs={cell.outputs}
                                 executionCount={cell.executionCount}
                                 onFixError={handleFixError}
                                 onClear={() => clearCellOutput(cell.id)}
@@ -505,3 +426,5 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
         </div>
     );
 };
+
+export const CellItem = React.memo(CellItemImpl);

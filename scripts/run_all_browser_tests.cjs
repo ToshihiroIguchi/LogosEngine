@@ -186,21 +186,27 @@ async function runTestSuite() {
         await page.screenshot({ path: path.join(SCREENSHOT_DIR, '02_math_calculations.png') });
 
         // ----------------------------------------------------
-        // SUITE 3: Error Handling & Undefined Variable Auto-Fix
+        // SUITE 3: Error Handling & Undefined Variable Quick Fix
         // ----------------------------------------------------
-        console.log('\n--- SUITE 3: Error Handling & Auto-Fix ---');
+        console.log('\n--- SUITE 3: Error Handling & Quick Fix ---');
 
-        // 3-1. Auto-Fix for undefined symbols (e.g. solving with unknown symbol w)
-        console.log('Testing Auto-fix with undefined variable w...');
-        outputs = await runCodeInFirstCell('solve(w + 7 = 0, w)');
-        // Wait extra 3s for auto-retry
+        // 3-1. Quick fix for undefined symbols (e.g. solving with unknown symbol w).
+        // The code is never rewritten or re-run on its own: the error offers a button instead.
+        console.log('Testing quick fix with undefined variable w...');
+        await runCodeInFirstCell('solve(w + 7 = 0, w)');
+        const errorShown = await page.evaluate(() => document.body.innerText.toLowerCase().includes('nameerror'));
+        recordResult('Suite 3', 'Undefined Variable Reports NameError', errorShown, 'Code was not rewritten automatically');
+        await page.evaluate(() => {
+            const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('as Symbol'));
+            if (btn) btn.click();
+        });
         await new Promise(r => setTimeout(r, 4000));
         outputs = await page.evaluate(() => {
             const outElements = Array.from(document.querySelectorAll('.font-mono, .katex, pre, code'));
             return outElements.map(el => el.textContent.trim()).filter(t => t.length > 0);
         });
         const hasAutoFixOutput = outputs.some(t => t.includes('-7') || t.includes('[-7]'));
-        recordResult('Suite 3', 'Undefined Variable Auto-Fix', hasAutoFixOutput, 'Automatically defined w and produced [-7]');
+        recordResult('Suite 3', 'Quick Fix Button Defines Symbol', hasAutoFixOutput, 'Clicking the button defined w and produced [-7]');
 
         // 3-2. SyntaxError marker display
         console.log('Testing SyntaxError display...');

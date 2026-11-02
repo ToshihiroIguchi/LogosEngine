@@ -4,11 +4,11 @@ import { useNotebook } from '../../state/AppNotebookContext';
 import { useDarkMode } from '../../hooks/useDarkMode';
 import { cn } from '../../lib/utils';
 import { storage } from '../../services/storage';
-import { downloadJsonFile } from '../../utils/fileUtils';
-import { downloadNotebook } from '../../utils/exportUtils';
+import { useExport } from '../../hooks/useExport';
 
 export const NotebookExplorer: React.FC = () => {
-    const { fileList, currentNotebookId, openNotebook, createNotebook, deleteNotebook } = useNotebook();
+    const { cells, fileList, currentNotebookId, openNotebook, createNotebook, deleteNotebook } = useNotebook();
+    const { exportJson, exportJupyter } = useExport();
     const [searchTerm, setSearchTerm] = useState('');
     useDarkMode();
 
@@ -16,17 +16,11 @@ export const NotebookExplorer: React.FC = () => {
         f.title.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const storageUsage = Math.min(100, (fileList.length / 50) * 100);
-
     const handleExport = async (e: React.MouseEvent, id: string, title: string) => {
         e.stopPropagation();
         try {
-            const notebook = await storage.getNotebook(id);
-            if (notebook) {
-                // Native JSON Backup
-                const dateStr = new Date().toISOString().slice(0, 10);
-                downloadJsonFile(`${title}-${dateStr}.json`, { title, cells: notebook.cells, version: '1.0' });
-            }
+            const source = id === currentNotebookId ? cells : (await storage.getNotebook(id))?.cells;
+            if (source) exportJson(source, title);
         } catch (err) {
             console.error('Failed to backup notebook:', err);
             alert('Failed to backup notebook.');
@@ -36,11 +30,8 @@ export const NotebookExplorer: React.FC = () => {
     const handleExportIpynb = async (e: React.MouseEvent, id: string, title: string) => {
         e.stopPropagation();
         try {
-            const notebook = await storage.getNotebook(id);
-            if (notebook) {
-                // Jupyter Export
-                downloadNotebook(notebook, `${title}.ipynb`);
-            }
+            const source = id === currentNotebookId ? cells : (await storage.getNotebook(id))?.cells;
+            if (source) await exportJupyter(source, title);
         } catch (err) {
             console.error('Failed to export ipynb:', err);
             alert('Failed to export .ipynb file.');
@@ -51,15 +42,9 @@ export const NotebookExplorer: React.FC = () => {
         <div className="flex flex-col h-full bg-[#F8FAF8] dark:bg-slate-900 animate-in fade-in duration-500">
             <div className="p-4 space-y-4">
                 <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm transition-all hover:shadow-md">
-                    <div className="flex items-center justify-between mb-3 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+                    <div className="flex items-center justify-between mb-2 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
                         <span>Notebook Storage</span>
-                        <span className={storageUsage > 80 ? 'text-red-500' : 'text-purple-500 dark:text-purple-400'}>{fileList.length} / 50</span>
-                    </div>
-                    <div className="h-1.5 w-full bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden mb-2">
-                        <div
-                            className={`h-full rounded-full transition-all duration-1000 ${storageUsage > 80 ? 'bg-red-400' : 'bg-gradient-to-r from-purple-400 to-blue-400'}`}
-                            style={{ width: `${storageUsage}%` }}
-                        />
+                        <span className="text-purple-500 dark:text-purple-400">{fileList.length} {fileList.length === 1 ? 'notebook' : 'notebooks'}</span>
                     </div>
                     <p className="text-[9px] text-gray-400 dark:text-gray-500 font-medium italic">Notebooks are saved locally in your browser.</p>
                 </div>
@@ -96,7 +81,7 @@ export const NotebookExplorer: React.FC = () => {
                                         {file.title}
                                     </div>
                                     <div className="text-[9px] text-gray-400 dark:text-gray-500 font-mono mt-0.5">
-                                        Last saved: {new Date(file.updatedAt).toLocaleTimeString()}
+                                        Last saved: {new Date(file.updatedAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                                     </div>
                                 </div>
                             </div>
@@ -106,9 +91,6 @@ export const NotebookExplorer: React.FC = () => {
                                     className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 rounded-lg transition-all"
                                     title="Backup (JSON)"
                                 >
-                                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-                                        Backup JSON
-                                    </div>
                                     <FileText size={14} />
                                 </button>
                                 <button
@@ -116,9 +98,6 @@ export const NotebookExplorer: React.FC = () => {
                                     className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-orange-50 dark:hover:bg-orange-900/30 text-gray-400 dark:text-gray-500 hover:text-orange-500 dark:hover:text-orange-400 rounded-lg transition-all"
                                     title="Export .ipynb"
                                 >
-                                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-                                        Export .ipynb
-                                    </div>
                                     <Download size={14} />
                                 </button>
                                 <button

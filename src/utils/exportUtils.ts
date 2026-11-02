@@ -1,4 +1,5 @@
 import type { NotebookState, Cell } from '../types';
+import { downloadBlob, sanitizeFileName } from './fileUtils';
 import type {
     INotebookContent,
     NotebookCell,
@@ -35,15 +36,23 @@ const LANGUAGE_INFO = {
 // Target functions that support Equation syntax (x=1)
 const TARGET_FUNCS = new Set(['solve', 'dsolve', 'nsolve', 'solveset', 'nonlinsolve', 'linsolve']);
 
-// SymPy reserved keywords that should NOT be converted to Eq(k, v)
+// SymPy reserved keywords that should NOT be converted to Eq(k, v).
+// Mirrors STATIC_RESERVED_ARGS in worker/python/preprocess.py (the engine is the primary
+// implementation; this TypeScript version is only the fallback while the engine is not ready).
 const SYMPY_RESERVED_ARGS = new Set([
-    'check', 'simplify', 'rational', 'manual', 'implicit', 'hint',
-    'force', 'dict', 'set', 'verify', 'exclude', 'quick', 'cubics',
-    'quartics', 'quintics', 'domain', 'symbols', 'flags',
-    // dsolve / nsolve keyword arguments. Keep this list conservative: names that
-    // are common variable names (n, x0, order, ...) must stay convertible to Eq().
-    'ics', 'prec', 'tol', 'solver', 'maxsteps', 'particular', 'bisect', 'modules'
+    'check', 'simplify', 'rational', 'manual', 'implicit', 'hint', 'force', 'dict', 'set',
+    'verify', 'exclude', 'quick', 'cubics', 'quartics', 'quintics', 'domain', 'symbols',
+    'flags', 'minimal', 'warn', 'numerical', 'particular', 'positive',
+    'ics', 'func', 'xi', 'eta',
+    'prec', 'tol', 'solver', 'maxsteps', 'bisect', 'modules'
 ]);
+// Valid keywords only for dsolve; ordinary variable names everywhere else
+const DSOLVE_ONLY_ARGS = new Set(['n', 'x0']);
+
+export interface ExportOptions {
+    /** Rewrites a code cell for standard Python. Defaults to the built-in transpiler. */
+    transpile?: (code: string) => string;
+}
 
 // --- Main Export Function ---
 
@@ -54,12 +63,12 @@ const SYMPY_RESERVED_ARGS = new Set([
  * - Setup cell is injected to ensure environment is ready.
  * - Syntax is transpiled to ensure standard Python compatibility.
  */
-export function convertToJupyterNotebook(state: NotebookState): INotebookContent {
+export function convertToJupyterNotebook(state: NotebookState, options: ExportOptions = {}): INotebookContent {
     // 1. Create Setup Cell
     const setupCell = createSetupCell();
 
     // 2. Convert User Cells
-    const userCells: NotebookCell[] = state.cells.map(convertCell);
+    const userCells: NotebookCell[] = state.cells.map((cell) => convertCell(cell, options));
 
     // 3. Combine
     const allCells = [setupCell, ...userCells];
@@ -81,7 +90,7 @@ export function convertToJupyterNotebook(state: NotebookState): INotebookContent
 
 // --- Cell Conversion ---
 
-function convertCell(cell: Cell): NotebookCell {
+function convertCell(cell: Cell, options: ExportOptions): NotebookCell {
     if (cell.type === 'markdown') {
         const mdCell: IMarkdownCell = {
             id: sanitizeCellId(cell.id),
@@ -92,7 +101,7 @@ function convertCell(cell: Cell): NotebookCell {
         return mdCell;
     } else {
         // Transpile code for compatibility
-        const transpiledCode = transpileCode(cell.content);
+        const transpiledCode = (options.transpile ?? transpileCode)(cell.content);
 
         const codeCell: ICodeCell = {
             id: sanitizeCellId(cell.id),
@@ -111,8 +120,9 @@ function convertOutputs(outputs: any[], executionCount?: number): CodeCellOutput
     if (!outputs) return [];
     return outputs.map(out => {
         if (out.type === 'error') {
+            // nbformat stores one string per line without trailing newlines (Jupyter joins them)
             const tracebackLines = out.traceback
-                ? out.traceback.split('\n').map((line: string) => line + '\n')
+                ? out.traceback.replace(/\n$/, '').split('\n')
                 : [out.value || ''];
             return {
                 output_type: 'error',
@@ -138,14 +148,18 @@ function convertOutputs(outputs: any[], executionCount?: number): CodeCellOutput
         }
 
         if (out.type === 'latex') {
+            const data = {
+                // Jupyter renders text/latex only when wrapped in math delimiters
+                'text/latex': `$$${out.value}$$`,
+                'text/plain': out.rawText || out.value
+            };
+            if (!out.isResult) {
+                return { output_type: 'display_data', data, metadata: {} } as IDisplayData;
+            }
             return {
                 output_type: 'execute_result',
                 execution_count: executionCount || null,
-                data: {
-                    // Jupyter renders text/latex only when wrapped in math delimiters
-                    'text/latex': `$$${out.value}$$`,
-                    'text/plain': out.rawText || out.value
-                },
+                data,
                 metadata: {}
             } as IExecuteResult;
         }
@@ -163,7 +177,7 @@ function convertOutputs(outputs: any[], executionCount?: number): CodeCellOutput
         } else {
             return {
                 output_type: 'stream',
-                name: 'stdout',
+                name: out.stream === 'stderr' ? 'stderr' : 'stdout',
                 text: splitLines(out.value)
             } as IStream;
         }
@@ -312,7 +326,7 @@ export function transpileCode(code: string): string {
 
                     if (closeParenIndex !== -1) {
                         const argsContent = code.substring(openParenIndex + 1, closeParenIndex);
-                        const processedArgs = processFunctionArgs(argsContent);
+                        const processedArgs = processFunctionArgs(argsContent, func);
 
                         result += code.substring(i, openParenIndex + 1); // "solve("
                         result += processedArgs;
@@ -355,12 +369,44 @@ function skipStringLiteral(code: string, i: number): number {
     return code.length;
 }
 
+/** If a comment starts at `i`, returns the index of its line break; otherwise `i`. */
+function skipComment(code: string, i: number): number {
+    if (code[i] !== '#') return i;
+    const end = code.indexOf('\n', i);
+    return end === -1 ? code.length : end;
+}
+
+/** Removes # comments (not those inside strings), keeping line breaks. */
+function stripComments(code: string): string {
+    let out = '';
+    for (let k = 0; k < code.length; k++) {
+        const skipped = skipStringLiteral(code, k);
+        if (skipped !== k) {
+            out += code.substring(k, skipped);
+            k = skipped - 1;
+            continue;
+        }
+        const afterComment = skipComment(code, k);
+        if (afterComment !== k) {
+            k = afterComment - 1;
+            continue;
+        }
+        out += code[k];
+    }
+    return out;
+}
+
 function findMatchingParen(code: string, start: number): number {
     let depth = 0;
     for (let k = start; k < code.length; k++) {
         const skipped = skipStringLiteral(code, k);
         if (skipped !== k) {
             k = skipped - 1;
+            continue;
+        }
+        const afterComment = skipComment(code, k);
+        if (afterComment !== k) {
+            k = afterComment - 1;
             continue;
         }
         if (code[k] === '(') depth++;
@@ -370,7 +416,7 @@ function findMatchingParen(code: string, start: number): number {
     return -1;
 }
 
-function processFunctionArgs(argsStr: string): string {
+function processFunctionArgs(argsStr: string, funcName: string): string {
     // Split by comma, respecting nested parens/brackets/braces and string literals
     const args: string[] = [];
     let lastSplit = 0;
@@ -380,6 +426,11 @@ function processFunctionArgs(argsStr: string): string {
         const skipped = skipStringLiteral(argsStr, k);
         if (skipped !== k) {
             k = skipped - 1;
+            continue;
+        }
+        const afterComment = skipComment(argsStr, k);
+        if (afterComment !== k) {
+            k = afterComment - 1;
             continue;
         }
         const char = argsStr[k];
@@ -394,25 +445,32 @@ function processFunctionArgs(argsStr: string): string {
     args.push(argsStr.substring(lastSplit)); // Last arg
 
     const newArgs = args.map(arg => {
-        const leading = arg.match(/^\s*/)![0];
+        // Blanks and comments before the argument stay where they are
+        const leading = arg.match(/^(?:\s|#[^\n]*)*/)![0];
+        const body = arg.slice(leading.length);
 
         // Look for a top-level '=' in this argument
         let eqIndex = -1;
         let d = 0;
-        for (let i = 0; i < arg.length; i++) {
-            const skipped = skipStringLiteral(arg, i);
+        for (let i = 0; i < body.length; i++) {
+            const skipped = skipStringLiteral(body, i);
             if (skipped !== i) {
                 i = skipped - 1;
                 continue;
             }
-            const c = arg[i];
+            const afterComment = skipComment(body, i);
+            if (afterComment !== i) {
+                i = afterComment - 1;
+                continue;
+            }
+            const c = body[i];
             if (c === '(' || c === '[' || c === '{') d++;
             if (c === ')' || c === ']' || c === '}') d--;
 
             // Found top-level '=' that is not '==', '<=', '>=', '!='
             if (c === '=' && d === 0) {
-                const prev = i > 0 ? arg[i - 1] : '';
-                const next = i < arg.length - 1 ? arg[i + 1] : '';
+                const prev = i > 0 ? body[i - 1] : '';
+                const next = i < body.length - 1 ? body[i + 1] : '';
                 if (prev !== '=' && prev !== '!' && prev !== '<' && prev !== '>' && next !== '=') {
                     eqIndex = i;
                     break;
@@ -421,13 +479,14 @@ function processFunctionArgs(argsStr: string): string {
         }
 
         if (eqIndex !== -1) {
-            const lhs = arg.substring(0, eqIndex).trim();
-            const rhs = arg.substring(eqIndex + 1).trim();
+            // Comments inside an equation cannot survive being moved into Eq(...)
+            const lhs = stripComments(body.substring(0, eqIndex)).trim();
+            const rhs = stripComments(body.substring(eqIndex + 1)).trim();
 
             // Check if LHS is a simple identifier (keyword arg candidate)
             const isSimpleIdentifier = /^[a-zA-Z_]\w*$/.test(lhs);
 
-            if (isSimpleIdentifier && SYMPY_RESERVED_ARGS.has(lhs)) {
+            if (isSimpleIdentifier && (SYMPY_RESERVED_ARGS.has(lhs) || (funcName === 'dsolve' && DSOLVE_ONLY_ARGS.has(lhs)))) {
                 // Reserved keyword argument (e.g. check=True) -> keep as is
                 return `${leading}${lhs}=${transpileCode(rhs)}`;
             }
@@ -436,14 +495,14 @@ function processFunctionArgs(argsStr: string): string {
         }
 
         // A list / tuple argument may itself contain equations: solve([x+y=1, x-y=2])
-        const trimmed = arg.trim();
+        const trimmed = body.trim();
         if ((trimmed[0] === '[' || trimmed[0] === '(') && trimmed.length > 1) {
-            const open = arg.indexOf(trimmed[0]);
-            const close = findMatchingBracket(arg, open);
-            if (close === arg.length - (arg.length - arg.trimEnd().length) - 1) {
-                const inner = arg.substring(open + 1, close);
-                const trailing = arg.substring(close + 1);
-                return `${leading}${trimmed[0]}${processFunctionArgs(inner)}${trimmed[0] === '[' ? ']' : ')'}${trailing}`;
+            const open = body.indexOf(trimmed[0]);
+            const close = findMatchingBracket(body, open);
+            if (close === body.trimEnd().length - 1) {
+                const inner = body.substring(open + 1, close);
+                const trailing = body.substring(close + 1);
+                return `${leading}${trimmed[0]}${processFunctionArgs(inner, funcName)}${trimmed[0] === '[' ? ']' : ')'}${trailing}`;
             }
         }
 
@@ -459,6 +518,11 @@ function findMatchingBracket(code: string, start: number): number {
         const skipped = skipStringLiteral(code, k);
         if (skipped !== k) {
             k = skipped - 1;
+            continue;
+        }
+        const afterComment = skipComment(code, k);
+        if (afterComment !== k) {
+            k = afterComment - 1;
             continue;
         }
         if (code[k] === '(' || code[k] === '[' || code[k] === '{') depth++;
@@ -485,19 +549,11 @@ function splitLines(text: string): string[] {
     });
 }
 
-export function downloadNotebook(state: NotebookState, filename: string = "notebook.ipynb") {
+export function downloadNotebook(state: NotebookState, filename: string = "notebook.ipynb", options: ExportOptions = {}) {
     try {
-        const notebook = convertToJupyterNotebook(state);
+        const notebook = convertToJupyterNotebook(state, options);
         const blob = new Blob([JSON.stringify(notebook, null, 2)], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        downloadBlob(`${sanitizeFileName(filename.replace(/\.ipynb$/i, ''))}.ipynb`, blob);
     } catch (e) {
         console.error("Failed to export notebook:", e);
         alert("Failed to generate .ipynb file. See console for details.");

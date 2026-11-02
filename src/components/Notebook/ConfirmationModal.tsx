@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { AlertTriangle, Trash2 } from 'lucide-react';
 import { useDarkMode } from '../../hooks/useDarkMode';
+import { useModal } from '../../hooks/useModal';
 
 interface ConfirmationModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onConfirm: () => void;
+    onConfirm: () => void | Promise<void>;
     title?: string;
     message?: string;
     confirmLabel?: string;
@@ -20,7 +21,24 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     confirmLabel = "Delete Everything"
 }) => {
     useDarkMode();
+    const dialogRef = useRef<HTMLDivElement>(null);
+    const [isWorking, setIsWorking] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    useModal(isOpen, onClose, dialogRef);
     if (!isOpen) return null;
+
+    const handleConfirm = async () => {
+        setIsWorking(true);
+        setError(null);
+        try {
+            await onConfirm();
+            onClose();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : String(err));
+        } finally {
+            setIsWorking(false);
+        }
+    };
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -31,7 +49,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             />
 
             {/* Modal */}
-            <div className="relative bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl shadow-2xl max-w-md w-full animate-in zoom-in-95 fade-in duration-300 overflow-hidden ring-1 ring-red-100 dark:ring-red-900/50">
+            <div ref={dialogRef} role="alertdialog" aria-modal="true" aria-label={title} tabIndex={-1} className="relative bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl shadow-2xl max-w-md w-full animate-in zoom-in-95 fade-in duration-300 overflow-hidden ring-1 ring-red-100 dark:ring-red-900/50">
                 <div className="p-8">
                     <div className="flex flex-col items-center text-center gap-4 mb-6">
                         <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-full text-red-500 border border-red-100 dark:border-red-900/50 mb-2">
@@ -47,12 +65,13 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                         </div>
                     </div>
 
+                    {error && (
+                        <p role="alert" className="mb-4 text-xs font-medium text-red-600 dark:text-red-400 text-center">{error}</p>
+                    )}
                     <div className="space-y-3">
                         <button
-                            onClick={() => {
-                                onConfirm();
-                                onClose();
-                            }}
+                            onClick={handleConfirm}
+                            disabled={isWorking}
                             className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-xl transition-all transform active:scale-95 shadow-lg shadow-red-200 dark:shadow-red-900/20"
                         >
                             <Trash2 size={16} />
