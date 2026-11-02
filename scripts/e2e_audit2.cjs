@@ -127,7 +127,7 @@ async function main() {
             setInterval(async () => {
                 const ok = await Promise.race([page.evaluate(() => 1).then(() => true).catch(() => true), sleep(8000).then(() => false)]);
                 if (!ok) cdp.send('Debugger.pause').catch(() => {});
-            }, 12000);
+            }, 12000).unref();
         }
         browser.on('disconnected', () => console.log('[BROWSER DISCONNECTED]'));
         page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });

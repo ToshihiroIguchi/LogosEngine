@@ -274,7 +274,15 @@ async function handleExecute(req: WorkerRequest) {
         return;
     }
 
-    if (interruptView) interruptView[0] = 0;
+    if (interruptView) {
+        // Clear a stale signal, then re-check the epoch: a Stop that landed after the checks above
+        // but before this reset would otherwise be wiped and the code would run uninterruptibly.
+        Atomics.store(interruptView, 0, 0);
+        if (isCancelled(req.epoch)) {
+            interruptedResponse(id);
+            return;
+        }
+    }
     const result = callPy<any>('execute_cell', code, ctx, executionCount);
     const interrupted = result.error?.errorName === 'KeyboardInterrupt';
     if (interruptView) interruptView[0] = 0;
