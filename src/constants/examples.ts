@@ -136,11 +136,8 @@ B = Matrix([[2, 0], [0, 2]])
                 title: "Eigenvalues & Vectors",
                 code: `M = Matrix([[1, 2], [2, 1]])
 
-# Eigenvalues
-M.eigenvals()
-
-# Eigenvectors
-M.eigenvects()`
+# (Eigenvalues, Eigenvectors)
+(M.eigenvals(), M.eigenvects())`
             },
             {
                 title: "Determinant & Inverse",
@@ -187,14 +184,11 @@ divergence(v)`
             },
             {
                 title: "Gradient & Curl",
-                code: `# Gradient
+                code: `# (Gradient, Curl)
 C = CoordSys3D('C')
-f = C.x*C.y*C.z
-gradient(f)
-
-# Curl
-v = C.x*C.i + C.y*C.j + C.z*C.k
-curl(v)`
+scalar_field = C.x*C.y*C.z
+vector_field = C.x*C.i + C.y*C.j + C.z*C.k
+(gradient(scalar_field), curl(vector_field))`
             },
             {
                 title: "Dot & Cross Product",
@@ -202,11 +196,8 @@ curl(v)`
 v1 = C.i + 2*C.j
 v2 = 3*C.i + 4*C.k
 
-# Dot (Scalar) Product
-v1.dot(v2)
-
-# Cross (Vector) Product
-v1.cross(v2)`
+# (Dot product, Cross product)
+(v1.dot(v2), v1.cross(v2))`
             }
         ]
     },
@@ -215,11 +206,8 @@ v1.cross(v2)`
         items: [
             {
                 title: "Number Theory",
-                code: `# Prime factorization
-factorint(2026)
-
-# Primality Test
-isprime(2**31 - 1)`
+                code: `# (Prime factorization of 2026, Is 2^31 - 1 prime?)
+(factorint(2026), isprime(2**31 - 1))`
             },
             {
                 title: "Summation",
@@ -236,9 +224,9 @@ satisfiable((x | y) & (~x | z))`
             {
                 title: "Recurrence Relations",
                 code: `# Fibonacci (Recurrence)
-y = Function('y')
+fib = Function('fib')
 n = symbols('n', integer=True)
-rsolve(y(n) - y(n-1) - y(n-2), y(n), {y(0): 0, y(1): 1})`
+rsolve(fib(n) - fib(n-1) - fib(n-2), fib(n), {fib(0): 0, fib(1): 1})`
             }
         ]
     },

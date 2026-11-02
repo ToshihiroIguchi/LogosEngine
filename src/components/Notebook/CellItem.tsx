@@ -13,6 +13,7 @@ import { ResultView } from './ResultView';
 import { cn } from '../../lib/utils';
 import { registerPythonCompletionProvider, updateActiveCompletionProvider } from '../../utils/monacoCompletionProvider';
 import { useDarkMode } from '../../hooks/useDarkMode';
+import { needsGraphics as detectNeedsGraphics } from '../../utils/graphicsDetect';
 
 interface CellItemProps {
     cell: Cell;
@@ -38,6 +39,17 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
     // Auto-fix retry counter
     const autoRetryCount = useRef(0);
     const MAX_AUTO_RETRIES = 2;
+    // Auto-fix only reacts to executions that happened while this cell was mounted,
+    // never to stale error outputs loaded from storage or an imported file.
+    const hasExecutedRef = useRef(false);
+
+    // Latest values for Monaco handlers registered once at mount (avoids stale closures)
+    const cellRef = useRef({ id: cell.id, type: cell.type });
+    const getCompletionsRef = useRef(getCompletions);
+    React.useEffect(() => {
+        cellRef.current = { id: cell.id, type: cell.type };
+        getCompletionsRef.current = getCompletions;
+    }, [cell.id, cell.type, getCompletions]);
 
     // Keep the refs updated with the latest functions to prevent stale closures
     React.useEffect(() => {
@@ -51,15 +63,20 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
         updateActiveCompletionProvider(getCompletions);
     }, [getCompletions]);
 
+    const stableGetCompletions = React.useCallback(
+        (code: string, position: number) => getCompletionsRef.current(code, position),
+        []
+    );
+
     const handleEditorDidMount = React.useCallback((editor: editor.IStandaloneCodeEditor, monaco: typeof import('monaco-editor')) => {
         editorRef.current = editor;
         monacoRef.current = monaco;
 
         if (!completionProviderRegistered.current) {
-            registerPythonCompletionProvider(monaco, getCompletions);
+            registerPythonCompletionProvider(monaco, stableGetCompletions);
             completionProviderRegistered.current = true;
         } else {
-            updateActiveCompletionProvider(getCompletions);
+            updateActiveCompletionProvider(stableGetCompletions);
         }
 
         // Apply theme immediately on mount
@@ -76,12 +93,13 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                 // Reset retry count on manual execution
                 autoRetryCount.current = 0;
 
-                if (cell.type === 'markdown') {
-                    setCellEditingRef.current(cell.id, false);
+                const { id: currentId, type: currentType } = cellRef.current;
+                if (currentType === 'markdown') {
+                    setCellEditingRef.current(currentId, false);
                 } else {
-                    await executeCellRef.current(cell.id);
+                    await executeCellRef.current(currentId);
                 }
-                selectNextCellRef.current(cell.id);
+                selectNextCellRef.current(currentId);
             }
         });
 
@@ -141,17 +159,17 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
         };
 
         editor.onDidFocusEditorText(() => {
-            updateActiveCompletionProvider(getCompletions);
+            updateActiveCompletionProvider(stableGetCompletions);
             registerInsertHandler(handleInsert);
         });
 
         // Also register immediately if this cell is the one being focused on mount
         if (focusedCellId === cell.id) {
-            updateActiveCompletionProvider(getCompletions);
+            updateActiveCompletionProvider(stableGetCompletions);
             registerInsertHandler(handleInsert);
         }
 
-    }, [cell.id, cell.type, focusedCellId, setFocusedCellId, getCompletions, registerInsertHandler, isDark]);
+    }, [cell.id, focusedCellId, setFocusedCellId, stableGetCompletions, registerInsertHandler, isDark]);
 
     // Handle focus when this cell is selected as the next cell
     React.useEffect(() => {
@@ -232,7 +250,11 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
 
     // Auto-fix monitoring
     React.useEffect(() => {
-        if (cell.isExecuting) return;
+        if (cell.isExecuting) {
+            hasExecutedRef.current = true;
+            return;
+        }
+        if (!hasExecutedRef.current) return;
 
         const errorOutput = cell.outputs.find(o => o.type === 'error' && o.missingVariables && o.missingVariables.length > 0);
 
@@ -246,7 +268,7 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
         }
     }, [cell.outputs, cell.isExecuting, handleFixError]);
 
-    const needsGraphics = /\bplot\w*\s*\(/.test(cell.content);
+    const needsGraphics = detectNeedsGraphics(cell.content);
     const isQueued = cell.isExecuting && (!isReady || (needsGraphics && !isGraphicsReady));
     const isEditing = cell.isEditing !== false; // For Markdown: true=edit, false=preview. For Code: irrelevant for display but handles undefined safely.
     const showOutputs = cell.type === 'code' || !isEditing;
@@ -307,36 +329,6 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
 
     return (
         <div className="group relative mb-6">
-            <style dangerouslySetInnerHTML={{
-                __html: `
-                .dark .monaco-editor,
-                .dark .monaco-editor .margin,
-                .dark .monaco-editor-background,
-                .dark .monaco-editor .inputarea.ime-input {
-                    background-color: #0f172a !important;
-                }
-                .dark .monaco-editor .view-line {
-                    color: #e2e8f0 !important;
-                }
-                /* Syntax Highlighting Forcing for Dark Mode */
-                .dark .monaco-editor .mtk1 { color: #e2e8f0 !important; } /* Base text / Variables */
-                .dark .monaco-editor .mtk6 { color: #94a3b8 !important; } /* Brackets / Punctuation */
-                .dark .monaco-editor .mtk8 { color: #4ade80 !important; } /* Strings / Green */
-                .dark .monaco-editor .mtk7 { color: #60a5fa !important; } /* Numbers / Functions (common) */
-                .dark .monaco-editor .mtk10 { color: #f87171 !important; } /* Errors / Special */
-                .dark .monaco-editor .mtk12 { color: #c084fc !important; } /* Keywords */
-                /* Force expand color specifically if it's mtk7 or common */
-                .dark .monaco-editor [class*="mtk"] { filter: brightness(1.2); }
-                
-                /* Better Current Line Highlight - Best Practice */
-                .dark .monaco-editor .current-line {
-                    background-color: #1e293b !important; /* Slate-800 */
-                    border: none !important;
-                }
-                .dark .monaco-editor .current-line-exact {
-                    border: none !important;
-                }
-            ` }} />
             <div className={cn(
                 "flex flex-col border rounded-xl transition-colors duration-200 bg-white dark:bg-slate-900 relative overflow-visible print:border-none print:shadow-none",
                 cell.isExecuting ? (isQueued ? "ring-2 ring-amber-400 border-amber-400 shadow-md z-20" : "ring-2 ring-blue-400 border-blue-400 shadow-md z-20") : "border-gray-200 dark:border-slate-800 shadow-sm dark:shadow-none hover:border-gray-300 dark:hover:border-slate-700 hover:z-[50] focus-within:z-[50]"
@@ -451,7 +443,7 @@ export const CellItem: React.FC<CellItemProps> = ({ cell, index }) => {
                         <>
                             <div className="print:hidden">
                                 <MonacoEditor
-                                    key={`editor-${index}`}
+                                    key={`editor-${cell.id}`}
                                     height={Math.max(100, (cell.content.split('\n').length + 1) * 19 + 32) + 'px'}
                                     language={cell.type === 'markdown' ? 'markdown' : 'python'}
                                     value={cell.content}

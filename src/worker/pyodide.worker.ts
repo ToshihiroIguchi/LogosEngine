@@ -107,7 +107,8 @@ def preprocess_equation_syntax(code):
     SYMPY_RESERVED_ARGS = {
         'check', 'simplify', 'rational', 'manual', 'implicit', 'hint', 
         'force', 'dict', 'set', 'verify', 'exclude', 'quick', 'cubics', 
-        'quartics', 'quintics', 'domain', 'symbols', 'flags'
+        'quartics', 'quintics', 'domain', 'symbols', 'flags',
+        'ics', 'prec', 'tol', 'solver', 'maxsteps', 'particular', 'bisect', 'modules'
     }
     
     call_stack = [] 
@@ -387,6 +388,26 @@ def format_error(e, code=None, ctx_keys=None):
         "missingVariables": missing_vars
     }
 
+def has_unresolved_names(code, ctx):
+    """True if the cell reads names that are not yet defined in ctx or builtins.
+    Used to wait for background extensions BEFORE running, instead of re-running
+    the whole cell after a NameError (which would repeat side effects)."""
+    try:
+        if '^' in code or 'solve' in code:
+            code = preprocess_equation_syntax(code)
+        tree = ast.parse(code)
+    except Exception:
+        return False
+    assigned = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name) and isinstance(n.ctx, (ast.Store, ast.Del))}
+    assigned |= {n.name for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef))}
+    assigned |= {a.arg for n in ast.walk(tree) if isinstance(n, ast.arguments) for a in n.args + n.kwonlyargs}
+    assigned |= {(al.asname or al.name).split('.')[0] for n in ast.walk(tree) if isinstance(n, (ast.Import, ast.ImportFrom)) for al in n.names}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+            if node.id not in ctx and node.id not in assigned and not hasattr(builtins, node.id):
+                return True
+    return False
+
 def execute_cell(code, ctx, execution_count=None):
     if 'plt' in ctx:
         ctx['plt'].close('all')
@@ -398,10 +419,11 @@ def execute_cell(code, ctx, execution_count=None):
     latex_res = None
     
     try:
-        try:
-            code = preprocess_equation_syntax(code)
-        except:
-            pass
+        if '^' in code or any(_f in code for _f in ('solve', 'dsolve', 'nsolve', 'solveset', 'nonlinsolve', 'linsolve')):
+            try:
+                code = preprocess_equation_syntax(code)
+            except Exception:
+                pass
 
         tree = ast.parse(code)
         
@@ -427,11 +449,11 @@ def execute_cell(code, ctx, execution_count=None):
                     ctx['Out'][execution_count] = result_val
                     ctx[f'_{execution_count}'] = result_val
     
-    except Exception as e:
+    except BaseException as e:
         error_data = format_error(e, code=code, ctx_keys=list(ctx.keys()))
         result_val = None
-        
-    sys.stdout = sys.__stdout__
+    finally:
+        sys.stdout = sys.__stdout__
     stdout_content = stdout_buffer.getvalue()
     
     try:
@@ -880,9 +902,11 @@ def load_extended_context(ctx):
             matplotlibReady = true;
 
             // Inject into current context
-            if (active_context) {
+            {
                 const load_extended_context = pyodide.globals.get('load_extended_context');
-                load_extended_context(active_context);
+                const targets = new Set(contexts.values());
+                if (active_context) targets.add(active_context);
+                for (const c of targets) load_extended_context(c);
                 load_extended_context.destroy();
             }
 
@@ -921,30 +945,33 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
                 await extensionsPromise;
             }
 
-            const execute_cell = pyodide.globals.get('execute_cell');
-            let result_py = execute_cell(code, ctx, executionCount);
-            // STRICT CONVERSION
-            let result = result_py.toJs({ dict_converter: Object.fromEntries });
-
-            // RETRY STRATEGY: If NameError occurs while loading, wait and retry
-            // This covers generic cases like 'plot3d', 'gamma', etc.
-            if (result.error && result.error.errorName === 'NameError' && !matplotlibReady && extensionsPromise) {
-                console.log(`Worker: NameError (${result.error.message}) detected during loading. Waiting for extensions...`);
-                // Check if the missing variable is likely to be loaded (heuristic)
-                // For now, we optimistically wait if ANY NameError occurs during loading phase.
-
-                result_py.destroy(); // Cleanup failed attempt
-                await extensionsPromise;
-
-                // Retry execution
-                console.log("Worker: Retrying execution after extensions loaded...");
-                // Re-get execute_cell in case it changed (though unlikely)
-                result_py = execute_cell(code, ctx, executionCount);
-                result = result_py.toJs({ dict_converter: Object.fromEntries });
+            // Wait for extensions BEFORE running if the cell references names that are
+            // not defined yet (e.g. plot3d, gamma). Never re-run a cell after it has executed.
+            if (!matplotlibReady && extensionsPromise) {
+                const has_unresolved = pyodide.globals.get('has_unresolved_names');
+                try {
+                    if (has_unresolved(code, ctx)) {
+                        console.log("Worker: Unresolved names detected during loading. Waiting for extensions...");
+                        await extensionsPromise;
+                    }
+                } finally {
+                    has_unresolved.destroy();
+                }
             }
 
-            result_py.destroy();
-            execute_cell.destroy();
+            const execute_cell = pyodide.globals.get('execute_cell');
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            let result: any;
+            try {
+                const result_py = execute_cell(code, ctx, executionCount);
+                try {
+                    result = result_py.toJs({ dict_converter: Object.fromEntries });
+                } finally {
+                    result_py.destroy();
+                }
+            } finally {
+                execute_cell.destroy();
+            }
 
             const output: Output[] = [];
 
@@ -1000,8 +1027,13 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
             try {
                 if (pyodide.globals.has('_get_variables')) {
                     const get_vars = pyodide.globals.get('_get_variables');
-                    variables = get_vars(ctx).toJs();
-                    get_vars.destroy();
+                    const varsProxy = get_vars(ctx);
+                    try {
+                        variables = varsProxy.toJs();
+                    } finally {
+                        varsProxy.destroy();
+                        get_vars.destroy();
+                    }
                 }
             } catch (e) {
                 console.warn('Worker: Failed to retrieve variables', e);
@@ -1023,7 +1055,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
             const get_completions = pyodide.globals.get('_get_completions');
             const completionsProxy = get_completions(code, ctx);
             try {
-                const completions = completionsProxy.toJs();
+                const completions = completionsProxy.toJs({ dict_converter: Object.fromEntries });
                 self.postMessage({ id, status: 'SUCCESS', completions });
             } finally {
                 completionsProxy.destroy();
@@ -1124,7 +1156,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
             self.postMessage({ id, status: 'SUCCESS', variables });
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
-            self.postMessage({ id, status: 'ERROR', message: err.message });
+            self.postMessage({ id, status: 'ERROR', message: err.message, error: err.message });
         }
     }
     else if (action === 'RESET_CONTEXT') {
@@ -1136,8 +1168,8 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
                 }
                 contexts.delete(notebookId);
             }
-            // Force recreation of context
-            getContext(notebookId);
+            // Force recreation of context (unless the caller only wants it freed)
+            if (code !== 'dispose') getContext(notebookId);
             self.postMessage({ id, status: 'SUCCESS' });
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {

@@ -1,6 +1,6 @@
 import type { Output, Variable, VariableAssumptions, Documentation, SearchResults } from '../types';
 
-export type WorkerAction = 'EXECUTE' | 'INTERRUPT' | 'COMPLETE' | 'RESET_CONTEXT' | 'DELETE_VARIABLE' | 'DEFINE_VARIABLE' | 'GET_COMPLETIONS' | 'GET_DOCS' | 'GET_HELP';
+export type WorkerAction = 'EXECUTE' | 'INTERRUPT' | 'RESET_CONTEXT' | 'DELETE_VARIABLE' | 'DEFINE_VARIABLE' | 'GET_COMPLETIONS' | 'GET_DOCS' | 'GET_HELP';
 
 export interface WorkerRequest {
     id: string;
@@ -37,9 +37,8 @@ export interface CompletionItem {
 
 export interface CompletionRequest {
     id: string;
-    action: 'COMPLETE';
-    code: string;
-    position: number;
+    action: 'GET_COMPLETIONS';
+    code: string; // identifier prefix to complete
     notebookId?: string;
 }
 

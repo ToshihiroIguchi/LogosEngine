@@ -145,3 +145,32 @@ textarea {
 .katex {
   font-size: 1.15em !important;
 }
+
+/* Monaco dark-mode overrides (previously injected as a <style> tag in every cell) */
+.dark .monaco-editor,
+.dark .monaco-editor .margin,
+.dark .monaco-editor-background,
+.dark .monaco-editor .inputarea.ime-input {
+    background-color: #0f172a !important;
+}
+.dark .monaco-editor .view-line {
+    color: #e2e8f0 !important;
+}
+/* Syntax Highlighting Forcing for Dark Mode */
+.dark .monaco-editor .mtk1 { color: #e2e8f0 !important; } /* Base text / Variables */
+.dark .monaco-editor .mtk6 { color: #94a3b8 !important; } /* Brackets / Punctuation */
+.dark .monaco-editor .mtk8 { color: #4ade80 !important; } /* Strings / Green */
+.dark .monaco-editor .mtk7 { color: #60a5fa !important; } /* Numbers / Functions (common) */
+.dark .monaco-editor .mtk10 { color: #f87171 !important; } /* Errors / Special */
+.dark .monaco-editor .mtk12 { color: #c084fc !important; } /* Keywords */
+/* Force expand color specifically if it's mtk7 or common */
+.dark .monaco-editor [class*="mtk"] { filter: brightness(1.2); }
+
+/* Better Current Line Highlight - Best Practice */
+.dark .monaco-editor .current-line {
+    background-color: #1e293b !important; /* Slate-800 */
+    border: none !important;
+}
+.dark .monaco-editor .current-line-exact {
+    border: none !important;
+}

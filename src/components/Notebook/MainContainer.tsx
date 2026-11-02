@@ -16,7 +16,7 @@ import { downloadNotebook } from '../../utils/exportUtils';
 
 export const MainContainer: React.FC = () => {
     const {
-        cells, addCell, executeAll, interrupt, isReady, importNotebook,
+        cells, addCell, executeAll, interrupt, isReady, initError, retryInit, importNotebook,
         isSidebarOpen, setIsSidebarOpen, clearAllOutputs, resetNotebook, isGraphicsReady,
         fileList, currentNotebookId, isDirty, renameNotebook
     } = useNotebook();
@@ -117,7 +117,10 @@ export const MainContainer: React.FC = () => {
                                     type="text"
                                     value={editTitleValue}
                                     onChange={(e) => setEditTitleValue(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleSaveTitle()}
+                                    onKeyDown={(e) => {
+                                        // Blur triggers the single save via onBlur (avoids saving twice on Enter)
+                                        if (e.key === 'Enter') e.currentTarget.blur();
+                                    }}
                                     onBlur={handleSaveTitle}
                                     autoFocus
                                     className="bg-gray-50 dark:bg-slate-800 border border-purple-200 dark:border-purple-800 rounded-lg px-3 py-1 text-sm font-bold text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-100 dark:focus:ring-purple-900 min-w-[200px]"
@@ -153,7 +156,17 @@ export const MainContainer: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-2">
-                    {!isReady ? (
+                    {initError ? (
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 rounded-full border border-red-200" role="alert" title={initError}>
+                            <span className="text-xs font-semibold text-red-600">Engine failed to start</span>
+                            <button
+                                onClick={retryInit}
+                                className="text-xs font-bold text-red-700 underline hover:text-red-900"
+                            >
+                                Retry
+                            </button>
+                        </div>
+                    ) : !isReady ? (
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 rounded-full border border-amber-100/50">
                             <Loader2 className="animate-spin text-amber-500" size={14} />
                             <span className="text-xs font-semibold text-amber-600">Initializing...</span>
@@ -285,7 +298,7 @@ export const MainContainer: React.FC = () => {
                     </main>
                     <footer className="print:hidden py-6 px-8 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between bg-gray-50/50 dark:bg-slate-900/50 mt-auto">
                         <div className="flex items-center gap-3 text-xs text-gray-400 font-mono">
-                            <span>PYTHON 3.11</span><span className="opacity-30">•</span><span>SYMPY CORE</span><span className="opacity-30">•</span><span>BROWSER-WASM</span>
+                            <span>PYTHON 3.13</span><span className="opacity-30">•</span><span>SYMPY CORE</span><span className="opacity-30">•</span><span>BROWSER-WASM</span>
                         </div>
                         <div className="flex items-center gap-3">
                             <button

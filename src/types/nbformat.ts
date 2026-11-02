@@ -44,6 +44,8 @@ export interface IError extends IOutput {
 export type CodeCellOutput = IExecuteResult | IDisplayData | IStream | IError;
 
 export interface ICell {
+    /** Required by nbformat >= 4.5 (top-level, not in metadata) */
+    id?: string;
     cell_type: CellType;
     metadata: Record<string, unknown>;
     source: string | string[];

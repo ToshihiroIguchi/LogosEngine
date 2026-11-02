@@ -27,7 +27,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     const [width, setWidth] = React.useState(() => {
         if (typeof window !== 'undefined') {
             const saved = localStorage.getItem('logos-sidebar-width');
-            return saved ? parseInt(saved, 10) : 320;
+            const parsed = saved ? Number.parseInt(saved, 10) : NaN;
+            return Number.isFinite(parsed) && parsed >= 200 ? parsed : 320;
         }
         return 320;
     });
@@ -392,7 +393,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                                     <BookCopy size={24} className="text-gray-300 dark:text-slate-600" />
                                 </div>
                                 <p className="text-sm text-gray-400 dark:text-slate-400 font-medium">No documentation loaded.</p>
-                                <p className="text-xs text-gray-500 dark:text-slate-500 mt-2 italic">Search above or type ?function to view docs.</p>
+                                <p className="text-xs text-gray-500 dark:text-slate-500 mt-2 italic">Search above to view documentation.</p>
                             </div>
                         )}
                     </div>

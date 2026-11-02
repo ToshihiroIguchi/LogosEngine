@@ -1,45 +1,71 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useSyncExternalStore } from 'react';
 
 export type Theme = 'light' | 'dark' | 'system';
 
-export const useDarkMode = () => {
-    const [theme, setThemeState] = useState<Theme>(() => {
+// Theme state is shared by every component that uses this hook.
+// (Previously each call kept its own state, so toggling the theme did not reach existing editors.)
+const listeners = new Set<() => void>();
+
+function readSavedTheme(): Theme {
+    try {
         const saved = localStorage.getItem('theme');
-        return (saved as Theme) || 'light';
-    });
-    const [isDark, setIsDark] = useState(false);
+        if (saved === 'light' || saved === 'dark' || saved === 'system') return saved;
+    } catch {
+        // localStorage may be unavailable (private mode, blocked site data)
+    }
+    return 'light';
+}
 
-    const applyTheme = useCallback((currentTheme: Theme) => {
-        const root = window.document.documentElement;
-        const darkMatch = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const shouldBeDark =
-            currentTheme === 'dark' ||
-            (currentTheme === 'system' && darkMatch);
+function computeIsDark(theme: Theme): boolean {
+    if (theme === 'dark') return true;
+    if (theme === 'system') return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    return false;
+}
 
-        if (shouldBeDark) {
-            root.classList.add('dark');
-        } else {
-            root.classList.remove('dark');
-        }
-        // Defer state update to avoid set-state-in-effect warning
-        setTimeout(() => setIsDark(shouldBeDark), 0);
-    }, []);
+let currentTheme: Theme = readSavedTheme();
+let currentIsDark = computeIsDark(currentTheme);
 
-    const setTheme = (newTheme: Theme) => {
-        setThemeState(newTheme);
+function applyToDom() {
+    currentIsDark = computeIsDark(currentTheme);
+    document.documentElement.classList.toggle('dark', currentIsDark);
+}
+
+function emit() {
+    listeners.forEach((l) => l());
+}
+
+applyToDom();
+
+// One media-query listener for the whole app (only matters while theme === 'system')
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (currentTheme !== 'system') return;
+    applyToDom();
+    emit();
+});
+
+function setThemeValue(newTheme: Theme) {
+    currentTheme = newTheme;
+    try {
         localStorage.setItem('theme', newTheme);
+    } catch {
+        // ignore storage failures; the theme still applies for this session
+    }
+    applyToDom();
+    emit();
+}
+
+function subscribe(listener: () => void) {
+    listeners.add(listener);
+    return () => {
+        listeners.delete(listener);
     };
+}
 
-    useEffect(() => {
-        applyTheme(theme);
+const getTheme = () => currentTheme;
+const getIsDark = () => currentIsDark;
 
-        if (theme === 'system') {
-            const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-            const handleChange = () => applyTheme('system');
-            mediaQuery.addEventListener('change', handleChange);
-            return () => mediaQuery.removeEventListener('change', handleChange);
-        }
-    }, [theme, applyTheme]);
-
-    return { theme, setTheme, isDark };
+export const useDarkMode = () => {
+    const theme = useSyncExternalStore(subscribe, getTheme);
+    const isDark = useSyncExternalStore(subscribe, getIsDark);
+    return { theme, setTheme: setThemeValue, isDark };
 };

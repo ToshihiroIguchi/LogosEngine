@@ -2,35 +2,83 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { WorkerRequest, WorkerResponse, CompletionRequest, CompletionResponse } from '../worker/workerTypes';
 import type { VariableAssumptions } from '../types';
 
-function checkNeedsGraphics(code: string): boolean {
-    // Strip Python comments to prevent false positives
-    const cleanCode = code.replace(/#.*$/gm, '');
-    // Match common plotting libraries/functions (plt, matplotlib, plot, scatter, hist, figure, subplots, etc.)
-    return /\b(plt|matplotlib|plot\w*|scatter|hist|figure|subplots?|gcf|gca|imshow|savefig)\b/.test(cleanCode);
+import { needsGraphics as checkNeedsGraphics } from '../utils/graphicsDetect';
+
+const INIT_TIMEOUT_MS = 120_000;
+const COMPLETION_TIMEOUT_MS = 3_000;
+
+/** Extracts the identifier prefix right before the cursor. Returns null when completing an attribute (after '.'). */
+function getCompletionPrefix(code: string, position: number): string | null {
+    const before = code.slice(0, position);
+    const match = before.match(/([A-Za-z_]\w*)$/);
+    const prefix = match ? match[1] : '';
+    const preceding = before.slice(0, before.length - prefix.length);
+    if (/\.\s*$/.test(preceding)) return null;
+    return prefix;
 }
 
 export function usePyodide() {
     const [isReady, setIsReady] = useState(false);
+    const [initError, setInitError] = useState<string | null>(null);
+    const initTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [isGraphicsReady, setIsGraphicsReady] = useState(false);
     const workerRef = useRef<Worker | null>(null);
     const resolversRef = useRef<Map<string, (response: WorkerResponse | CompletionResponse) => void>>(new Map());
     // Queue now includes executionCount to ensure persistence
     const queueRef = useRef<Array<{ id: string; code: string; notebookId?: string; executionCount?: number; resolve: (response: WorkerResponse | CompletionResponse) => void }>>([]);
 
+    const failPending = useCallback((message: string) => {
+        const errorResponse = {
+            id: 'init-failed',
+            status: 'ERROR' as const,
+            results: [{ type: 'error' as const, value: message, timestamp: Date.now() }],
+            completions: [],
+            error: message
+        };
+        resolversRef.current.forEach((resolve) => resolve(errorResponse as unknown as WorkerResponse));
+        resolversRef.current.clear();
+        const queue = queueRef.current;
+        queueRef.current = [];
+        queue.forEach(({ resolve }) => resolve(errorResponse as unknown as WorkerResponse));
+    }, []);
+
     const initWorker = useCallback(() => {
         setIsReady(false);
         setIsGraphicsReady(false);
+        setInitError(null);
         if (workerRef.current) {
             workerRef.current.terminate();
         }
+        if (initTimerRef.current) clearTimeout(initTimerRef.current);
 
         const worker = new Worker(new URL('../worker/pyodide.worker.ts', import.meta.url), {
             type: 'module'
         });
 
+        initTimerRef.current = setTimeout(() => {
+            const message = 'Engine initialization timed out. Check your network connection and reload.';
+            setInitError(message);
+            failPending(message);
+        }, INIT_TIMEOUT_MS);
+
+        worker.onerror = (event) => {
+            const message = `Engine failed to start: ${event.message || 'unknown error'}`;
+            if (initTimerRef.current) clearTimeout(initTimerRef.current);
+            setInitError(message);
+            failPending(message);
+        };
+
         worker.onmessage = (event) => {
             const data = event.data;
+            if (data.type === 'ERROR' && !data.id) {
+                if (initTimerRef.current) clearTimeout(initTimerRef.current);
+                const message = data.message || 'Engine initialization failed.';
+                setInitError(message);
+                failPending(message);
+                return;
+            }
             if (data.type === 'READY') {
+                if (initTimerRef.current) clearTimeout(initTimerRef.current);
                 setIsReady(true);
                 // Process queue...
                 const queue = queueRef.current;
@@ -67,12 +115,15 @@ export function usePyodide() {
         };
 
         workerRef.current = worker;
-    }, []);
+    }, [failPending]);
 
     useEffect(() => {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         initWorker();
-        return () => workerRef.current?.terminate();
+        return () => {
+            if (initTimerRef.current) clearTimeout(initTimerRef.current);
+            workerRef.current?.terminate();
+        };
     }, [initWorker]);
 
     // Flush queue when engine becomes ready or graphics become ready
@@ -149,21 +200,34 @@ export function usePyodide() {
     const getCompletions = useCallback((code: string, position: number, notebookId?: string): Promise<CompletionResponse> => {
         if (!workerRef.current || !isReady) return Promise.resolve({ id: '', completions: [] });
 
+        const prefix = getCompletionPrefix(code, position);
+        if (prefix === null) return Promise.resolve({ id: '', completions: [] });
+
         const id = crypto.randomUUID();
         return new Promise((resolve) => {
-            resolversRef.current.set(id, (response) => resolve(response as CompletionResponse));
-            const request: CompletionRequest = { id, action: 'COMPLETE', code, position, notebookId };
+            // Never leave a resolver behind if the worker does not answer
+            const timer = setTimeout(() => {
+                resolversRef.current.delete(id);
+                resolve({ id, completions: [] });
+            }, COMPLETION_TIMEOUT_MS);
+            resolversRef.current.set(id, (response) => {
+                clearTimeout(timer);
+                const completions = (response as CompletionResponse).completions ?? [];
+                resolve({ id, completions });
+            });
+            const request: CompletionRequest = { id, action: 'GET_COMPLETIONS', code: prefix, notebookId };
             workerRef.current?.postMessage(request);
         });
     }, [isReady]);
 
-    const resetContext = useCallback((notebookId?: string): Promise<void> => {
+    /** Resets a notebook context. With `dispose`, the context is freed and not recreated. */
+    const resetContext = useCallback((notebookId?: string, dispose = false): Promise<void> => {
         if (!workerRef.current || !isReady) return Promise.resolve();
 
         const id = crypto.randomUUID();
         return new Promise((resolve) => {
             resolversRef.current.set(id, () => resolve());
-            const request: WorkerRequest = { id, action: 'RESET_CONTEXT', code: '', notebookId };
+            const request: WorkerRequest = { id, action: 'RESET_CONTEXT', code: dispose ? 'dispose' : '', notebookId };
             workerRef.current?.postMessage(request);
         });
     }, [isReady]);
@@ -217,5 +281,5 @@ export function usePyodide() {
         });
     }, [isReady]);
 
-    return { isReady, isGraphicsReady, execute, interrupt, getCompletions, resetContext, deleteVariable, defineVariable, searchDocs };
+    return { isReady, initError, retryInit: initWorker, isGraphicsReady, execute, interrupt, getCompletions, resetContext, deleteVariable, defineVariable, searchDocs };
 }

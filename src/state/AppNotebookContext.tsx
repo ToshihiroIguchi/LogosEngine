@@ -1,8 +1,6 @@
 /*
  * LogosEngine NotebookContext
- * Revision: ForceUpdate-2026-01-12-FixBuild
  * This file handles the main notebook state.
- * Last Build Trigger: 2026-01-17-FixBuildConsistency
  */
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import type { Cell, Variable, VariableAssumptions, Documentation, NotebookMeta, SearchResults } from '../types';
@@ -24,6 +22,8 @@ interface NotebookContextType {
     isSidebarOpen: boolean;
     setIsSidebarOpen: (isOpen: boolean) => void;
     isReady: boolean;
+    initError: string | null;
+    retryInit: () => void;
     focusedCellId: string | null;
     setFocusedCellId: (id: string | null) => void;
     addCell: (type: 'code' | 'markdown', index?: number) => string;
@@ -68,17 +68,13 @@ const NotebookContext = createContext<NotebookContextType | undefined>(undefined
 export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [cells, setCells] = useState<Cell[]>(
         // Initialize with welcome notebook
-        WELCOME_NOTEBOOK_DATA.map((data, idx) => {
-            // Force usage of idx to prevent build error
-            if (idx < 0) console.debug(idx);
-            return {
-                id: crypto.randomUUID(),
-                type: data.type as 'code' | 'markdown',
-                content: data.content,
-                outputs: [],
-                isExecuting: false
-            };
-        })
+        WELCOME_NOTEBOOK_DATA.map((data) => ({
+            id: crypto.randomUUID(),
+            type: data.type as 'code' | 'markdown',
+            content: data.content,
+            outputs: [],
+            isExecuting: false
+        }))
     );
     const [variables, setVariables] = useState<Variable[]>([]);
     const [activeDocumentation, setActiveDocumentation] = useState<Documentation | null>(null);
@@ -93,12 +89,14 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         return saved === null ? true : saved === 'true';
     });
     const [focusedCellId, setFocusedCellId] = useState<string | null>(null);
-    const { isReady, isGraphicsReady, execute, interrupt: pyodideInterrupt, getCompletions, deleteVariable: deleteVarWorker, defineVariable: defineVarWorker, searchDocs: searchDocsWorker } = usePyodide();
+    const { isReady, initError, retryInit, isGraphicsReady, execute, interrupt: pyodideInterrupt, getCompletions, resetContext, deleteVariable: deleteVarWorker, defineVariable: defineVarWorker, searchDocs: searchDocsWorker } = usePyodide();
 
     const [fileList, setFileList] = useState<NotebookMeta[]>([]);
     const [currentNotebookId, setCurrentNotebookId] = useState<string | null>(null);
     const [isDirty, setIsDirty] = useState(false);
     const isInitialMount = useRef(true);
+    const initStartedRef = useRef(false);
+    const deletedIdsRef = useRef<Set<string>>(new Set());
     const executionCountRef = useRef(1);
     const lastSavedCellsJsonRef = useRef<string>('');
 
@@ -119,7 +117,12 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     // Initial Load
     useEffect(() => {
+        // Guard against double invocation (React StrictMode), which would create two notebooks
+        if (initStartedRef.current) return;
+        initStartedRef.current = true;
+
         const init = async () => {
+          try {
             // 1. Load file list
             const metaList = await storage.getAllMeta();
             setFileList(metaList.sort((a, b) => b.updatedAt - a.updatedAt));
@@ -143,7 +146,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             } else {
                 // Completely fresh start
                 await createNotebook('Welcome Notebook');
-                return; // createNotebook handles the rest
+                return; // createNotebook handles the rest (autosave is enabled in finally)
             }
 
             setCells(initialCells);
@@ -154,8 +157,11 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
             const maxCount = initialCells.reduce((max, cell) =>
                 Math.max(max, cell.executionCount || 0), 0);
             executionCountRef.current = maxCount + 1;
-
+          } catch (err) {
+            console.error('Failed to initialize notebook storage:', err);
+          } finally {
             isInitialMount.current = false;
+          }
         };
         init();
     }, []);
@@ -182,6 +188,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         setIsDirty(true);
 
         const timer = setTimeout(async () => {
+            if (deletedIdsRef.current.has(targetNotebookId)) return;
             const currentMeta = fileListRef.current.find(m => m.id === targetNotebookId);
             if (currentMeta) {
                 const now = Date.now();
@@ -289,7 +296,9 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
     };
 
     const deleteNotebook = async (id: string) => {
+        deletedIdsRef.current.add(id);
         await storage.deleteNotebook(id);
+        void resetContext(id, true);
         setFileList(prev => prev.filter(m => m.id !== id));
         if (currentNotebookId === id) {
             const metaList = await storage.getAllMeta();
@@ -393,6 +402,10 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     const resetNotebook = useCallback(async () => {
         // Factory Reset: Clear all data
+        fileListRef.current.forEach(m => {
+            deletedIdsRef.current.add(m.id);
+            void resetContext(m.id, true);
+        });
         await storage.clearAllData();
         localStorage.removeItem('logos-engine-last-id');
 
@@ -425,7 +438,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         executionCountRef.current = 1;
 
         // Force reload to ensure clean state if needed, but state updates should suffice.
-    }, []);
+    }, [resetContext]);
 
     const deleteCell = useCallback((id: string) => {
         setCells(prev => {
@@ -439,6 +452,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         if (!cell || cell.type !== 'code' || (!codeOverride && !cell.content.trim())) return;
 
         setCells(prev => prev.map(c => c.id === id ? { ...c, isExecuting: true } : c));
+        const executedNotebookId = currentNotebookId;
 
         try {
             // Get AND increment monotonic execution count
@@ -458,7 +472,8 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
                 c.id === id ? { ...c, outputs: response.results, isExecuting: false, executionCount: currentCount, executionTime: duration } : c
             ));
 
-            if (response.variables) {
+            // Ignore variables from a notebook the user has already switched away from
+            if (response.variables && currentNotebookIdRef.current === executedNotebookId) {
                 setVariables(response.variables);
             }
 
@@ -500,6 +515,8 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     const interrupt = useCallback(() => {
         pyodideInterrupt();
+        // The engine restarts with an empty context, so the variable list is stale
+        setVariables([]);
         setCells(prev => prev.map(c => ({ ...c, isExecuting: false })));
     }, [pyodideInterrupt]);
 
@@ -521,11 +538,12 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
                 setVariables(response.variables);
             }
             if (response.status === 'ERROR') {
-                throw new Error(response.error || 'Failed to define variable');
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                throw new Error(response.error || (response as any).message || 'Failed to define variable');
             }
         } catch (err) {
             console.error('Failed to define variable:', err);
-            throw err;
+            throw err instanceof Error ? err : new Error(String(err));
         }
     }, [defineVarWorker, currentNotebookId]);
 
@@ -571,17 +589,30 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
                 throw new Error('Invalid notebook format: missing cells array');
             }
 
+            const seenIds = new Set<string>();
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const importedCells: Cell[] = data.cells.map((cell: any) => ({
-                id: cell.id || crypto.randomUUID(),
-                type: cell.type || 'code',
-                content: cell.content || '',
-                outputs: cell.outputs || [],
-                executionCount: cell.executionCount,
-                executionTime: cell.executionTime,
-                isExecuting: false,
-                isEditing: cell.isEditing
-            }));
+            const importedCells: Cell[] = data.cells.map((cell: any) => {
+                // Never trust imported shapes: normalize type, content and outputs
+                let id = typeof cell?.id === 'string' && cell.id ? cell.id : crypto.randomUUID();
+                if (seenIds.has(id)) id = crypto.randomUUID();
+                seenIds.add(id);
+                const outputs = Array.isArray(cell?.outputs) ? cell.outputs : [];
+                return {
+                    id,
+                    type: cell?.type === 'markdown' ? 'markdown' : 'code',
+                    content: typeof cell?.content === 'string' ? cell.content : '',
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    outputs: outputs.filter((o: any) =>
+                        o && typeof o.type === 'string' && typeof o.value === 'string' &&
+                        // Image outputs must be PNG data URLs; anything else could point elsewhere
+                        (o.type !== 'image' || o.value.startsWith('data:image/png;base64,'))
+                    ),
+                    executionCount: typeof cell?.executionCount === 'number' ? cell.executionCount : undefined,
+                    executionTime: typeof cell?.executionTime === 'number' ? cell.executionTime : undefined,
+                    isExecuting: false,
+                    isEditing: cell?.isEditing
+                };
+            });
 
             if (importedCells.length === 0) {
                 throw new Error('No cells found in the imported file');
@@ -659,7 +690,7 @@ export const NotebookProvider: React.FC<{ children: ReactNode }> = ({ children }
         <NotebookContext.Provider value={{
             cells, variables, activeDocumentation, activeTab, setActiveTab,
             isSidebarOpen, setIsSidebarOpen,
-            isReady, focusedCellId, setFocusedCellId,
+            isReady, initError, retryInit, focusedCellId, setFocusedCellId,
             addCell, updateCell, toggleCellType, deleteCell, executeCell, executeAll, interrupt, insertExample, importNotebook,
             selectNextCell,
             setCellEditing, moveCell, duplicateCell, clearCellOutput, clearAllOutputs, resetNotebook,

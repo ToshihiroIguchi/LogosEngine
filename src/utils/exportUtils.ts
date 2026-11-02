@@ -29,7 +29,7 @@ const LANGUAGE_INFO = {
     name: "python",
     nbconvert_exporter: "python",
     pygments_lexer: "ipython3",
-    version: "3.10"
+    version: "3.13"
 };
 
 // Target functions that support Equation syntax (x=1)
@@ -39,7 +39,10 @@ const TARGET_FUNCS = new Set(['solve', 'dsolve', 'nsolve', 'solveset', 'nonlinso
 const SYMPY_RESERVED_ARGS = new Set([
     'check', 'simplify', 'rational', 'manual', 'implicit', 'hint',
     'force', 'dict', 'set', 'verify', 'exclude', 'quick', 'cubics',
-    'quartics', 'quintics', 'domain', 'symbols', 'flags'
+    'quartics', 'quintics', 'domain', 'symbols', 'flags',
+    // dsolve / nsolve keyword arguments. Keep this list conservative: names that
+    // are common variable names (n, x0, order, ...) must stay convertible to Eq().
+    'ics', 'prec', 'tol', 'solver', 'maxsteps', 'particular', 'bisect', 'modules'
 ]);
 
 // --- Main Export Function ---
@@ -47,7 +50,7 @@ const SYMPY_RESERVED_ARGS = new Set([
 /**
  * Converts internal NotebookState to Jupyter Notebook format (v4.5)
  * Strategy: Code-First.
- * - Outputs are empty to keep file size small.
+ * - Outputs from the notebook are included as-is (converted to nbformat outputs).
  * - Setup cell is injected to ensure environment is ready.
  * - Syntax is transpiled to ensure standard Python compatibility.
  */
@@ -81,10 +84,9 @@ export function convertToJupyterNotebook(state: NotebookState): INotebookContent
 function convertCell(cell: Cell): NotebookCell {
     if (cell.type === 'markdown') {
         const mdCell: IMarkdownCell = {
+            id: sanitizeCellId(cell.id),
             cell_type: 'markdown',
-            metadata: {
-                id: cell.id
-            },
+            metadata: {},
             source: splitLines(cell.content)
         };
         return mdCell;
@@ -93,11 +95,10 @@ function convertCell(cell: Cell): NotebookCell {
         const transpiledCode = transpileCode(cell.content);
 
         const codeCell: ICodeCell = {
+            id: sanitizeCellId(cell.id),
             cell_type: 'code',
             execution_count: cell.executionCount || null,
-            metadata: {
-                id: cell.id
-            },
+            metadata: {},
             source: splitLines(transpiledCode),
             outputs: convertOutputs(cell.outputs, cell.executionCount)
         };
@@ -141,7 +142,8 @@ function convertOutputs(outputs: any[], executionCount?: number): CodeCellOutput
                 output_type: 'execute_result',
                 execution_count: executionCount || null,
                 data: {
-                    'text/latex': out.value,
+                    // Jupyter renders text/latex only when wrapped in math delimiters
+                    'text/latex': `$$${out.value}$$`,
                     'text/plain': out.rawText || out.value
                 },
                 metadata: {}
@@ -190,10 +192,10 @@ function createSetupCell(): ICodeCell {
     ].join('\n');
 
     return {
+        id: "logos-setup-cell",
         cell_type: 'code',
         execution_count: null,
         metadata: {
-            id: "logos-setup-cell",
             collapsed: true
         },
         source: splitLines(setupCode),
@@ -296,6 +298,10 @@ export function transpileCode(code: string): string {
                 // Check boundary before
                 const isWordStart = i === 0 || !/[a-zA-Z0-9_]/.test(code[i - 1]);
                 if (!isWordStart) continue;
+                // Skip attribute / method calls such as `obj.solve(a=1)`
+                let b = i - 1;
+                while (b >= 0 && (code[b] === ' ' || code[b] === '\t')) b--;
+                if (b >= 0 && code[b] === '.') continue;
 
                 const afterName = prefix.substring(func.length);
                 const openParenMatch = afterName.match(/^\s*\(/);
@@ -328,9 +334,35 @@ export function transpileCode(code: string): string {
     return result;
 }
 
+/**
+ * If a string literal starts at `i`, returns the index just past its end.
+ * Otherwise returns `i` unchanged.
+ */
+function skipStringLiteral(code: string, i: number): number {
+    const ch = code[i];
+    if (ch !== '"' && ch !== "'") return i;
+    const quote = code.startsWith(ch.repeat(3), i) ? ch.repeat(3) : ch;
+    let k = i + quote.length;
+    while (k < code.length) {
+        if (code[k] === '\\') {
+            k += 2;
+            continue;
+        }
+        if (code.startsWith(quote, k)) return k + quote.length;
+        if (quote.length === 1 && code[k] === '\n') return k;
+        k++;
+    }
+    return code.length;
+}
+
 function findMatchingParen(code: string, start: number): number {
     let depth = 0;
     for (let k = start; k < code.length; k++) {
+        const skipped = skipStringLiteral(code, k);
+        if (skipped !== k) {
+            k = skipped - 1;
+            continue;
+        }
         if (code[k] === '(') depth++;
         if (code[k] === ')') depth--;
         if (depth === 0) return k;
@@ -339,12 +371,17 @@ function findMatchingParen(code: string, start: number): number {
 }
 
 function processFunctionArgs(argsStr: string): string {
-    // Split by comma, respecting nested parens/brackets/braces
+    // Split by comma, respecting nested parens/brackets/braces and string literals
     const args: string[] = [];
     let lastSplit = 0;
     let depth = 0;
 
     for (let k = 0; k < argsStr.length; k++) {
+        const skipped = skipStringLiteral(argsStr, k);
+        if (skipped !== k) {
+            k = skipped - 1;
+            continue;
+        }
         const char = argsStr[k];
         if (char === '(' || char === '[' || char === '{') depth++;
         if (char === ')' || char === ']' || char === '}') depth--;
@@ -357,17 +394,23 @@ function processFunctionArgs(argsStr: string): string {
     args.push(argsStr.substring(lastSplit)); // Last arg
 
     const newArgs = args.map(arg => {
+        const leading = arg.match(/^\s*/)![0];
+
         // Look for a top-level '=' in this argument
         let eqIndex = -1;
         let d = 0;
         for (let i = 0; i < arg.length; i++) {
+            const skipped = skipStringLiteral(arg, i);
+            if (skipped !== i) {
+                i = skipped - 1;
+                continue;
+            }
             const c = arg[i];
             if (c === '(' || c === '[' || c === '{') d++;
             if (c === ')' || c === ']' || c === '}') d--;
 
-            // Found top-level '=' that is not '==' (lookahead/behind check)
+            // Found top-level '=' that is not '==', '<=', '>=', '!='
             if (c === '=' && d === 0) {
-                // Check it's not ==, <=, >=, !=
                 const prev = i > 0 ? arg[i - 1] : '';
                 const next = i < arg.length - 1 ? arg[i + 1] : '';
                 if (prev !== '=' && prev !== '!' && prev !== '<' && prev !== '>' && next !== '=') {
@@ -385,11 +428,22 @@ function processFunctionArgs(argsStr: string): string {
             const isSimpleIdentifier = /^[a-zA-Z_]\w*$/.test(lhs);
 
             if (isSimpleIdentifier && SYMPY_RESERVED_ARGS.has(lhs)) {
-                // It is a reserved keyword argument (e.g. check=True) -> Keep as is (transpile rhs)
-                return `${lhs}=${transpileCode(rhs)}`;
-            } else {
-                // Complex LHS (x+1=0) OR Simple LHS not reserved (x=1) -> Equation
-                return ` Eq(${transpileCode(lhs)}, ${transpileCode(rhs)})`;
+                // Reserved keyword argument (e.g. check=True) -> keep as is
+                return `${leading}${lhs}=${transpileCode(rhs)}`;
+            }
+            // Complex LHS (x+1=0) OR simple LHS not reserved (x=1) -> Equation
+            return `${leading}Eq(${transpileCode(lhs)}, ${transpileCode(rhs)})`;
+        }
+
+        // A list / tuple argument may itself contain equations: solve([x+y=1, x-y=2])
+        const trimmed = arg.trim();
+        if ((trimmed[0] === '[' || trimmed[0] === '(') && trimmed.length > 1) {
+            const open = arg.indexOf(trimmed[0]);
+            const close = findMatchingBracket(arg, open);
+            if (close === arg.length - (arg.length - arg.trimEnd().length) - 1) {
+                const inner = arg.substring(open + 1, close);
+                const trailing = arg.substring(close + 1);
+                return `${leading}${trimmed[0]}${processFunctionArgs(inner)}${trimmed[0] === '[' ? ']' : ')'}${trailing}`;
             }
         }
 
@@ -399,8 +453,29 @@ function processFunctionArgs(argsStr: string): string {
     return newArgs.join(',');
 }
 
+function findMatchingBracket(code: string, start: number): number {
+    let depth = 0;
+    for (let k = start; k < code.length; k++) {
+        const skipped = skipStringLiteral(code, k);
+        if (skipped !== k) {
+            k = skipped - 1;
+            continue;
+        }
+        if (code[k] === '(' || code[k] === '[' || code[k] === '{') depth++;
+        if (code[k] === ')' || code[k] === ']' || code[k] === '}') depth--;
+        if (depth === 0) return k;
+    }
+    return -1;
+}
+
 
 // --- Helpers ---
+
+/** nbformat 4.5 cell ids must match ^[a-zA-Z0-9-_]+$ and be 1-64 characters long. */
+function sanitizeCellId(id: string): string {
+    const cleaned = (id || '').replace(/[^a-zA-Z0-9-_]/g, '-').slice(0, 64);
+    return cleaned || crypto.randomUUID();
+}
 
 function splitLines(text: string): string[] {
     if (!text) return [];
